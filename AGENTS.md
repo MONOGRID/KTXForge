@@ -4,3 +4,43 @@ Before choosing or changing an approach for this app, read these:
 
 - [docs/requirements.md](docs/requirements.md) is the product spec.
 - [docs/decision-context.md](docs/decision-context.md) is the decision log. Read every entry. When a decision is made, append a dated entry there (date, what was decided, why) and leave earlier entries in place.
+
+## Where work lives
+
+Rust owns the heavy work: file conversion, process control, parsing, image preparation, and anything that encodes, decodes, or shells out. Vue, TypeScript, and HTML only render controls, previews, progress, and inspector data. The frontend calls Tauri commands and listens for events. It does not encode, decode, parse KTX, or build a command line.
+
+## TypeScript
+
+`strict` stays on. Write types the checker can prove.
+
+- No `any`. No `as any`, `as unknown as`, double assertions, or other casts that skip checking. No `@ts-ignore` or `@ts-expect-error` to hide a real type hole.
+- Prefer `satisfies` when a value must match a type and the narrow inferred type must stay. A type annotation widens the value. `satisfies` (TypeScript 4.9) only checks it.
+
+```ts
+const palette = {
+  red: [255, 0, 0],
+  green: "#00ff00",
+} satisfies Record<"red" | "green" | "blue", string | [number, number, number]>;
+
+palette.green.toUpperCase();
+```
+
+- Reach for generics, conditional types, mapped types, and `infer` before a cast. Add a small utility type in the project when the same shape is needed in more than one place.
+- Model Rust command payloads as explicit types shared with the frontend. Do not widen them to `unknown` and cast on the way out.
+
+## ESLint
+
+Lint with the strict type-checked typescript-eslint configs (`strict` and `strictTypeChecked`), plus the Vue recommended flat config. A lint error is fixed in the code. Do not disable a rule, weaken the config, or add an inline disable to get a green run. The existing `vue/multi-word-component-names` exception stays.
+
+## Styles
+
+Style with UnoCSS utility classes (`presetWind3`, attributify, icons, directives, variant groups). Reach for a `<style lang="scss">` block only when a utility class cannot express the rule, such as a keyframe or a selector UnoCSS does not cover. Keep that SCSS local to the component.
+
+## Reuse before writing
+
+Before writing a helper, check whether it already exists:
+
+1. [VueUse](https://vueuse.org/) (`@vueuse/core`) for Vue composition utilities: element size, event listeners, refs, async state, and similar.
+2. Context7 (`resolve-library-id`, then `query-docs`) or a web search for an existing npm package.
+
+Use the existing function or package when it covers the need. Write project code when nothing maintained does, or when pulling in a package would be larger than the few lines required.
