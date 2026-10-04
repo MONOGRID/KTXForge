@@ -22,15 +22,15 @@ async function greet() {
 </script>
 
 <template>
-  <main class="box-border grid min-h-screen place-items-center p-8">
-    <section class="home w-full max-w-md">
-      <p class="home-kicker">
+  <main class="box-border grid min-h-screen place-items-center bg-[#f6f3ee] p-8 text-stone-900 font-['Segoe_UI',sans-serif]">
+    <section class="w-full max-w-md">
+      <p class="m-0 text-xs text-[#0f6e56] font-650 tracking-[0.14em] uppercase">
         Desktop
       </p>
-      <h1 class="home-title">
+      <h1 class="m-0 mt-1 text-5xl font-650 -tracking-[0.04em]">
         Hello
       </h1>
-      <p class="home-lede">
+      <p class="m-0 mt-3 text-stone-600">
         A Vue page on this Tauri app.
       </p>
       <form
@@ -39,21 +39,21 @@ async function greet() {
       >
         <input
           v-model="name"
-          class="home-field min-w-0 flex-1"
+          class="min-w-0 flex-1 border border-stone-300 rounded-lg bg-white px-[0.85rem] py-[0.65rem] text-inherit [font:inherit] border-solid"
           type="text"
           name="name"
           placeholder="Your name"
           autocomplete="name"
         >
         <button
-          class="home-button"
+          class="cursor-pointer border border-[#0f6e56] rounded-lg bg-[#0f6e56] px-[0.85rem] py-[0.65rem] text-white [font:inherit] border-solid"
           type="submit"
         >
           Greet
         </button>
       </form>
       <p
-        class="home-message"
+        class="m-0 mt-4 min-h-6"
         role="status"
       >
         {{ message }}
@@ -61,64 +61,3 @@ async function greet() {
     </section>
   </main>
 </template>
-
-<style lang="scss">
-$ink: #1c1917;
-$paper: #f6f3ee;
-$line: #d6d3d1;
-$accent: #0f6e56;
-
-:root {
-  color: $ink;
-  background: $paper;
-  font-family: "Segoe UI", sans-serif;
-}
-
-body {
-  margin: 0;
-}
-
-.home-kicker {
-  margin: 0;
-  color: $accent;
-  font-size: 0.75rem;
-  font-weight: 650;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-}
-
-.home-title {
-  margin: 0.25rem 0 0;
-  font-size: 3rem;
-  font-weight: 650;
-  letter-spacing: -0.04em;
-  line-height: 1;
-}
-
-.home-lede {
-  margin: 0.75rem 0 0;
-  color: #57534e;
-}
-
-.home-field,
-.home-button {
-  border: 1px solid $line;
-  border-radius: 0.5rem;
-  padding: 0.65rem 0.85rem;
-  font: inherit;
-  color: inherit;
-  background: #fff;
-}
-
-.home-button {
-  border-color: $accent;
-  color: #fff;
-  cursor: pointer;
-  background: $accent;
-}
-
-.home-message {
-  min-height: 1.5rem;
-  margin: 1rem 0 0;
-}
-</style>

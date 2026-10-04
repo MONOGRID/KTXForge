@@ -48,3 +48,9 @@ Rust still wraps the CLI where the tool stops, as already specified:
 **Decided:** Agent instructions in [AGENTS.md](../AGENTS.md) now require: Rust for heavy work and Vue only for visualization (already in [requirements.md](requirements.md)); strict TypeScript with no `any` or assertion escapes, preferring `satisfies`, generics, and project utility types; ESLint kept on typescript-eslint `strict` and `strictTypeChecked`; UnoCSS utilities, with component SCSS only when a utility cannot express the rule; VueUse and an existing npm package before a new helper, checked via Context7 or web search first.
 
 **Why:** The product split was already specified. These rules stop the frontend from growing type escapes, one-off CSS, and helpers that VueUse or a small package already provides.
+
+## 2026-10-04 — Remember window bounds, File → Exit
+
+**Decided:** Persist the main window with `tauri-plugin-window-state`, flags size, position, maximized, and visible. The window is created hidden (`visible: false`) and the plugin shows it after restore. The plugin is registered on the Tauri builder, before config windows exist. File → Exit is a native menu item with id `exit` and shortcut Cmd/Ctrl+Q. The click handler calls `app.exit(0)`. On macOS the menu also has the application submenu and Edit, because a menu bar with only File drops copy, paste, hide, and the app menu.
+
+**Why:** Size and position are the request. Maximized is stored with them so a maximized close does not write the monitor corner as the restored frame. Visible is included because the plugin only calls `show` when that flag is set, which is what avoids a flash at the default 800×600. Registering the plugin inside `setup` is too late: Tauri creates config windows before that hook, and this plugin restores on window-ready. Predefined Quit is unsupported on Linux, so Exit is a normal item on every desktop OS. The menu stays in Rust; the frontend does not own window chrome.
