@@ -78,3 +78,21 @@ Rust still wraps the CLI where the tool stops, as already specified:
 **Decided:** Releases are automatic on push to `main` with semantic-release. Conventional Commits, enforced locally by husky + commitlint and in CI on pull requests, decide the version: `feat` minor, `fix`/`perf` patch, `!` or `BREAKING CHANGE:` major, other types no release. semantic-release writes `CHANGELOG.md`, bumps `package.json` (Tauri reads its version from there) and `Cargo.toml`, commits as `github-actions[bot]`, tags `vX.Y.Z`, and creates a draft GitHub Release with the notes and bot comments on released issues and PRs. The tauri-action matrix uploads artifacts to that draft; a final job publishes it. A `beta` branch publishes prereleases. Development happens on `dev`; merging to `main` ships. This replaces "Publishing the draft is the ship step" in [requirements.md](requirements.md), which is updated to match.
 
 **Why:** The user wants a changelog and releases driven by commit messages and already knows semantic-release. release-please (a bot that opens a release PR to merge) was the alternative; it adds a review step the user did not ask for. The draft stays unpublished until every platform has built, so the updater's `releases/latest` never points at a release with missing artifacts.
+
+## 2026-10-10 — `TS_RS_EXPORT_DIR` set from `build.rs`
+
+**Decided:** Keep `src-tauri/.cargo/config.toml` as documented, and also set `TS_RS_EXPORT_DIR` to an absolute `../src/bindings` path from `src-tauri/build.rs` via `cargo:rustc-env`. Generated bindings are committed under `src/bindings/`.
+
+**Why:** With a relocated Cargo target directory (CI / sandbox), the relative env from `.cargo/config.toml` alone did not reliably land files in `src/bindings/`. `CARGO_MANIFEST_DIR` is stable.
+
+## 2026-10-10 — Scaffold architecture choices (development plan)
+
+**Decided:** Adopt the plan’s “Decisions this plan makes” table: pin KTX-Software v4.4.2; share Rust→TS types via `ts-rs` into `src/bindings/`; keep the option rules engine in Rust (`describe_options`); send previews as PNG bytes through `tauri::ipc::Response`; open save/open dialogs from the Rust dialog plugin; use two Vite HTML entries (`index.html` encoder, `inspector.html` inspector); convert images with the `image` crate and temp dirs with `tempfile`; read KTX2 with `ktx2`; check unused Rust crates with `cargo machete`; enforce Conventional Commits with husky + commitlint.
+
+**Why:** These choices are required for Wave 1 scaffold (T1.1) so later waves only fill stub bodies. They match AGENTS.md (Rust owns heavy work; explicit shared types) and the settled product/repo decisions already logged.
+
+## 2026-10-10 — Wave 0 spike results (v4.4.2 CLI gaps)
+
+**Decided (interim):** Keep the KTX-Software **v4.4.2** pin for Wave 1 scaffold and document the CLI gaps in [ktx-cli/README.md](ktx-cli/README.md). Do not invent 5.0-only codec names in types until the user chooses: (A) defer missing options / map UI `uastc` to the v4.4.2 value, or (B) move the pin to 5.0. ASTC format strings passed to `ktx` must use the Vulkan `_BLOCK` suffix. KTX1→KTX2 uses legacy `ktx2ktx2` until a `ktx convert` exists. Windows sidecar staging is `ktx.exe` + side-by-side `ktx.dll` (see [ktx-cli/staging.md](ktx-cli/staging.md)).
+
+**Why:** T0.1 compared every UI option in [requirements.md](requirements.md) to `ktx create --help` from the official Windows x64 4.4.2 build. Missing or different: UASTC HDR codecs and flags, `--premultiply-alpha`, `ktx convert`, half-float extract transcode targets; `--encode` is `basis-lz | uastc` only; `pg_eotf` / `abobergb` are real tool spellings. T0.3 fixtures and info samples are in-tree; `hdr_uastc.ktx2` is uncompressed float because encode-to-UASTC on HDR is rejected in 4.4.2.

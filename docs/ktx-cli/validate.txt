@@ -1,0 +1,20 @@
+ktx validate: Validates the Khronos texture format version 2 (KTX2) file specified
+    as the input-file argument. It prints any found errors and warnings to stdout.
+
+Usage:
+  ktx validate [OPTION...] <input-file>
+
+  -e, --warnings-as-errors      Treat warnings as errors.
+  -g, --gltf-basisu             Check compatibility with KHR_texture_basisu glTF extension.
+  -f, --format text|json|mini-json
+                                Specifies the report output format. Possible options are:
+                                  text: Human readable text based format
+                                  json: Formatted JSON
+                                  mini-json: Minified JSON
+                                 (default: text)
+      --stdin                   Use stdin as the input file. (Using a single dash '-' as the input 
+                                file has the same effect)
+  -h, --help                    Print this usage message and exit
+  -v, --version                 Print the version number of this program and exit
+      --testrun                 Indicates test run. If enabled the tool will produce deterministic 
+                                output whenever possible

@@ -182,9 +182,11 @@ Logged in [decision-context.md](decision-context.md).
 
 ## Wave 0 — Spikes
 
+Status: **complete** (2026-10-10). Gaps from T0.1 are listed in [ktx-cli/README.md](ktx-cli/README.md) and need a user decision before Wave 2 option types freeze the codec list. Wave 1 (scaffold) can proceed.
+
 Facts later tasks depend on. Run by **one capable agent or a human**, not a low-context sub-agent: the outcome is not known in advance. Work in a scratch directory; commit only the files listed under Owns.
 
-### T0.1 Capture the pinned CLI surface
+### T0.1 Capture the pinned CLI surface ✅
 
 - **Owns:** `docs/ktx-cli/*.txt`, `docs/ktx-cli/README.md`
 - **Do:**
@@ -193,7 +195,7 @@ Facts later tasks depend on. Run by **one capable agent or a human**, not a low-
   3. In `docs/ktx-cli/README.md`, compare every flag and every value list in requirements.md "Options that must appear in the UI" against `create.txt`. List: present, missing, spelled differently (the spec flags `pg_eotf` and `abobergb` as suspect).
 - **Done when:** the README has the comparison table, and any missing flag is reported to the orchestrator, who takes it to the user.
 
-### T0.2 Runtime dependencies and staging layout
+### T0.2 Runtime dependencies and staging layout ✅
 
 - **Owns:** `docs/ktx-cli/staging.md`
 - **Do:** For each release target (Windows x64, macOS arm64, macOS x64, Linux x64, Linux arm64):
@@ -203,7 +205,7 @@ Facts later tasks depend on. Run by **one capable agent or a human**, not a low-
   4. Copy the license file path inside each archive.
 - **Done when:** `staging.md` has one table row per target: asset name, extract command, path of `ktx`, paths of libraries, destination in the bundle, rpath fix (if any), license path. Platforms the spike could not test locally are marked "verify in CI".
 
-### T0.3 Fixtures and sample outputs
+### T0.3 Fixtures and sample outputs ✅
 
 - **Owns:** `src-tauri/tests/fixtures/**`, `docs/ktx-cli/samples/**`
 - **Do:** Using the v4.4.2 `ktx`, create small (≤ 64×64) fixtures and commit them with a `README.md` that lists the command used for each:
@@ -222,9 +224,11 @@ Facts later tasks depend on. Run by **one capable agent or a human**, not a low-
 
 ## Wave 1 — Scaffold
 
+Status: **in progress** (2026-10-10). T1.1 scaffold is in place and `npm run check` passes. Remaining for the wave gate: manual `npm run tauri dev` (window title KTX-GUI) and rename local `master` → `dev` when pushing to GitHub.
+
 **One agent, sequential.** This wave creates every file in the target layout with compiling stubs, all dependencies, and all command registrations. After it, later tasks only fill in bodies inside files they own. This is what lets Waves 2–5 run in parallel.
 
-### T1.1 Dependencies, config, module tree, stubs
+### T1.1 Dependencies, config, module tree, stubs ✅ (`npm run check` green; verify `tauri dev` manually)
 
 - **Owns:** `src-tauri/Cargo.toml`, `src-tauri/Cargo.lock`, `src-tauri/.cargo/config.toml`, `src-tauri/tauri.conf.json`, `src-tauri/capabilities/*.json`, `src-tauri/src/**` (all files, stubs only), `src-tauri/.gitignore`, `package.json`, `package-lock.json`, `vite.config.ts`, `index.html`, `inspector.html`, `src/**` (stubs only), `.gitignore`, `.fallowrc.json`, `.husky/commit-msg`, `commitlint.config.js`, `AGENTS.md` (new sections only), `docs/decision-context.md` (append only)
 - **Read:** this plan's "Target layout" and "Decisions this plan makes", `docs/ktx-cli/staging.md`

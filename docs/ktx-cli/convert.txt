@@ -1,0 +1,23 @@
+ktx: Unified CLI frontend for the KTX-Software library with sub-commands for specific operations.
+
+Usage:
+  ktx [<command>] [OPTION...]
+
+  -h, --help     Print this usage message and exit
+  -v, --version  Print the version number of this program and exit
+      --testrun  Indicates test run. If enabled the tool will produce deterministic output whenever 
+                 possible
+
+Available commands:
+  create     Create a KTX2 file from various input files
+  deflate    Deflate (supercompress) a KTX2 file
+  extract    Extract selected images from a KTX2 file
+  encode     Encode a KTX2 file
+  transcode  Transcode a KTX2 file
+  info       Print information about a KTX2 file
+  validate   Validate a KTX2 file
+  compare    Compare two KTX2 files
+  help       Display help information about the ktx tool
+
+For detailed usage and description of each subcommand use 'ktx help <command>'
+or 'ktx <command> --help'

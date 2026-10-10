@@ -54,6 +54,12 @@ Use `npx fallow` (devDependency). Prefer `--format json --quiet`.
 - Trace before deleting: `fallow dead-code --trace <file>:<export>` or `--trace-dependency <name>`
 - Always `--dry-run` before `fallow fix`, then `fix --yes`
 
+Run `npm run check` before every commit. Fallow findings (dead code, duplication, health) are fixed in the code, like lint errors. Do not disable a rule, weaken a threshold, or edit `.fallowrc.json` to get a green run. The only allowed suppression is the “written ahead of its consumer” marker described in [docs/development-plan.md](docs/development-plan.md) (`@expected-unused` / `fallow-ignore-file unused-file` naming the consuming task).
+
+## Commits
+
+Use [Conventional Commits](https://www.conventionalcommits.org/). The type drives the release: `feat` → minor, `fix` / `perf` → patch, `!` or a `BREAKING CHANGE:` footer → major; other types do not release. Enforced locally by husky + commitlint.
+
 <!-- generated:task-matrix:start -->
 | When the agent is about to... | Run |
 |---|---|

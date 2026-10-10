@@ -1,7 +1,7 @@
 {
-  "name": "tauri-app",
+  "name": "ktx-gui",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -11,21 +11,30 @@
     "lint:style": "stylelint \"src/**/*.{css,scss,vue}\"",
     "fallow": "fallow",
     "fallow:audit": "fallow audit --format json --quiet",
+    "check:rust": "cargo fmt --check --manifest-path src-tauri/Cargo.toml && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml && cargo machete --with-metadata src-tauri",
+    "check:web": "npm run build && npm run lint && npm run lint:style",
+    "check:fallow": "fallow dead-code --fail-on-issues && fallow dupes --threshold 3 && fallow health --min-score 85 --min-severity high",
+    "check": "npm run check:rust && npm run check:web && npm run check:fallow",
+    "prepare": "husky",
     "tauri": "tauri"
   },
   "dependencies": {
     "@tauri-apps/api": "^2",
-    "@tauri-apps/plugin-opener": "^2",
+    "@vueuse/core": "^13.9.0",
     "vue": "^3.5.43"
   },
   "devDependencies": {
+    "@commitlint/cli": "^19.8.1",
+    "@commitlint/config-conventional": "^19.8.1",
     "@eslint/js": "^10.0.1",
     "@tauri-apps/cli": "^2",
+    "@types/node": "^24.5.2",
     "@vitejs/plugin-vue": "^6.0.9",
     "eslint": "^10.12.0",
     "eslint-plugin-vue": "^10.11.1",
     "fallow": "^3.33.1",
     "globals": "^17.13.0",
+    "husky": "^9.1.7",
     "sass": "^1.105.1",
     "stylelint": "^17.16.0",
     "stylelint-config-recommended-vue": "^2.0.0",

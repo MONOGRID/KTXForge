@@ -1,0 +1,16 @@
+### bad flag
+exit=1
+stdout:
+
+stderr:
+ktx create fatal: Option 'not-a-real-flag' does not exist. See 'ktx create --help'.
+
+
+### invalid input
+exit=4
+stdout:
+
+stderr:
+ktx create fatal: No image plugin recognized the format of "c:\Users\danie\Desktop\tauri-test\src-tauri\tests\fixtures\not_ktx.ktx2". Is it a file format that we don't know about?
+
+
