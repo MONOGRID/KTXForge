@@ -1,11 +1,9 @@
 <script setup lang="ts">
-// fallow-ignore-file unused-file
-// consumed by T5.5
 import { computed, onUnmounted, ref, watch } from "vue";
 import { call } from "../../../api/commands";
 import { toAppError } from "../../../api/guards";
 import type { AppError } from "../../../bindings/AppError";
-import { store } from "../../store";
+import { path, report, selection } from "../../store";
 
 type FitMode = "real" | "fit";
 
@@ -18,7 +16,7 @@ const error = ref<AppError | null>(null);
 const fetchGen = ref(0);
 
 const previewUnavailable = computed((): string | null => {
-  const preview = store.report?.preview;
+  const preview = report.value?.preview;
   if (preview?.kind === "unavailable") {
     return preview.reason;
   }
@@ -26,7 +24,7 @@ const previewUnavailable = computed((): string | null => {
 });
 
 const tonemapped = computed(
-  (): boolean => store.report?.preview.kind === "tonemappedFromExr",
+  (): boolean => report.value?.preview.kind === "tonemappedFromExr",
 );
 
 function revokeUrl(): void {
@@ -37,7 +35,7 @@ function revokeUrl(): void {
 }
 
 async function loadImage(): Promise<void> {
-  const path = store.path;
+  const filePath = path.value;
   const gen = ++fetchGen.value;
 
   revokeUrl();
@@ -45,7 +43,7 @@ async function loadImage(): Promise<void> {
   naturalHeight.value = 0;
   error.value = null;
 
-  if (path === null || path === "" || store.report === null) {
+  if (filePath === null || filePath === "" || report.value === null) {
     loading.value = false;
     return;
   }
@@ -58,12 +56,12 @@ async function loadImage(): Promise<void> {
   loading.value = true;
   try {
     const bytes = await call("inspector_image", {
-      path,
+      path: filePath,
       selection: {
-        level: store.selection.level,
-        face: store.selection.face,
-        layer: store.selection.layer,
-        depthSlice: store.selection.depthSlice,
+        level: selection.value.level,
+        face: selection.value.face,
+        layer: selection.value.layer,
+        depthSlice: selection.value.depthSlice,
       },
     });
     if (gen !== fetchGen.value) {
@@ -101,12 +99,12 @@ function setFit(mode: FitMode): void {
 watch(
   () =>
     [
-      store.path,
-      store.report,
-      store.selection.level,
-      store.selection.face,
-      store.selection.layer,
-      store.selection.depthSlice,
+      path.value,
+      report.value,
+      selection.value.level,
+      selection.value.face,
+      selection.value.layer,
+      selection.value.depthSlice,
     ] as const,
   () => {
     void loadImage();

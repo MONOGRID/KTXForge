@@ -10,6 +10,10 @@ import KnownMetadataPanel from "./components/report/KnownMetadataPanel.vue";
 import Ktx1TextPanel from "./components/report/Ktx1TextPanel.vue";
 import LevelIndexTable from "./components/report/LevelIndexTable.vue";
 import StatusPanel from "./components/report/StatusPanel.vue";
+import FramePlayer from "./components/viewer/FramePlayer.vue";
+import ImageViewer from "./components/viewer/ImageViewer.vue";
+import MipStrip from "./components/viewer/MipStrip.vue";
+import SubresourceSelectors from "./components/viewer/SubresourceSelectors.vue";
 import {
   displayValue,
   error,
@@ -20,7 +24,6 @@ import {
   loading,
   path,
   report,
-  selection,
 } from "./store";
 
 const title = computed((): string => {
@@ -99,26 +102,17 @@ onMounted(() => {
       <Ktx1TextPanel :text="ktx1Text" />
     </section>
 
-    <!-- T5.6 wires ImageViewer / MipStrip / SubresourceSelectors / FramePlayer here -->
     <section
-      class="panel flex min-h-64 flex-col gap-2 p-3"
+      class="panel flex min-h-64 flex-col gap-3 overflow-auto p-3"
       aria-label="Image viewer"
     >
       <h2 class="m-0 text-sm font-semibold">
         Image viewer
       </h2>
-      <p class="m-0 text-sm text-ink-muted">
-        Placeholder until T5.6 (ImageViewer, MipStrip, SubresourceSelectors, FramePlayer).
-      </p>
-      <p class="m-0 font-mono text-xs text-ink-faint">
-        selection: level={{ selection.level }} face={{ selection.face }}
-        layer={{ selection.layer }} depthSlice={{ selection.depthSlice }}
-      </p>
-      <div
-        class="mt-2 flex flex-1 items-center justify-center rounded border border-dashed border-line bg-surface-sunken text-sm text-ink-faint"
-      >
-        No preview component yet
-      </div>
+      <MipStrip />
+      <SubresourceSelectors />
+      <FramePlayer />
+      <ImageViewer />
     </section>
   </main>
 </template>

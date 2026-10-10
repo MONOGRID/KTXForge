@@ -1,8 +1,6 @@
 <script setup lang="ts">
-// fallow-ignore-file unused-file
-// consumed by T5.5
 import { computed } from "vue";
-import { store } from "../../store";
+import { report, selection } from "../../store";
 
 type MipEntry = {
   level: number;
@@ -15,23 +13,23 @@ function mipSize(base: number, level: number): number {
 }
 
 const entries = computed((): MipEntry[] => {
-  const report = store.report;
-  if (report === null) {
+  const current = report.value;
+  if (current === null) {
     return [];
   }
 
   const baseW =
-    report.kind.kind === "ktx2"
-      ? report.kind.info.header.pixelWidth
-      : report.kind.header.pixelWidth;
+    current.kind.kind === "ktx2"
+      ? current.kind.info.header.pixelWidth
+      : current.kind.header.pixelWidth;
   const baseH =
-    report.kind.kind === "ktx2"
-      ? report.kind.info.header.pixelHeight
-      : report.kind.header.pixelHeight;
+    current.kind.kind === "ktx2"
+      ? current.kind.info.header.pixelHeight
+      : current.kind.header.pixelHeight;
   const levelCount =
-    report.kind.kind === "ktx2"
-      ? Math.max(1, report.kind.info.header.levelCount)
-      : Math.max(1, report.kind.header.numberOfMipmapLevels);
+    current.kind.kind === "ktx2"
+      ? Math.max(1, current.kind.info.header.levelCount)
+      : Math.max(1, current.kind.header.numberOfMipmapLevels);
 
   const list: MipEntry[] = [];
   for (let i = 0; i < levelCount; i += 1) {
@@ -45,7 +43,7 @@ const entries = computed((): MipEntry[] => {
 });
 
 function selectLevel(level: number): void {
-  store.selection.level = level;
+  selection.value.level = level;
 }
 </script>
 
@@ -63,8 +61,8 @@ function selectLevel(level: number): void {
         :key="entry.level"
         type="button"
         class="btn font-mono text-xs"
-        :class="{ 'btn-primary': store.selection.level === entry.level }"
-        :aria-pressed="store.selection.level === entry.level"
+        :class="{ 'btn-primary': selection.level === entry.level }"
+        :aria-pressed="selection.level === entry.level"
         @click="selectLevel(entry.level)"
       >
         L{{ entry.level }}

@@ -1,28 +1,26 @@
 <script setup lang="ts">
-// fallow-ignore-file unused-file
-// consumed by T5.5
 import { computed, ref, watch } from "vue";
 import { useIntervalFn } from "@vueuse/core";
 import { call } from "../../../api/commands";
 import type { KtxAnimDataInfo } from "../../../bindings/KtxAnimDataInfo";
-import { store } from "../../store";
+import { path, report, selection } from "../../store";
 
 const playsCompleted = ref(0);
 
 const anim = computed((): KtxAnimDataInfo | null => {
-  const report = store.report;
-  if (report === null || report.kind.kind !== "ktx2") {
+  const current = report.value;
+  if (current === null || current.kind.kind !== "ktx2") {
     return null;
   }
-  return report.kind.info.keyValueData.KTXanimData;
+  return current.kind.info.keyValueData.KTXanimData;
 });
 
 const frameCount = computed((): number => {
-  const report = store.report;
-  if (report === null || report.kind.kind !== "ktx2") {
+  const current = report.value;
+  if (current === null || current.kind.kind !== "ktx2") {
     return 0;
   }
-  return Math.max(1, report.kind.info.header.layerCount);
+  return Math.max(1, current.kind.info.header.layerCount);
 });
 
 const frameLengthSec = computed((): number => {
@@ -59,11 +57,11 @@ function stepBy(delta: number): void {
   if (count <= 0) {
     return;
   }
-  const next = store.selection.layer + delta;
+  const next = selection.value.layer + delta;
   if (next < 0 || next >= count) {
     return;
   }
-  store.selection.layer = next;
+  selection.value.layer = next;
 }
 
 function advanceFrame(): void {
@@ -74,22 +72,22 @@ function advanceFrame(): void {
     return;
   }
 
-  if (store.selection.layer < count - 1) {
-    store.selection.layer += 1;
+  if (selection.value.layer < count - 1) {
+    selection.value.layer += 1;
     return;
   }
 
   // Finished one play-through of the sequence.
   playsCompleted.value += 1;
   if (data.loopCount === 0) {
-    store.selection.layer = 0;
+    selection.value.layer = 0;
     return;
   }
   if (playsCompleted.value >= data.loopCount) {
     pause();
     return;
   }
-  store.selection.layer = 0;
+  selection.value.layer = 0;
 }
 
 const { pause, resume, isActive } = useIntervalFn(
@@ -110,24 +108,24 @@ function togglePlay(): void {
 }
 
 async function preloadNext(): Promise<void> {
-  const path = store.path;
+  const filePath = path.value;
   const data = anim.value;
-  if (path === null || path === "" || data === null) {
+  if (filePath === null || filePath === "" || data === null) {
     return;
   }
   const count = frameCount.value;
   if (count <= 1) {
     return;
   }
-  const nextLayer = (store.selection.layer + 1) % count;
+  const nextLayer = (selection.value.layer + 1) % count;
   try {
     await call("inspector_image", {
-      path,
+      path: filePath,
       selection: {
-        level: store.selection.level,
-        face: store.selection.face,
+        level: selection.value.level,
+        face: selection.value.face,
         layer: nextLayer,
-        depthSlice: store.selection.depthSlice,
+        depthSlice: selection.value.depthSlice,
       },
     });
   } catch {
@@ -138,11 +136,11 @@ async function preloadNext(): Promise<void> {
 watch(
   () =>
     [
-      store.path,
-      store.selection.level,
-      store.selection.face,
-      store.selection.layer,
-      store.selection.depthSlice,
+      path.value,
+      selection.value.level,
+      selection.value.face,
+      selection.value.layer,
+      selection.value.depthSlice,
       anim.value,
     ] as const,
   () => {
@@ -176,7 +174,7 @@ watch(visible, (isVisible) => {
       <button
         type="button"
         class="btn"
-        :disabled="store.selection.layer <= 0"
+        :disabled="selection.layer <= 0"
         @click="stepBy(-1)"
       >
         Prev
@@ -191,13 +189,13 @@ watch(visible, (isVisible) => {
       <button
         type="button"
         class="btn"
-        :disabled="store.selection.layer >= frameCount - 1 && anim.loopCount !== 0"
+        :disabled="selection.layer >= frameCount - 1 && anim.loopCount !== 0"
         @click="stepBy(1)"
       >
         Next
       </button>
       <span class="text-sm font-mono text-ink-muted">
-        {{ store.selection.layer + 1 }} / {{ frameCount }}
+        {{ selection.layer + 1 }} / {{ frameCount }}
       </span>
     </div>
   </div>

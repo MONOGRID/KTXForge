@@ -1,8 +1,6 @@
 <script setup lang="ts">
-// fallow-ignore-file unused-file
-// consumed by T5.5
 import { computed } from "vue";
-import { store } from "../../store";
+import { report, selection } from "../../store";
 
 const FACE_LABELS = [
   "+X",
@@ -21,14 +19,14 @@ type Dims = {
 };
 
 const dims = computed((): Dims | null => {
-  const report = store.report;
-  if (report === null) {
+  const current = report.value;
+  if (current === null) {
     return null;
   }
 
-  if (report.kind.kind === "ktx2") {
-    const header = report.kind.info.header;
-    const anim = report.kind.info.keyValueData.KTXanimData;
+  if (current.kind.kind === "ktx2") {
+    const header = current.kind.info.header;
+    const anim = current.kind.info.keyValueData.KTXanimData;
     return {
       faceCount: Math.max(1, header.faceCount),
       layerCount: Math.max(1, header.layerCount),
@@ -37,7 +35,7 @@ const dims = computed((): Dims | null => {
     };
   }
 
-  const header = report.kind.header;
+  const header = current.kind.header;
   return {
     faceCount: Math.max(1, header.numberOfFaces),
     layerCount: Math.max(1, header.numberOfArrayElements),
@@ -71,7 +69,7 @@ const depthOptions = computed((): number[] => {
 });
 
 function selectFace(face: number): void {
-  store.selection.face = face;
+  selection.value.face = face;
 }
 
 function onLayerChange(event: Event): void {
@@ -79,7 +77,7 @@ function onLayerChange(event: Event): void {
   if (!(el instanceof HTMLSelectElement)) {
     return;
   }
-  store.selection.layer = Number(el.value);
+  selection.value.layer = Number(el.value);
 }
 
 function onDepthChange(event: Event): void {
@@ -87,7 +85,7 @@ function onDepthChange(event: Event): void {
   if (!(el instanceof HTMLSelectElement)) {
     return;
   }
-  store.selection.depthSlice = Number(el.value);
+  selection.value.depthSlice = Number(el.value);
 }
 </script>
 
@@ -109,8 +107,8 @@ function onDepthChange(event: Event): void {
           :key="label"
           type="button"
           class="btn font-mono text-xs"
-          :class="{ 'btn-primary': store.selection.face === index }"
-          :aria-pressed="store.selection.face === index"
+          :class="{ 'btn-primary': selection.face === index }"
+          :aria-pressed="selection.face === index"
           :disabled="dims !== null && index >= dims.faceCount"
           @click="selectFace(index)"
         >
@@ -130,7 +128,7 @@ function onDepthChange(event: Event): void {
       <select
         id="inspector-layer"
         class="rounded border border-line bg-surface-raised px-2 py-1 text-sm"
-        :value="store.selection.layer"
+        :value="selection.layer"
         @change="onLayerChange"
       >
         <option
@@ -154,7 +152,7 @@ function onDepthChange(event: Event): void {
       <select
         id="inspector-depth"
         class="rounded border border-line bg-surface-raised px-2 py-1 text-sm"
-        :value="store.selection.depthSlice"
+        :value="selection.depthSlice"
         @change="onDepthChange"
       >
         <option
