@@ -1,4 +1,4 @@
-// Engine modules are stubs until Waves 2–4; keep unused helpers from failing clippy -D warnings.
+// Engine modules keep unused helpers from failing clippy -D warnings until the frontend consumes them.
 #![allow(dead_code)]
 
 mod commands;
@@ -12,7 +12,7 @@ mod state;
 mod updater;
 mod workspace;
 
-use state::AppState;
+use state::{AppState, PendingUpdate};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -20,10 +20,12 @@ pub fn run() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_process::init())
-        .manage(AppState::default());
-
-    // Updater plugin needs pubkey/endpoints (T6.3). Register a no-op setup for now.
-    // .plugin(tauri_plugin_updater::Builder::new().build()) is added in T6.3.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(AppState::default())
+        .manage(PendingUpdate::default())
+        .on_window_event(|window, event| {
+            drop::on_window_event(window, event);
+        });
 
     #[cfg(desktop)]
     {

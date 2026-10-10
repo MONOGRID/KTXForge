@@ -349,7 +349,7 @@ These shapes are fixed. Tasks fill in fields exactly as listed; extra fields nee
 
 ## Wave 3 — Rust engines
 
-Status: **complete** (2026-10-10). T3.1–T3.10 implemented with unit tests; `npm run check` green. Process-spawn paths that need a staged `ktx` sidecar or `AppHandle` remain `#[ignore]` until Wave 4.
+Status: **complete** (2026-10-10). T3.1–T3.10 implemented with unit tests; `npm run check` green. Wave 4 unlocked staged-binary process tests; AppHandle `inspect` and `ktx validate` after anim rewrite remain `#[ignore]`.
 
 Parallel. Pure or near-pure modules with unit tests. No Tauri commands yet.
 
@@ -422,42 +422,44 @@ Parallel. Pure or near-pure modules with unit tests. No Tauri commands yet.
 
 ## Wave 4 — Commands and window wiring
 
+Status: **complete** (2026-10-10). T4.1–T4.6 implemented; `npm run check` green. Sidecar process tests that need a staged `ktx` binary run when `binaries/` is present (gitignored; skip otherwise). Full AppHandle sidecar inspect path remains `#[ignore]`. Manual drag-drop / dialog checks wait on Wave 5 UI.
+
 Parallel. Each task fills one command file (registered already in T1.1).
 
 ### T4.1 Encoder commands
 
-- **Owns:** `src-tauri/src/commands/encoder.rs`, `src-tauri/src/commands/app.rs`
+- [x] **Owns:** `src-tauri/src/commands/encoder.rs`, `src-tauri/src/commands/app.rs`
 - **Do:** `default_create_options` → `CreateOptions::default()`. `describe_options` → `rules::describe`. `pick_sources` → Rust multi-file open dialog filtered to supported image extensions, classify, return `SourceInfo` list (KTX files picked here go to `open_inspector` instead). `source_thumbnail` → `convert::thumbnail_png` as `ipc::Response`. `ktx_version` → pinned from `ktx-version.json` (via `include_str!`) and reported from `ktx --version`.
 - **Done when:** `npm run check` passes; manual: in `npm run tauri dev`, calling each command from the devtools console via `window.__TAURI__.core.invoke` returns data.
 
 ### T4.2 Encode pipeline
 
-- **Owns:** `src-tauri/src/commands/encode.rs`
+- [x] **Owns:** `src-tauri/src/commands/encode.rs`
 - **Do:** `encode`: create job dir; emit `converting`; `prepare_input` each source (in order; `order_frames` already applied by the frontend list order); emit `encoding`; `build_create_args` + `run_ktx`, forwarding stderr lines in `encode://progress`; if `animation` is set, emit `writing-anim` and `write_anim_data`; emit `previewing` and extract a preview (transcode target per T3.8, tone-map for HDR); read output metadata via `ktx2`; parse metrics; emit `done`; return `EncodeResult`. Run on `tauri::async_runtime` so the UI never blocks. Store the child handle for `cancel_encode`. `encoded_preview` returns the preview PNG bytes. `save_encoded` opens a save dialog (default name from the first source, `.ktx2`) and copies the output.
 - **Done when:** an `#[ignore]` integration test encodes `rgba.png` with defaults and with `basis-lz`, and `frames/*` with animation, asserting exit success and the anim key; `npm run check` passes.
 
 ### T4.3 Inspector window and drag-drop
 
-- **Owns:** `src-tauri/src/drop.rs`, `src-tauri/src/commands/inspector_window.rs`
+- [x] **Owns:** `src-tauri/src/drop.rs`, `src-tauri/src/commands/inspector_window.rs`
 - **Read:** requirements.md "Architecture" (drag-drop and the Windows deadlock note)
 - **Do:** `drop.rs`: handle `WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. })` for the `main` window: classify; images → emit `encoder://sources-added` (with `SourceInfo`, frames ordered); KTX files → `open_inspector` for the first one (spawned async); unsupported → `encoder://drop-rejected`. Drops on the inspector window with a KTX file load that file. `open_inspector`: `async`; store the path in `AppState`; reuse window `inspector` if it exists (`set_focus`, emit `inspector://file`); otherwise build it with `WebviewWindowBuilder` at `inspector.html`, title "KTX-GUI Inspector — <file name>", 1100×760. `inspector_current_file` returns the stored path so a freshly loaded window does not miss the first event.
 - **Done when:** manual in `npm run tauri dev`: dropping `rgba.png` on main logs the event; dropping `basis_lz.ktx2` opens one inspector window; dropping a second KTX reuses it. `npm run check` passes.
 
 ### T4.4 Inspect and image commands
 
-- **Owns:** `src-tauri/src/commands/inspect.rs`
+- [x] **Owns:** `src-tauri/src/commands/inspect.rs`
 - **Do:** `inspect` → `info::inspect`. `inspector_image`: extract the selected level/face/layer/depth into the workspace inspector cache (cache by selection), transcode Basis/UASTC to an unpacked target, convert KTX1 via `ktx convert` first when extract rejects it, tone-map HDR, return PNG bytes.
 - **Done when:** `#[ignore]` tests on `basis_lz.ktx2` level 0 and last level, `cubemap.ktx2` face 3, `array4_mips.ktx2` layer 2 level 1, `hdr_uastc.ktx2`. `npm run check` passes.
 
 ### T4.5 Export command
 
-- **Owns:** `src-tauri/src/commands/export.rs`
+- [x] **Owns:** `src-tauri/src/commands/export.rs`
 - **Do:** `export_images`: single image → save dialog with PNG/JPEG/EXR filter; multi-image → folder dialog. Extract to the workspace, then copy PNG/EXR or convert to JPEG with `png_to_jpeg`. Names follow `expected_output_name`. Refuse PNG/JPEG for formats the tool will not write as PNG (EXR only) with a clear `InvalidInput` message. Return the written paths.
 - **Done when:** `#[ignore]` test exports all frames of `anim.ktx2` as JPEG into a temp dir (bypass the dialog with an internal `export_to(dir, ...)` function the command calls). `npm run check` passes.
 
 ### T4.6 Updater runtime
 
-- **Owns:** `src-tauri/src/updater.rs`, `src-tauri/src/commands/update.rs`
+- [x] **Owns:** `src-tauri/src/updater.rs`, `src-tauri/src/commands/update.rs`
 - **Do:** On setup, spawn a task that calls `app.updater()?.check()` (skip silently in debug builds and when no endpoint is configured). On update found, store it in state and emit `update://status` `available` with version and notes. `install_update` downloads with progress events (`downloading`), installs, emits `installed`, then `app.restart()`. Errors emit `error` and never crash the app.
 - **Done when:** `npm run check` passes; the debug build starts without errors when the updater config is absent.
 

@@ -174,9 +174,11 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "requires staged ktx sidecar binary"]
     fn version_via_staged_binary() {
-        let bin = staged_ktx_binary().expect("staged ktx binary");
+        let Some(bin) = staged_ktx_binary() else {
+            // binaries/ is gitignored; skip when fetch-ktx has not been run.
+            return;
+        };
         let output = Command::new(&bin)
             .arg("--version")
             .output()

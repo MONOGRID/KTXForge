@@ -122,3 +122,16 @@ ASTC `--format` strings keep the Vulkan `_BLOCK` suffix required by v4.4.2. This
 5. **Extract transcode:** v4.4.2 `extract.txt` has only `r8|rg8|rgb8|rgba8` unpacked targets; half-float targets stay deferred per the pin decision.
 
 **Why:** Keep Wave 3 engines honest to the shipped binary and fixtures without inventing 5.0 surface or weakening the anim layer rule.
+
+## 2026-10-10 — Wave 4 command wiring
+
+**Decided:**
+
+1. **`ktx extract` unit dimensions:** `build_extract_args` takes `Dims` and omits `--layer` / `--face` / `--depth` (and `--level` when levels is 1 and level is 0). Explicit `--layer 0` on a non-array texture fails in v4.4.2.
+2. **Shared extract helpers:** `ktx/extract_ops.rs` owns ensure-KTX2, extract+preview PNG (transcode / tone-map), and texture meta from `ktx info` or the `ktx2` crate. Encode, inspect, and export call it.
+3. **KTX1 → KTX2:** Prefer legacy `ktx2ktx2` beside staged binaries or under `target/ktx-cache` (no `ktx convert` on v4.4.2). If missing, extract may still be tried on the original path.
+4. **Process tests without AppHandle:** Encode / inspect / export fixture tests run the staged `ktx-<triple>` via `std::process::Command` when present; they no-op skip when `binaries/` is empty (gitignored). Full `sidecar::run_ktx` + AppHandle inspect remains `#[ignore]`.
+5. **Updater plugin:** Registered always; check/install skipped in debug builds and when endpoints/pubkey are absent (errors never crash). Pubkey/endpoints still land in T6.3.
+6. **Drag-drop:** Wired on `Builder::on_window_event` (not only setup), async `open_inspector` for Windows.
+
+**Why:** Wave 4 must ship working commands against the Wave 3 engines and the staged sidecar without waiting for T6.3 updater config or a mocked AppHandle.

@@ -2,19 +2,69 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Mutex;
 
-/// Per-encode job bookkeeping. Child handle filled in Wave 4.
-#[derive(Debug, Default)]
+use crate::error::AppError;
+use crate::ktx::info_types::PreviewKind;
+use crate::ktx::sidecar::CancellationHandle;
+use crate::workspace::Workspace;
+
+/// Per-encode job bookkeeping.
+#[derive(Debug)]
 pub struct Job {
-    pub dir: Option<PathBuf>,
-    pub output_path: Option<PathBuf>,
-    /// Opaque cancel token / process id placeholder until the sidecar runner lands.
-    pub child_id: Option<u32>,
+    pub dir: PathBuf,
+    pub output_path: PathBuf,
+    pub preview_png: PathBuf,
+    pub preview_kind: PreviewKind,
+    pub cancel: CancellationHandle,
+    pub default_save_name: String,
 }
 
 #[derive(Debug, Default)]
 pub struct AppState {
+    workspace: Mutex<Option<Workspace>>,
     pub jobs: Mutex<HashMap<String, Job>>,
     pub inspector_file: Mutex<Option<PathBuf>>,
+}
+
+impl AppState {
+    pub fn workspace_root(&self) -> Result<PathBuf, AppError> {
+        self.with_workspace(|ws| Ok(ws.root().to_path_buf()))
+    }
+
+    pub fn job_dir(&self, job_id: &str) -> Result<PathBuf, AppError> {
+        self.with_workspace(|ws| ws.job_dir(job_id))
+    }
+
+    pub fn inspector_cache(&self, path: &std::path::Path) -> Result<PathBuf, AppError> {
+        self.with_workspace(|ws| {
+            let mtime = std::fs::metadata(path)
+                .and_then(|m| m.modified())
+                .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
+            ws.inspector_cache(path, mtime)
+        })
+    }
+
+    pub fn with_workspace<F, T>(&self, f: F) -> Result<T, AppError>
+    where
+        F: FnOnce(&Workspace) -> Result<T, AppError>,
+    {
+        let mut guard = self
+            .workspace
+            .lock()
+            .map_err(|_| AppError::io("workspace lock poisoned"))?;
+        if guard.is_none() {
+            *guard = Some(Workspace::new()?);
+        }
+        f(guard.as_ref().expect("workspace just initialized"))
+    }
+}
+
+/// Pending updater payload (separate manage so `Update` need not live in `AppState`).
+pub struct PendingUpdate(pub Mutex<Option<tauri_plugin_updater::Update>>);
+
+impl Default for PendingUpdate {
+    fn default() -> Self {
+        Self(Mutex::new(None))
+    }
 }
 
 /// Reserve a job id shape for Wave 4 (keeps `uuid` linked in the scaffold).
