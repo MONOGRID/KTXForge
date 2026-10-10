@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useTitle } from "@vueuse/core";
 import { computed, onMounted, ref } from "vue";
+import UpdateBanner from "../shared/components/UpdateBanner.vue";
 import DropOverlay from "./components/DropOverlay.vue";
 import SourceList from "./components/SourceList.vue";
 import { initStore, store } from "./store";
@@ -37,6 +38,8 @@ onMounted(() => {
         ktx {{ versionLabel }}
       </span>
     </header>
+
+    <UpdateBanner />
 
     <p
       v-if="initError"

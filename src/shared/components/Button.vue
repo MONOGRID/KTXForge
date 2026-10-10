@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// fallow-ignore-file unused-file
-// consumed by T5.4
-
 withDefaults(
   defineProps<{
     variant?: "default" | "primary";
