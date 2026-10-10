@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// fallow-ignore-file unused-file
-// consumed by T5.5
 import { computed, ref, watch } from "vue";
 import { call } from "../../api/commands";
 import { toAppError } from "../../api/guards";

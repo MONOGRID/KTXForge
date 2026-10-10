@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
 import { useTitle } from "@vueuse/core";
+import ExportPanel from "./components/ExportPanel.vue";
 import BasisGlobalDataPanel from "./components/report/BasisGlobalDataPanel.vue";
 import DfdPanel from "./components/report/DfdPanel.vue";
 import HeaderPanel from "./components/report/HeaderPanel.vue";
@@ -113,6 +114,7 @@ onMounted(() => {
       <SubresourceSelectors />
       <FramePlayer />
       <ImageViewer />
+      <ExportPanel />
     </section>
   </main>
 </template>
