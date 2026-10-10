@@ -467,6 +467,8 @@ Parallel. Each task fills one command file (registered already in T1.1).
 
 ## Wave 5 — Frontend
 
+Status: **complete** (2026-10-10). T5.1–T5.8 merged; `npm run check` green on integration branch `master` (rename to `dev` still pending).
+
 Parallel. Vue only renders and calls `src/api`. Each task owns its own folder or files.
 
 ### T5.1 Encoder state and shell
