@@ -146,7 +146,6 @@ watch(
   { deep: true },
 );
 
-/** @expected-unused consumed by T5.2 */
 export function fieldState(key: OptionKey): FieldState {
   const found = store.report.fields.find((field) => field.key === key);
   if (found) {
