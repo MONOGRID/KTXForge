@@ -54,3 +54,27 @@ Rust still wraps the CLI where the tool stops, as already specified:
 **Decided:** Persist the main window with `tauri-plugin-window-state`, flags size, position, maximized, and visible. The window is created hidden (`visible: false`) and the plugin shows it after restore. The plugin is registered on the Tauri builder, before config windows exist. File → Exit is a native menu item with id `exit` and shortcut Cmd/Ctrl+Q. The click handler calls `app.exit(0)`. On macOS the menu also has the application submenu and Edit, because a menu bar with only File drops copy, paste, hide, and the app menu.
 
 **Why:** Size and position are the request. Maximized is stored with them so a maximized close does not write the monitor corner as the restored frame. Visible is included because the plugin only calls `show` when that flag is set, which is what avoids a flash at the default 800×600. Registering the plugin inside `setup` is too late: Tauri creates config windows before that hook, and this plugin restores on window-ready. Predefined Quit is unsupported on Linux, so Exit is a normal item on every desktop OS. The menu stays in Rust; the frontend does not own window chrome.
+
+## 2026-10-10 — Fallow for TypeScript/Vue cleanup gates
+
+**Decided:** Add [fallow](https://fallow.tools) as a project `devDependency` with `.fallowrc.json` (Vue/Vite entry globs, `duplicates.minOccurrences: 3`), Claude Code PreToolUse gate under `.claude/`, npm scripts `fallow` / `fallow:audit`, and a Fallow section in [AGENTS.md](../AGENTS.md). Warn-default cleanup rules stay advisory; `private-type-leak` stays off. No git pre-commit hook: run via `npx fallow` / the local `devDependency` only; do not require a global install.
+
+**Why:** Static dead-code, duplication, and complexity checks on the Vue/TS surface, without replacing `tsc` or ESLint. Rust stays outside fallow's scope. A git hook that shells out to a bare `fallow` binary breaks when Corepack/nvm has no global activation, and nobody should need `npm install -g` to commit.
+
+## 2026-10-10 — Name, repository, `ktx` pin
+
+**Decided:** The product is `KTX-GUI`, identifier `com.monogrid.ktx-gui`, repository `https://github.com/MONOGRID/KTX-GUI`. The embedded tool is pinned to KTX-Software v4.4.2. The user generates the updater signing key pair and stores the private key in GitHub secrets.
+
+**Why:** v4.4.2 is the latest stable release; 5.0.0 is still a release candidate (rc2, 2026-08-17). If a flag in [requirements.md](requirements.md) is missing from v4.4.2, the user decides between dropping that option for now and moving to 5.0. The identifier must be final before the first public release, because installed apps key their data directory and updates on it. The updater endpoint needs the repository path.
+
+## 2026-10-10 — fallow in the quality gate
+
+**Decided:** `npm run check` is the single quality gate, run before every commit, by every sub-agent task, at every wave merge, and in CI. It runs Rust checks (fmt, clippy with `-D warnings`, tests, `cargo machete`), web checks (vue-tsc build, ESLint, Stylelint), and fallow: `fallow dead-code --fail-on-issues`, `fallow dupes --threshold 3`, `fallow health --min-score 85 --min-severity high`. Fallow findings are fixed in code, like lint errors. The only allowed suppression marks code written ahead of its consumer and names the consuming task; fallow reports it as stale once the code is used. Thresholds change only through a new entry here.
+
+**Why:** The user asked for health, duplication, and dead-code checks in the same routine as lint and typecheck. Running them at every step catches drift while the change is small; parallel sub-agents especially tend to duplicate helpers. Fallow covers TypeScript, Vue, and CSS only, so Rust dead code relies on clippy and unused crates on `cargo machete`.
+
+## 2026-10-10 — Automatic releases with semantic-release
+
+**Decided:** Releases are automatic on push to `main` with semantic-release. Conventional Commits, enforced locally by husky + commitlint and in CI on pull requests, decide the version: `feat` minor, `fix`/`perf` patch, `!` or `BREAKING CHANGE:` major, other types no release. semantic-release writes `CHANGELOG.md`, bumps `package.json` (Tauri reads its version from there) and `Cargo.toml`, commits as `github-actions[bot]`, tags `vX.Y.Z`, and creates a draft GitHub Release with the notes and bot comments on released issues and PRs. The tauri-action matrix uploads artifacts to that draft; a final job publishes it. A `beta` branch publishes prereleases. Development happens on `dev`; merging to `main` ships. This replaces "Publishing the draft is the ship step" in [requirements.md](requirements.md), which is updated to match.
+
+**Why:** The user wants a changelog and releases driven by commit messages and already knows semantic-release. release-please (a bot that opens a release PR to merge) was the alternative; it adds a review step the user did not ask for. The draft stays unpublished until every platform has built, so the updater's `releases/latest` never points at a release with missing artifacts.

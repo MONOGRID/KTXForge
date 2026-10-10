@@ -44,3 +44,27 @@ Before writing a helper, check whether it already exists:
 2. Context7 (`resolve-library-id`, then `query-docs`) or a web search for an existing npm package.
 
 Use the existing function or package when it covers the need. Write project code when nothing maintained does, or when pulling in a package would be larger than the few lines required.
+
+## Fallow
+
+Use `npx fallow` (devDependency). Prefer `--format json --quiet`.
+
+- Before committing AI-generated changes: `fallow audit --format json --quiet`
+- Cleanup / dupes / complexity: `fallow dead-code`, `fallow dupes`, `fallow health` (same JSON flags)
+- Trace before deleting: `fallow dead-code --trace <file>:<export>` or `--trace-dependency <name>`
+- Always `--dry-run` before `fallow fix`, then `fix --yes`
+
+<!-- generated:task-matrix:start -->
+| When the agent is about to... | Run |
+|---|---|
+| delete an "unused" export or file | `fallow dead-code --trace <file>:<export>` |
+| prove a TypeScript symbol's exact consumers before refactoring | `fallow dead-code --type-aware --symbol-impact <file>:<export-or-class.method>` |
+| find how one module reaches another | `fallow trace --path <from> <to>` |
+| delete an "unused" dependency | `fallow dead-code --trace-dependency <name>` |
+| commit or open a PR | `fallow audit --base <ref>` |
+| prioritize refactoring | `fallow health --hotspots --targets` |
+| consolidate duplication | `fallow dupes --trace dup:<fingerprint>` |
+| check which architecture rules apply to a file before changing it | `fallow guard <files>` |
+| surface security candidates | `fallow security` |
+| understand a finding | `fallow explain <issue-type>` |
+<!-- generated:task-matrix:end -->

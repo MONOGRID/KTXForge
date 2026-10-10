@@ -9,6 +9,8 @@
     "preview": "vite preview",
     "lint": "eslint src",
     "lint:style": "stylelint \"src/**/*.{css,scss,vue}\"",
+    "fallow": "fallow",
+    "fallow:audit": "fallow audit --format json --quiet",
     "tauri": "tauri"
   },
   "dependencies": {
@@ -22,6 +24,7 @@
     "@vitejs/plugin-vue": "^6.0.9",
     "eslint": "^10.12.0",
     "eslint-plugin-vue": "^10.11.1",
+    "fallow": "^3.33.1",
     "globals": "^17.13.0",
     "sass": "^1.105.1",
     "stylelint": "^17.16.0",
