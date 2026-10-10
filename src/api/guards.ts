@@ -23,7 +23,6 @@ function hasKtxFields(value: Record<string, unknown>): boolean {
   );
 }
 
-/** @expected-unused consumed by T5.4 */
 export function isAppError(value: unknown): value is AppError {
   if (!isRecord(value) || typeof value.kind !== "string") {
     return false;
