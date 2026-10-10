@@ -1,5 +1,3 @@
-// fallow-ignore-file unused-file
-// consumed by T5.1
 import type { AppError } from "../bindings/AppError";
 
 const APP_ERROR_KINDS = new Set([
@@ -25,7 +23,7 @@ function hasKtxFields(value: Record<string, unknown>): boolean {
   );
 }
 
-/** @expected-unused consumed by T5.1 */
+/** @expected-unused consumed by T5.4 */
 export function isAppError(value: unknown): value is AppError {
   if (!isRecord(value) || typeof value.kind !== "string") {
     return false;
@@ -36,7 +34,6 @@ export function isAppError(value: unknown): value is AppError {
   return value.kind !== "ktx" || hasKtxFields(value);
 }
 
-/** @expected-unused consumed by T5.1 */
 export function toAppError(err: unknown): AppError {
   if (isAppError(err)) {
     return err;

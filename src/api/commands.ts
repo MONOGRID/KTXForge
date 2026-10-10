@@ -1,5 +1,3 @@
-// fallow-ignore-file unused-file
-// consumed by T5.1
 import { invoke } from "@tauri-apps/api/core";
 import type { CreateOptions } from "../bindings/CreateOptions";
 import type { EncodeRequest } from "../bindings/EncodeRequest";
@@ -41,7 +39,6 @@ export type Commands = {
   install_update: { args: EmptyArgs; result: null };
 };
 
-/** @expected-unused consumed by T5.1 */
 export async function call<K extends keyof Commands>(
   name: K,
   args: Commands[K]["args"],
