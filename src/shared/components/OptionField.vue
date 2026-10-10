@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// fallow-ignore-file unused-file
-// consumed by T5.2
 import type { FieldState } from "../../bindings/FieldState";
 import type { OptionKey } from "../../bindings/OptionKey";
 
@@ -19,6 +17,7 @@ withDefaults(
 <template>
   <div
     class="field-row"
+    :data-option-key="optionKey"
     :class="{ 'opacity-50': state && !state.enabled }"
   >
     <div class="label">

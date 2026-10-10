@@ -3,6 +3,9 @@ import { useTitle } from "@vueuse/core";
 import { computed, onMounted, ref } from "vue";
 import DropOverlay from "./components/DropOverlay.vue";
 import SourceList from "./components/SourceList.vue";
+import ColorSection from "./components/options/ColorSection.vue";
+import ContainerSection from "./components/options/ContainerSection.vue";
+import FilterSection from "./components/options/FilterSection.vue";
 import { initStore, store } from "./store";
 
 useTitle("KTX-GUI");
@@ -49,15 +52,10 @@ onMounted(() => {
     <main class="grid min-h-0 flex-1 grid-cols-[minmax(220px,280px)_minmax(0,1fr)_minmax(220px,300px)] gap-3 p-3">
       <SourceList class="min-h-0" />
 
-      <section class="panel flex min-h-0 flex-col overflow-hidden">
-        <header class="border-b border-line px-3 py-2">
-          <h2 class="m-0 text-sm font-semibold">
-            Options
-          </h2>
-        </header>
-        <div class="flex flex-1 items-center justify-center px-4 text-sm text-ink-muted">
-          Options
-        </div>
+      <section class="flex min-h-0 flex-col gap-2 overflow-auto">
+        <ContainerSection />
+        <FilterSection />
+        <ColorSection />
       </section>
 
       <section class="panel flex min-h-0 flex-col overflow-hidden">
