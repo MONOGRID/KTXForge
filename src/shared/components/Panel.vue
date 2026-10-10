@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// fallow-ignore-file unused-file
-// consumed by T5.2
 import { ref, watch } from "vue";
 
 const props = withDefaults(
