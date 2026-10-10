@@ -4,5 +4,5 @@ use crate::error::AppError;
 use crate::ktx::info_types::InspectReport;
 
 pub async fn inspect(_path: &str) -> Result<InspectReport, AppError> {
-    Err(AppError::NotImplemented("info::inspect"))
+    Err(AppError::not_implemented("info::inspect"))
 }

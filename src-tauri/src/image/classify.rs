@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use crate::error::AppError;
 
 pub fn classify(_path: &std::path::Path) -> Result<(), AppError> {
-    Err(AppError::NotImplemented("classify::classify"))
+    Err(AppError::not_implemented("classify::classify"))
 }
 
 pub fn order_frames(paths: Vec<PathBuf>) -> Vec<PathBuf> {

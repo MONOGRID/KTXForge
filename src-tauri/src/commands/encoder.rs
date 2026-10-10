@@ -12,15 +12,15 @@ pub fn describe_options(
     _options: CreateOptions,
     _sources: Vec<SourceInfo>,
 ) -> Result<OptionReport, AppError> {
-    Err(AppError::NotImplemented("describe_options"))
+    Err(AppError::not_implemented("describe_options"))
 }
 
 #[tauri::command]
 pub async fn pick_sources() -> Result<Vec<SourceInfo>, AppError> {
-    Err(AppError::NotImplemented("pick_sources"))
+    Err(AppError::not_implemented("pick_sources"))
 }
 
 #[tauri::command]
 pub async fn source_thumbnail(_path: String) -> Result<tauri::ipc::Response, AppError> {
-    Err(AppError::NotImplemented("source_thumbnail"))
+    Err(AppError::not_implemented("source_thumbnail"))
 }

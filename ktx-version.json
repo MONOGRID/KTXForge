@@ -1,0 +1,49 @@
+{
+  "version": "4.4.2",
+  "targets": {
+    "x86_64-pc-windows-msvc": {
+      "asset": "KTX-Software-4.4.2-Windows-x64.exe",
+      "sha1": "5323B8DD2431DCD4C22AA869015942294BEA99E7",
+      "ktxPath": "bin/ktx.exe",
+      "libs": ["bin/ktx.dll"],
+      "extract": "nsis7z"
+    },
+    "aarch64-pc-windows-msvc": {
+      "asset": "KTX-Software-4.4.2-Windows-arm64.exe",
+      "sha1": "74C6063D727E45837C3DD89D69E8522CA3F3562E",
+      "ktxPath": "bin/ktx.exe",
+      "libs": ["bin/ktx.dll"],
+      "extract": "nsis7z"
+    },
+    "aarch64-apple-darwin": {
+      "asset": "KTX-Software-4.4.2-Darwin-arm64.pkg",
+      "sha1": "F6BC075B4DE1F633DED8EFE06E8B281E6360B1C4",
+      "ktxPath": "usr/local/bin/ktx",
+      "libs": ["usr/local/lib/libktx.4.dylib"],
+      "extract": "pkg"
+    },
+    "x86_64-apple-darwin": {
+      "asset": "KTX-Software-4.4.2-Darwin-x86_64.pkg",
+      "sha1": "69AA8799FBFAF72380ADFEF949727FFB36671AA8",
+      "ktxPath": "usr/local/bin/ktx",
+      "libs": ["usr/local/lib/libktx.4.dylib"],
+      "extract": "pkg"
+    },
+    "x86_64-unknown-linux-gnu": {
+      "asset": "KTX-Software-4.4.2-Linux-x86_64.tar.bz2",
+      "sha1": "C6B08C817F8C8DD299DECCAE4F2FBB8D55E9ACD2",
+      "ktxPath": "bin/ktx",
+      "libs": ["lib/libktx.so.4"],
+      "extract": "tarbz2",
+      "patchelf": true
+    },
+    "aarch64-unknown-linux-gnu": {
+      "asset": "KTX-Software-4.4.2-Linux-arm64.tar.bz2",
+      "sha1": "5300220283C2C1BEF07CA310B27519241E5F51EE",
+      "ktxPath": "bin/ktx",
+      "libs": ["lib/libktx.so.4"],
+      "extract": "tarbz2",
+      "patchelf": true
+    }
+  }
+}

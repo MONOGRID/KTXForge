@@ -8,6 +8,6 @@ pub struct Workspace;
 impl Workspace {
     pub fn new() -> Result<Self, AppError> {
         let _builder = tempfile::Builder::new().prefix("ktx-encoder-");
-        Err(AppError::NotImplemented("Workspace::new"))
+        Err(AppError::not_implemented("Workspace::new"))
     }
 }

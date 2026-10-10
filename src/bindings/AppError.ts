@@ -5,4 +5,4 @@
  *
  * Serialized as `{ kind, message, exitCode?, exitMeaning?, stderr? }` for the webview.
  */
-export type AppError = { "notImplemented": string } | { "io": string } | { "invalidInput": string } | { "unsupportedFile": string } | { "ktx": { exit_code: number, stderr: string, } } | "cancelled" | { "image": string } | { "update": string };
+export type AppError = { "kind": "notImplemented", message: string, } | { "kind": "io", message: string, } | { "kind": "invalidInput", message: string, } | { "kind": "unsupportedFile", message: string, } | { "kind": "ktx", message: string, exitCode: number, exitMeaning: string, stderr: string, } | { "kind": "cancelled", message: string, } | { "kind": "image", message: string, } | { "kind": "update", message: string, };

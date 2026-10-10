@@ -3,5 +3,5 @@
 use crate::error::AppError;
 
 pub fn read_header(_bytes: &[u8]) -> Result<(), AppError> {
-    Err(AppError::NotImplemented("ktx1::read_header"))
+    Err(AppError::not_implemented("ktx1::read_header"))
 }

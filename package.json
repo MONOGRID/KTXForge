@@ -16,6 +16,7 @@
     "check:fallow": "fallow dead-code --fail-on-issues && fallow dupes --threshold 3 && fallow health --min-score 85 --min-severity high",
     "check": "npm run check:rust && npm run check:web && npm run check:fallow",
     "prepare": "husky",
+    "fetch-ktx": "node scripts/fetch-ktx.mjs",
     "tauri": "tauri"
   },
   "dependencies": {

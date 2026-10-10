@@ -4,5 +4,5 @@ use crate::error::AppError;
 use crate::ktx::options::CreateOptions;
 
 pub fn describe(_opts: &CreateOptions) -> Result<(), AppError> {
-    Err(AppError::NotImplemented("rules::describe"))
+    Err(AppError::not_implemented("rules::describe"))
 }

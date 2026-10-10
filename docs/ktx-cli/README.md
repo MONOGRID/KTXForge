@@ -133,4 +133,17 @@ These are required by [requirements.md](../requirements.md) but absent or differ
 
 Suspect spellings from the spec (`pg_eotf`, `abobergb`) are **confirmed present** in this binary’s help; keep those strings.
 
-**Decision needed:** drop / defer the missing options for the v4.4.2 pin, or move the pin to KTX-Software 5.0 (still RC as of the plan’s survey). Until the user answers, later waves should expose only flags that exist in these captures.
+## Decision (2026-10-10): stay on v4.4.2, defer gaps
+
+**Frozen surface for Wave 2+:** only flags and values present in these captures. See [decision-context.md](../decision-context.md) (2026-10-10 — Stay on KTX-Software v4.4.2).
+
+| Gap | Treatment until a pin bump |
+| --- | --- |
+| `--encode` codecs beyond `basis-lz` \| `uastc` | **Deferred.** Types/UI offer `basis-lz` and `uastc` only (map LDR UASTC to `uastc`, not `uastc-ldr-4x4`). |
+| All `--uastc-hdr-*` flags and HDR encode codecs | **Deferred.** No `uastcHdr` option group in `CreateOptions`. |
+| `--premultiply-alpha` | **Deferred.** Omitted from `CreateOptions` / `OptionKey`. |
+| `ktx convert` | **Deferred** as a subcommand; use legacy `ktx2ktx2` when KTX1→KTX2 is required. |
+| Half-float extract `--transcode` targets | **Deferred.** Preview/export use `r8` \| `rg8` \| `rgb8` \| `rgba8` (plus EXR extract for HDR). |
+| ASTC format short names without `_BLOCK` | **Not used.** Pass Vulkan names with `_BLOCK` (e.g. `ASTC_6x6_SRGB_BLOCK`). |
+
+Revisit when upgrading the pin (likely KTX-Software 5.x stable): re-run T0.1 against the new `--help`, then extend option types.

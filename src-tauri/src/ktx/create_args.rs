@@ -10,5 +10,5 @@ pub fn build_create_args(
     _inputs: &[std::path::PathBuf],
     _output: &Path,
 ) -> Result<Vec<String>, AppError> {
-    Err(AppError::NotImplemented("create_args::build_create_args"))
+    Err(AppError::not_implemented("create_args::build_create_args"))
 }

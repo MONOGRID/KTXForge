@@ -3,5 +3,7 @@
 use crate::error::AppError;
 
 pub fn build_extract_args() -> Result<Vec<String>, AppError> {
-    Err(AppError::NotImplemented("extract_args::build_extract_args"))
+    Err(AppError::not_implemented(
+        "extract_args::build_extract_args",
+    ))
 }

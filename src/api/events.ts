@@ -1,16 +1,18 @@
 // fallow-ignore-file unused-file
 // consumed by T5.1
-/**
- * Typed event listeners. Bound to generated payloads in T2.6.
- */
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import type { DropRejectedPayload } from "../bindings/DropRejectedPayload";
+import type { EncodeProgressPayload } from "../bindings/EncodeProgressPayload";
+import type { InspectorFilePayload } from "../bindings/InspectorFilePayload";
+import type { SourceInfo } from "../bindings/SourceInfo";
+import type { UpdateStatusPayload } from "../bindings/UpdateStatusPayload";
 
 export type Events = {
-  "encoder://sources-added": unknown;
-  "encoder://drop-rejected": unknown;
-  "encode://progress": unknown;
-  "inspector://file": unknown;
-  "update://status": unknown;
+  "encoder://sources-added": SourceInfo[];
+  "encoder://drop-rejected": DropRejectedPayload;
+  "encode://progress": EncodeProgressPayload;
+  "inspector://file": InspectorFilePayload;
+  "update://status": UpdateStatusPayload;
 };
 
 /** @expected-unused consumed by T5.1 */

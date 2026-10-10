@@ -96,3 +96,17 @@ Rust still wraps the CLI where the tool stops, as already specified:
 **Decided (interim):** Keep the KTX-Software **v4.4.2** pin for Wave 1 scaffold and document the CLI gaps in [ktx-cli/README.md](ktx-cli/README.md). Do not invent 5.0-only codec names in types until the user chooses: (A) defer missing options / map UI `uastc` to the v4.4.2 value, or (B) move the pin to 5.0. ASTC format strings passed to `ktx` must use the Vulkan `_BLOCK` suffix. KTX1→KTX2 uses legacy `ktx2ktx2` until a `ktx convert` exists. Windows sidecar staging is `ktx.exe` + side-by-side `ktx.dll` (see [ktx-cli/staging.md](ktx-cli/staging.md)).
 
 **Why:** T0.1 compared every UI option in [requirements.md](requirements.md) to `ktx create --help` from the official Windows x64 4.4.2 build. Missing or different: UASTC HDR codecs and flags, `--premultiply-alpha`, `ktx convert`, half-float extract transcode targets; `--encode` is `basis-lz | uastc` only; `pg_eotf` / `abobergb` are real tool spellings. T0.3 fixtures and info samples are in-tree; `hdr_uastc.ktx2` is uncompressed float because encode-to-UASTC on HDR is rejected in 4.4.2.
+
+## 2026-10-10 — Stay on KTX-Software v4.4.2 (defer CLI gaps)
+
+**Decided:** Keep the embedded tool pin at **KTX-Software v4.4.2**. Do **not** upgrade to 5.0 for the missing surface. Wave 2 option types and later CLI wrappers freeze against the captured v4.4.2 help in [ktx-cli/](ktx-cli/). Gaps documented in [ktx-cli/README.md](ktx-cli/README.md) are **deferred** (not exposed in types or UI) until a deliberate pin bump:
+
+- UASTC HDR codecs (`uastc-hdr-4x4`, `uastc-hdr-6x6i`) and all `--uastc-hdr-*` flags
+- Spec codec name `uastc-ldr-4x4` (v4.4.2 only has `--encode uastc`; UI/types use that value)
+- `--premultiply-alpha`
+- Unified `ktx convert` (keep legacy `ktx2ktx2` path when needed)
+- Half-float `ktx extract --transcode` targets
+
+ASTC `--format` strings keep the Vulkan `_BLOCK` suffix required by v4.4.2. This supersedes the interim “user must choose A or B” note in the Wave 0 spike entry above; the user chose **pin and defer** (A).
+
+**Why:** The user chose a stable pin over moving to a 5.0 release candidate. Deferring gaps keeps encode args and the option rules engine honest to the binary we ship; inventing 5.0-only names would fail at runtime.

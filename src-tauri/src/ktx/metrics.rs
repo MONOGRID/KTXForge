@@ -3,5 +3,5 @@
 use crate::error::AppError;
 
 pub fn parse_metrics(_stdout: &str) -> Result<(), AppError> {
-    Err(AppError::NotImplemented("metrics::parse_metrics"))
+    Err(AppError::not_implemented("metrics::parse_metrics"))
 }
