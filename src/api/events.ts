@@ -1,5 +1,3 @@
-// fallow-ignore-file unused-file
-// consumed by T5.1
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import type { DropRejectedPayload } from "../bindings/DropRejectedPayload";
 import type { EncodeProgressPayload } from "../bindings/EncodeProgressPayload";
@@ -15,7 +13,6 @@ export type Events = {
   "update://status": UpdateStatusPayload;
 };
 
-/** @expected-unused consumed by T5.1 */
 export async function on<K extends keyof Events>(
   name: K,
   handler: (payload: Events[K]) => void,
