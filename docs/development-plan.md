@@ -166,7 +166,7 @@ Logged in [decision-context.md](decision-context.md).
 
 | Topic | Answer |
 | --- | --- |
-| `ktx` version | v4.4.2. If T0.1 finds a spec flag missing, the orchestrator asks the user whether to drop that option for now or move to 5.0. |
+| `ktx` version | v4.4.2. **Settled:** stay on 4.4.2; defer missing CLI options (see [ktx-cli/README.md](ktx-cli/README.md)). |
 | Repository | `https://github.com/MONOGRID/KTX-GUI` |
 | Product | name `KTX-GUI`, identifier `com.monogrid.ktx-gui` |
 | Updater signing key | The user generates it (`npx tauri signer generate`), stores the private key and password as GitHub secrets, and provides the public key for T6.3. |
@@ -182,7 +182,7 @@ Logged in [decision-context.md](decision-context.md).
 
 ## Wave 0 — Spikes
 
-Status: **complete** (2026-10-10). Gaps from T0.1 are listed in [ktx-cli/README.md](ktx-cli/README.md) and need a user decision before Wave 2 option types freeze the codec list. Wave 1 (scaffold) can proceed.
+Status: **complete** (2026-10-10). Gaps from T0.1 are listed in [ktx-cli/README.md](ktx-cli/README.md). **User decision (2026-10-10):** stay on v4.4.2 and defer those gaps (see decision-context). Wave 2 option types freeze against that surface.
 
 Facts later tasks depend on. Run by **one capable agent or a human**, not a low-context sub-agent: the outcome is not known in advance. Work in a scratch directory; commit only the files listed under Owns.
 
@@ -279,6 +279,8 @@ All commands that run `ktx` or touch files are `async`.
 
 ## Wave 2 — Contracts and foundations
 
+Status: **complete** (2026-10-10). Option / codec surface is **frozen to KTX-Software v4.4.2** (user decision: defer gaps in [ktx-cli/README.md](ktx-cli/README.md); do not invent 5.0-only flags). T2.1–T2.6 implemented; `npm run check` green.
+
 Parallel. Fills in the shared types every later task depends on, plus independent infrastructure.
 
 ### Shared contracts
@@ -306,7 +308,7 @@ These shapes are fixed. Tasks fill in fields exactly as listed; extra fields nee
 
 - **Owns:** `src-tauri/src/ktx/options.rs`
 - **Read:** requirements.md "Output the tool can produce" and "Options that must appear in the UI", `docs/ktx-cli/create.txt`, `docs/ktx-cli/README.md`
-- **Do:** Define `CreateOptions` with nested groups `container`, `filter`, `color`, `basisLz`, `uastcLdr`, `uastcHdr`, `astc`, `encoder` (threads, no-sse, compare-ssim, compare-psnr), `supercompression` (`None | Zstd(u8) | Zlib(u8)`), plus top-level `format: VkFormat` and `encode: Option<EncodeCodec>`. One field per CLI flag in the spec. Flags without a value are `bool`. Optional values are `Option<T>` meaning "not passed, tool default". Enums for every value list (VkFormat incl. all 28 ASTC LDR formats, codecs, mip filters, wrap modes, transfer functions, primaries, texcoord origins, ASTC quality). Swizzle is a validated newtype over 4 chars of `rgba01`. Also define `AnimationOptions { duration: u32, timescale: u32, loop_count: u32 }`. Implement `Default` matching tool defaults (format `R8G8B8A8_SRGB`, no encode). Follow the CLI-string rule from Global rules.
+- **Do:** Define `CreateOptions` with nested groups `container`, `filter`, `color`, `basisLz`, `uastcLdr`, `astc`, `encoder` (threads, no-sse, compare-ssim, compare-psnr), `supercompression` (`None | Zstd(u8) | Zlib(u8)`), plus top-level `format: VkFormat` and `encode: Option<EncodeCodec>`. **v4.4.2 freeze:** one field per CLI flag that exists in `create.txt` / the README present table. **Omit (deferred):** `uastcHdr` group, HDR encode codecs, `--premultiply-alpha`. `EncodeCodec` is `basis-lz` \| `uastc` only (not `uastc-ldr-4x4`). ASTC `VkFormat` serde/CLI names use the Vulkan `_BLOCK` suffix. Flags without a value are `bool`. Optional values are `Option<T>` meaning "not passed, tool default". Enums for every value list (VkFormat incl. uncompressed + all 28 ASTC LDR `_BLOCK` formats, codecs, mip filters, wrap modes, transfer functions, primaries, texcoord origins, ASTC quality). Swizzle is a validated newtype over 4 chars of `rgba01`. Also define `AnimationOptions { duration: u32, timescale: u32, loop_count: u32 }`. Implement `Default` matching tool defaults (format `R8G8B8A8_SRGB`, no encode). Follow the CLI-string rule from Global rules.
 - **Done when:** unit tests cover: default serializes and round-trips through serde; every enum's serde name equals `cli()`; swizzle rejects `rgbx` and `rgb`. `npm run check` passes.
 
 ### T2.2 Inspector report types
