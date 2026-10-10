@@ -1,14 +1,190 @@
-//! Input conversion and thumbnails. Implemented in T3.5.
+//! Input conversion and thumbnails for `ktx create`.
 
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
+use image::imageops::FilterType;
+use image::{DynamicImage, ImageFormat};
+
+use crate::commands::{SourceInfo, SourceKind};
 use crate::error::AppError;
+use crate::image::classify::{classify, FileKind};
 
-pub fn prepare_input(_src: &Path, _workdir: &Path) -> Result<(), AppError> {
-    let _ = image::ImageFormat::Png;
-    Err(AppError::not_implemented("convert::prepare_input"))
+#[derive(Debug, Clone)]
+pub struct PreparedInput {
+    pub path: PathBuf,
+    /// True when the original path is used unchanged (PNG / EXR).
+    pub passthrough: bool,
 }
 
-pub fn thumbnail_png(_path: &Path, _max: u32) -> Result<Vec<u8>, AppError> {
-    Err(AppError::not_implemented("convert::thumbnail_png"))
+/// PNG and EXR pass through; JPEG/WebP/BMP/GIF/TIFF → PNG; Radiance HDR → half-float EXR.
+pub fn prepare_input(src: &Path, workdir: &Path) -> Result<PreparedInput, AppError> {
+    std::fs::create_dir_all(workdir).map_err(|e| AppError::io(e.to_string()))?;
+    match classify(src) {
+        FileKind::Image {
+            kind: SourceKind::Ldr,
+            needs_conversion: false,
+        } => Ok(PreparedInput {
+            path: src.to_path_buf(),
+            passthrough: true,
+        }),
+        FileKind::Image {
+            kind: SourceKind::Hdr,
+            needs_conversion: false,
+        } => Ok(PreparedInput {
+            path: src.to_path_buf(),
+            passthrough: true,
+        }),
+        FileKind::Image {
+            kind: SourceKind::Hdr,
+            needs_conversion: true,
+        } => {
+            let img = image::open(src).map_err(|e| AppError::image(e.to_string()))?;
+            let stem = src.file_stem().and_then(|s| s.to_str()).unwrap_or("input");
+            let out = workdir.join(format!("{stem}.exr"));
+            img.save_with_format(&out, ImageFormat::OpenExr)
+                .map_err(|e| AppError::image(e.to_string()))?;
+            Ok(PreparedInput {
+                path: out,
+                passthrough: false,
+            })
+        }
+        FileKind::Image {
+            kind: SourceKind::Ldr,
+            needs_conversion: true,
+        } => {
+            let img = load_for_png(src)?;
+            let stem = src.file_stem().and_then(|s| s.to_str()).unwrap_or("input");
+            let out = workdir.join(format!("{stem}.png"));
+            img.save_with_format(&out, ImageFormat::Png)
+                .map_err(|e| AppError::image(e.to_string()))?;
+            Ok(PreparedInput {
+                path: out,
+                passthrough: false,
+            })
+        }
+        FileKind::Ktx1 | FileKind::Ktx2 => Err(AppError::invalid_input(
+            "KTX files are not valid create inputs; open them in the inspector",
+        )),
+        FileKind::Unsupported => Err(AppError::unsupported_file(format!(
+            "unsupported input: {}",
+            src.display()
+        ))),
+    }
+}
+
+fn load_for_png(src: &Path) -> Result<DynamicImage, AppError> {
+    let ext = src
+        .extension()
+        .and_then(|e| e.to_str())
+        .map(|e| e.to_ascii_lowercase())
+        .unwrap_or_default();
+    if ext == "gif" {
+        let file = std::fs::File::open(src).map_err(|e| AppError::io(e.to_string()))?;
+        let reader = std::io::BufReader::new(file);
+        let decoder = image::codecs::gif::GifDecoder::new(reader)
+            .map_err(|e| AppError::image(e.to_string()))?;
+        use image::AnimationDecoder;
+        let mut frames = decoder.into_frames();
+        let frame = frames
+            .next()
+            .ok_or_else(|| AppError::image("GIF has no frames"))?
+            .map_err(|e| AppError::image(e.to_string()))?;
+        return Ok(DynamicImage::ImageRgba8(frame.into_buffer()));
+    }
+    image::open(src).map_err(|e| AppError::image(e.to_string()))
+}
+
+pub fn read_source_info(path: &Path) -> Result<SourceInfo, AppError> {
+    let name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or_default()
+        .to_owned();
+    match classify(path) {
+        FileKind::Image {
+            kind,
+            needs_conversion,
+        } => {
+            let (width, height) =
+                image::image_dimensions(path).map_err(|e| AppError::image(e.to_string()))?;
+            Ok(SourceInfo {
+                path: path.to_string_lossy().into_owned(),
+                name,
+                kind,
+                width,
+                height,
+                needs_conversion,
+            })
+        }
+        FileKind::Ktx1 | FileKind::Ktx2 => Err(AppError::invalid_input(
+            "KTX files are inspected, not used as encode sources",
+        )),
+        FileKind::Unsupported => Err(AppError::unsupported_file(format!(
+            "unsupported source: {}",
+            path.display()
+        ))),
+    }
+}
+
+pub fn thumbnail_png(path: &Path, max: u32) -> Result<Vec<u8>, AppError> {
+    let max = max.max(1);
+    let img = image::open(path).map_err(|e| AppError::image(e.to_string()))?;
+    let thumb = img.resize(max, max, FilterType::Triangle);
+    let mut buf = Vec::new();
+    let mut cursor = std::io::Cursor::new(&mut buf);
+    thumb
+        .write_to(&mut cursor, ImageFormat::Png)
+        .map_err(|e| AppError::image(e.to_string()))?;
+    Ok(buf)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use image::GenericImageView;
+
+    fn fixtures() -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
+    }
+
+    #[test]
+    fn converts_jpeg_to_png_same_size() {
+        let root = fixtures();
+        let dir = tempfile::tempdir().unwrap();
+        let prepared = prepare_input(&root.join("rgb.jpg"), dir.path()).unwrap();
+        assert!(!prepared.passthrough);
+        assert_eq!(
+            prepared.path.extension().and_then(|e| e.to_str()),
+            Some("png")
+        );
+        let (w, h) = image::image_dimensions(&prepared.path).unwrap();
+        let (sw, sh) = image::image_dimensions(root.join("rgb.jpg")).unwrap();
+        assert_eq!((w, h), (sw, sh));
+    }
+
+    #[test]
+    fn exr_passthrough_byte_identical() {
+        let root = fixtures();
+        let dir = tempfile::tempdir().unwrap();
+        let src = root.join("hdr.exr");
+        let prepared = prepare_input(&src, dir.path()).unwrap();
+        assert!(prepared.passthrough);
+        assert_eq!(prepared.path, src);
+        let a = std::fs::read(&src).unwrap();
+        let b = std::fs::read(&prepared.path).unwrap();
+        assert_eq!(a, b);
+    }
+
+    #[test]
+    fn thumbnail_long_side_at_most_max() {
+        let root = fixtures();
+        let bytes = thumbnail_png(&root.join("rgba.png"), 32).unwrap();
+        let img = image::load_from_memory(&bytes).unwrap();
+        let (w, h) = img.dimensions();
+        assert!(w <= 32 && h <= 32, "{w}x{h}");
+        let (sw, sh) = image::image_dimensions(root.join("rgba.png")).unwrap();
+        if sw.max(sh) >= 32 {
+            assert_eq!(w.max(h), 32);
+        }
+    }
 }

@@ -110,3 +110,15 @@ Rust still wraps the CLI where the tool stops, as already specified:
 ASTC `--format` strings keep the Vulkan `_BLOCK` suffix required by v4.4.2. This supersedes the interim “user must choose A or B” note in the Wave 0 spike entry above; the user chose **pin and defer** (A).
 
 **Why:** The user chose a stable pin over moving to a 5.0 release candidate. Deferring gaps keeps encode args and the option rules engine honest to the binary we ship; inventing 5.0-only names would fail at runtime.
+
+## 2026-10-10 — Wave 3 engine notes
+
+**Decided:**
+
+1. **`run_ktx` vs collect:** `sidecar::run_ktx` maps non-zero exit to `AppError::Ktx`. `sidecar::run_ktx_collect` returns `KtxOutput` for any exit code so `info::inspect` can still parse JSON from invalid files (stdout is not on `AppError::Ktx`).
+2. **`CancellationHandle`:** Shared `Arc<AtomicBool>`; cancel kills the shell `CommandChild` and returns `AppError::Cancelled`.
+3. **KTXanimData + BasisLZ fixture:** Reject when `layerCount < 2`. Wave 0 `basis_lz.ktx2` is a non-array texture (`layerCount` 0) with SGD, so write success is tested on `array4_mips.ktx2` / `anim.ktx2`; `basis_lz.ktx2` asserts rejection. SGD rewrite code remains for when encode produces layers + BasisLZ.
+4. **`hdr.exr` fixture:** Regenerated with alphabetically sorted RGBA channels (`exr` crate). The Wave 0 file failed OpenEXR channel-order validation in both `image` and `exr`, blocking tone-map tests. Preview tone-map loads EXR via the `exr` crate (not `image`'s OpenEXR decoder).
+5. **Extract transcode:** v4.4.2 `extract.txt` has only `r8|rg8|rgb8|rgba8` unpacked targets; half-float targets stay deferred per the pin decision.
+
+**Why:** Keep Wave 3 engines honest to the shipped binary and fixtures without inventing 5.0 surface or weakening the anim layer rule.

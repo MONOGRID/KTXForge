@@ -349,6 +349,8 @@ These shapes are fixed. Tasks fill in fields exactly as listed; extra fields nee
 
 ## Wave 3 — Rust engines
 
+Status: **complete** (2026-10-10). T3.1–T3.10 implemented with unit tests; `npm run check` green. Process-spawn paths that need a staged `ktx` sidecar or `AppHandle` remain `#[ignore]` until Wave 4.
+
 Parallel. Pure or near-pure modules with unit tests. No Tauri commands yet.
 
 ### T3.1 Sidecar runner

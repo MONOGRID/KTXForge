@@ -37,10 +37,11 @@ image = { version = "0.25", default-features = false, features = [
   "exr",
   "hdr",
 ] }
+exr = "1.74"
 tempfile = "3"
 ktx2 = "0.5"
 uuid = { version = "1", features = ["v4"] }
-tokio = { version = "1", features = ["sync", "fs", "process"] }
+tokio = { version = "1", features = ["sync", "fs", "process", "time", "macros", "rt"] }
 
 [profile.release]
 codegen-units = 1

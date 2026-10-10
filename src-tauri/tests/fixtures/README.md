@@ -11,7 +11,7 @@ Total size is under 2 MB (~90 KiB as of Wave 0).
 | `rgba.png` | Synthetic 64×64 RGBA PNG |
 | `rgb.jpg` | Solid 48×48 JPEG via System.Drawing |
 | `gray.png` | Synthetic 32×32 greyscale PNG |
-| `hdr.exr` | Minimal OpenEXR half-float RGBA 16×16 |
+| `hdr.exr` | Minimal OpenEXR float RGBA 32×32 with alphabetically sorted channels (rewritten Wave 3; prior Wave 0 file failed OpenEXR channel-order validation) |
 | `odd_size.png` | Synthetic 37×19 RGBA PNG |
 | `frames/frame_001.png` … `frame_004.png` | 32×32 solid colors |
 | `cube/face_0.png` … `face_5.png` | Cubemap faces in +X…−Z order |
