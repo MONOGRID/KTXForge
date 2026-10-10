@@ -12,10 +12,8 @@ import type { OptionKey } from "../bindings/OptionKey";
 import type { OptionReport } from "../bindings/OptionReport";
 import type { SourceInfo } from "../bindings/SourceInfo";
 
-/** @expected-unused consumed by T5.4 */
 export type JobStatus = "idle" | "running" | "done" | "error";
 
-/** @expected-unused consumed by T5.4 */
 export type JobState = {
   status: JobStatus;
   jobId: string | null;

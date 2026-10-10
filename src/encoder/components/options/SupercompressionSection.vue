@@ -1,6 +1,4 @@
 <script setup lang="ts">
-// fallow-ignore-file unused-file
-// consumed by T5.4
 import { computed } from "vue";
 import type { Supercompression } from "../../../bindings/Supercompression";
 import OptionField from "../../../shared/components/OptionField.vue";
