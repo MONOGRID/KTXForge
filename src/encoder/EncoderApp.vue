@@ -1,14 +1,17 @@
 <script setup lang="ts">
 import { useTitle } from "@vueuse/core";
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted } from "vue";
 import {
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Toaster } from "@/components/ui/sonner";
+import { toAppError } from "../api/guards";
 import ModeToggle from "../shared/components/ModeToggle.vue";
 import UpdateBanner from "../shared/components/UpdateBanner.vue";
+import { toastAppError } from "../shared/toastAppError";
 import DropOverlay from "./components/DropOverlay.vue";
 import EncodeBar from "./components/EncodeBar.vue";
 import PreviewPane from "./components/PreviewPane.vue";
@@ -17,8 +20,6 @@ import OptionsPanel from "./components/options/OptionsPanel.vue";
 import { initStore, store } from "./store";
 
 useTitle("KTX-GUI");
-
-const initError = ref<string | null>(null);
 
 const versionLabel = computed((): string => {
   const version = store.ktxVersion;
@@ -30,14 +31,17 @@ const versionLabel = computed((): string => {
 
 onMounted(() => {
   void initStore().catch((err: unknown) => {
-    initError.value =
-      err instanceof Error ? err.message : "Failed to initialize encoder";
+    toastAppError(toAppError(err));
   });
 });
 </script>
 
 <template>
   <div class="box-border flex h-screen flex-col overflow-hidden font-sans text-ink">
+    <Toaster
+      rich-colors
+      close-button
+    />
     <DropOverlay />
 
     <header class="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-surface-raised px-4 py-2">
@@ -53,14 +57,6 @@ onMounted(() => {
     </header>
 
     <UpdateBanner />
-
-    <p
-      v-if="initError"
-      class="m-0 border-b border-danger/40 bg-danger/10 px-4 py-2 text-sm text-danger"
-      role="alert"
-    >
-      {{ initError }}
-    </p>
 
     <main class="min-h-0 flex-1 p-2">
       <ResizablePanelGroup

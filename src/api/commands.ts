@@ -24,9 +24,9 @@ export type Commands = {
   pick_sources: { args: EmptyArgs; result: SourceInfo[] };
   source_thumbnail: { args: { path: string }; result: ArrayBuffer };
   encode: { args: { request: EncodeRequest }; result: EncodeResult };
-  cancel_encode: { args: { job_id: string }; result: null };
-  encoded_preview: { args: { job_id: string }; result: ArrayBuffer };
-  save_encoded: { args: { job_id: string }; result: string | null };
+  cancel_encode: { args: { jobId: string }; result: null };
+  encoded_preview: { args: { jobId: string }; result: ArrayBuffer };
+  save_encoded: { args: { jobId: string }; result: string | null };
   open_inspector: { args: { path: string }; result: null };
   inspector_current_file: { args: EmptyArgs; result: string | null };
   inspect: { args: { path: string }; result: InspectReport };

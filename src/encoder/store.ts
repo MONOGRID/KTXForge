@@ -2,7 +2,6 @@ import { useDebounceFn } from "@vueuse/core";
 import { reactive, watch } from "vue";
 import { call } from "../api/commands";
 import type { AnimationOptions } from "../bindings/AnimationOptions";
-import type { AppError } from "../bindings/AppError";
 import type { CreateOptions } from "../bindings/CreateOptions";
 import type { EncodeResult } from "../bindings/EncodeResult";
 import type { EncodeStage } from "../bindings/EncodeStage";
@@ -20,7 +19,6 @@ export type JobState = {
   stage: EncodeStage | null;
   stderrLines: string[];
   result: EncodeResult | null;
-  error: AppError | null;
 };
 
 function emptyJob(): JobState {
@@ -30,7 +28,6 @@ function emptyJob(): JobState {
     stage: null,
     stderrLines: [],
     result: null,
-    error: null,
   };
 }
 

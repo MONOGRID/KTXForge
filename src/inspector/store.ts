@@ -1,13 +1,13 @@
 import { computed, ref, shallowRef } from "vue";
 import { call } from "../api/commands";
 import { on } from "../api/events";
-import { isAppError } from "../api/guards";
-import type { AppError } from "../bindings/AppError";
+import { toAppError } from "../api/guards";
 import type { ImageSelection } from "../bindings/ImageSelection";
 import type { InspectReport } from "../bindings/InspectReport";
 import type { Ktx1Header } from "../bindings/Ktx1Header";
 import type { Ktx2Info } from "../bindings/Ktx2Info";
 import type { KeyValueValue } from "../bindings/KeyValueValue";
+import { toastAppError } from "../shared/toastAppError";
 
 export const MISSING = "—";
 
@@ -21,7 +21,6 @@ const DEFAULT_SELECTION = {
 export const path = ref<string | null>(null);
 export const report = shallowRef<InspectReport | null>(null);
 export const selection = ref<ImageSelection>({ ...DEFAULT_SELECTION });
-export const error = shallowRef<AppError | null>(null);
 export const loading = ref(false);
 
 export const ktx2Info = computed((): Ktx2Info | null => {
@@ -87,15 +86,12 @@ export function displayKeyValue(value: KeyValueValue): string {
 async function loadPath(nextPath: string): Promise<void> {
   path.value = nextPath;
   loading.value = true;
-  error.value = null;
   try {
     report.value = await call("inspect", { path: nextPath });
     selection.value = { ...DEFAULT_SELECTION };
   } catch (err: unknown) {
     report.value = null;
-    error.value = isAppError(err)
-      ? err
-      : { kind: "io", message: err instanceof Error ? err.message : "Inspect failed" };
+    toastAppError(toAppError(err));
   } finally {
     loading.value = false;
   }

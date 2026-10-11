@@ -5,8 +5,8 @@ import { on } from "../../api/events";
 import { toAppError } from "../../api/guards";
 import type { EncodeStage } from "../../bindings/EncodeStage";
 import Button from "../../shared/components/Button.vue";
-import ErrorBox from "../../shared/components/ErrorBox.vue";
 import ProgressBar from "../../shared/components/ProgressBar.vue";
+import { toastAppError } from "../../shared/toastAppError";
 import type { JobState, JobStatus } from "../store";
 import { store } from "../store";
 
@@ -62,7 +62,6 @@ function resetJobForRun(jobId: string): void {
     stage: "converting",
     stderrLines: [],
     result: null,
-    error: null,
   };
   store.job = next;
 }
@@ -90,17 +89,17 @@ async function onEncode(): Promise<void> {
     store.job.status = "done";
     store.job.stage = "done";
     store.job.result = result;
-    store.job.error = null;
   } catch (err: unknown) {
     if (store.job.jobId !== jobId) {
       return;
     }
     const appError = toAppError(err);
     store.job.status = appError.kind === "cancelled" ? "idle" : "error";
-    store.job.error = appError.kind === "cancelled" ? null : appError;
     store.job.result = null;
     if (appError.kind === "cancelled") {
       store.job.stage = null;
+    } else {
+      toastAppError(appError);
     }
   }
 }
@@ -111,10 +110,9 @@ async function onCancel(): Promise<void> {
     return;
   }
   try {
-    await call("cancel_encode", { job_id: jobId });
+    await call("cancel_encode", { jobId });
   } catch (err: unknown) {
-    store.job.error = toAppError(err);
-    store.job.status = "error";
+    toastAppError(toAppError(err));
   }
 }
 
@@ -124,10 +122,9 @@ async function onSave(): Promise<void> {
     return;
   }
   try {
-    await call("save_encoded", { job_id: jobId });
+    await call("save_encoded", { jobId });
   } catch (err: unknown) {
-    store.job.error = toAppError(err);
-    store.job.status = "error";
+    toastAppError(toAppError(err));
   }
 }
 
@@ -205,11 +202,6 @@ onUnmounted(() => {
         v-if="stderrTail"
         class="m-0 max-h-28 overflow-auto rounded bg-surface-sunken p-2 font-mono text-xs whitespace-pre-wrap text-ink-muted"
       >{{ stderrTail }}</pre>
-
-      <ErrorBox
-        v-if="store.job.error"
-        :error="store.job.error"
-      />
     </div>
   </section>
 </template>

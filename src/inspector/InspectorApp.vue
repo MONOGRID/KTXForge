@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
 import { useTitle } from "@vueuse/core";
+import { Toaster } from "@/components/ui/sonner";
 import ModeToggle from "../shared/components/ModeToggle.vue";
 import ExportPanel from "./components/ExportPanel.vue";
 import BasisGlobalDataPanel from "./components/report/BasisGlobalDataPanel.vue";
@@ -18,7 +19,6 @@ import MipStrip from "./components/viewer/MipStrip.vue";
 import SubresourceSelectors from "./components/viewer/SubresourceSelectors.vue";
 import {
   displayValue,
-  error,
   initInspectorStore,
   ktx1Header,
   ktx1Text,
@@ -58,6 +58,10 @@ onMounted(() => {
 
 <template>
   <main class="box-border grid min-h-screen grid-cols-1 gap-4 p-4 font-sans lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+    <Toaster
+      rich-colors
+      close-button
+    />
     <section class="flex min-h-0 flex-col gap-3 overflow-auto">
       <header class="panel px-3 py-2">
         <div class="flex items-start justify-between gap-3">
@@ -78,12 +82,6 @@ onMounted(() => {
         >
           Loading…
         </p>
-        <div
-          v-if="error !== null"
-          class="mt-2 rounded border border-danger/40 bg-danger/10 p-2 text-sm text-danger"
-        >
-          {{ error.message }}
-        </div>
       </header>
 
       <StatusPanel

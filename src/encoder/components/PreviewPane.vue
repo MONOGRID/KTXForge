@@ -2,7 +2,9 @@
 import { computed, onUnmounted, ref, watch } from "vue";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { call } from "../../api/commands";
+import { toAppError } from "../../api/guards";
 import type { EncodeResult } from "../../bindings/EncodeResult";
+import { toastAppError } from "../../shared/toastAppError";
 import { store } from "../store";
 
 const sourceUrl = ref<string | null>(null);
@@ -79,7 +81,7 @@ watch(
     if (jobId === null) {
       return;
     }
-    void call("encoded_preview", { job_id: jobId })
+    void call("encoded_preview", { jobId })
       .then((bytes) => {
         if (store.job.jobId !== jobId || store.job.status !== "done") {
           return;
@@ -88,8 +90,11 @@ watch(
           new Blob([bytes], { type: "image/png" }),
         );
       })
-      .catch(() => {
-        // Leave the encoded slot empty; stats still show.
+      .catch((err: unknown) => {
+        if (store.job.jobId !== jobId || store.job.status !== "done") {
+          return;
+        }
+        toastAppError(toAppError(err));
       });
   },
   { immediate: true },

@@ -2,7 +2,7 @@
 import { computed, onUnmounted, ref, watch } from "vue";
 import { call } from "../../../api/commands";
 import { toAppError } from "../../../api/guards";
-import type { AppError } from "../../../bindings/AppError";
+import { toastAppError } from "../../../shared/toastAppError";
 import { path, report, selection } from "../../store";
 
 type FitMode = "real" | "fit";
@@ -12,7 +12,7 @@ const objectUrl = ref<string | null>(null);
 const naturalWidth = ref(0);
 const naturalHeight = ref(0);
 const loading = ref(false);
-const error = ref<AppError | null>(null);
+const loadFailed = ref(false);
 const fetchGen = ref(0);
 
 const previewUnavailable = computed((): string | null => {
@@ -41,7 +41,7 @@ async function loadImage(): Promise<void> {
   revokeUrl();
   naturalWidth.value = 0;
   naturalHeight.value = 0;
-  error.value = null;
+  loadFailed.value = false;
 
   if (filePath === null || filePath === "" || report.value === null) {
     loading.value = false;
@@ -75,7 +75,8 @@ async function loadImage(): Promise<void> {
     if (gen !== fetchGen.value) {
       return;
     }
-    error.value = toAppError(err);
+    loadFailed.value = true;
+    toastAppError(toAppError(err));
   } finally {
     if (gen === fetchGen.value) {
       loading.value = false;
@@ -171,10 +172,10 @@ onUnmounted(() => {
         Preview unavailable: {{ previewUnavailable }}
       </div>
       <div
-        v-else-if="error !== null"
-        class="p-4 text-sm text-danger"
+        v-else-if="loadFailed"
+        class="p-4 text-sm text-ink-muted"
       >
-        {{ error.message }}
+        Failed to load image
       </div>
       <div
         v-else-if="objectUrl === null"

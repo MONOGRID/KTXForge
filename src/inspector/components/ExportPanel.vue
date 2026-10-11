@@ -2,14 +2,13 @@
 import { computed, ref, watch } from "vue";
 import { call } from "../../api/commands";
 import { toAppError } from "../../api/guards";
-import type { AppError } from "../../bindings/AppError";
 import type { ExportFormat } from "../../bindings/ExportFormat";
 import type { ExportSelection } from "../../bindings/ExportSelection";
 import type { ImageSelection } from "../../bindings/ImageSelection";
 import type { PreviewKind } from "../../bindings/PreviewKind";
 import Button from "../../shared/components/Button.vue";
-import ErrorBox from "../../shared/components/ErrorBox.vue";
 import Panel from "../../shared/components/Panel.vue";
+import { toastAppError } from "../../shared/toastAppError";
 import { path, report, selection } from "../store";
 
 type ScopeKind = "one" | "allFrames" | "all";
@@ -73,7 +72,6 @@ const scope = ref<ScopeKind>("one");
 const formatKind = ref<FormatKind>("png");
 const jpegQuality = ref(90);
 const busy = ref(false);
-const exportError = ref<AppError | null>(null);
 const writtenFiles = ref<string[]>([]);
 
 const pngJpegDisabledReason = computed((): string | null =>
@@ -107,15 +105,14 @@ const canExport = computed(
 );
 
 async function onExport(): Promise<void> {
-  exportError.value = null;
   writtenFiles.value = [];
 
   const filePath = path.value;
   if (filePath === null || !fileReady.value) {
-    exportError.value = {
+    toastAppError({
       kind: "invalidInput",
       message: "No file loaded",
-    };
+    });
     return;
   }
 
@@ -130,7 +127,7 @@ async function onExport(): Promise<void> {
     });
     writtenFiles.value = result.files;
   } catch (err: unknown) {
-    exportError.value = toAppError(err);
+    toastAppError(toAppError(err));
   } finally {
     busy.value = false;
   }
@@ -222,12 +219,6 @@ async function onExport(): Promise<void> {
         {{ busy ? "Exporting…" : "Export" }}
       </Button>
     </div>
-
-    <ErrorBox
-      v-if="exportError"
-      class="mt-3"
-      :error="exportError"
-    />
 
     <ul
       v-if="writtenFiles.length > 0"

@@ -165,3 +165,9 @@ ASTC `--format` strings keep the Vulkan `_BLOCK` suffix required by v4.4.2. This
 **Decided:** `ValidationMessage` is `{ id: u32, type, message, details }` per [info_v0](https://schema.khronos.org/ktx/info_v0.json) (`type` is `fatal` | `error` | `warning`). The previous `level` / string `id` shape was wrong; samples had empty `messages` so it never failed until a file with warnings was opened.
 
 **Why:** Inspector failed to parse `barracuda_base_alpha.ktx2` with `invalid type: integer 6030, expected a string`.
+
+## 2026-10-11 — Command args camelCase; errors via Sonner toast
+
+**Decided:** Tauri v2 IPC renames snake_case command parameters to camelCase for the webview, so frontend `call(...)` args use `jobId` (not `job_id`) for `cancel_encode` / `encoded_preview` / `save_encoded`. Transient and command failures surface through shadcn-vue Sonner (`vue-sonner`) toasts in both encoder and inspector windows via a shared `toastAppError` helper; the inline `ErrorBox` and header error banners are removed.
+
+**Why:** Save and encoded preview failed with `missing required key jobId` while the UI kept snake_case keys. Red inline error boxes are a poor fit for multi-window desktop chrome; toasts keep the panels clean and work the same in the inspector.
