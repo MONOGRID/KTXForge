@@ -62,16 +62,30 @@ Replace the SVGs under [`docs/screenshots/`](docs/screenshots/) with real captur
 ## Development
 
 ```bash
-npm install
+npm ci
 npm run fetch-ktx   # stage pinned ktx sidecars (see project scripts)
 npm run tauri dev
 ```
+
+Prerequisites: Node LTS, Rust stable, and `cargo install cargo-machete` (CI caches the binary).
 
 Quality gate before commit:
 
 ```bash
 npm run check
 ```
+
+### Commits and releases
+
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/). On `main` / `beta`, [semantic-release](https://semantic-release.gitbook.io/) derives the version (`feat` → minor, `fix` / `perf` → patch, `!` or `BREAKING CHANGE:` → major; other types do not release), updates [`CHANGELOG.md`](CHANGELOG.md), tags, and publishes GitHub Release artifacts via Actions.
+
+Preview the next version locally (needs a `GITHUB_TOKEN` with repo access):
+
+```bash
+npx semantic-release --dry-run --no-ci
+```
+
+Releases run only in CI (`npm run release` / the Release workflow). To bump the embedded `ktx` pin, edit `ktx-version.json` in a `feat:` or `fix:` commit.
 
 Product requirements live in [`docs/requirements.md`](docs/requirements.md). Decision log: [`docs/decision-context.md`](docs/decision-context.md).
 

@@ -525,6 +525,8 @@ Parallel. Vue only renders and calls `src/api`. Each task owns its own folder or
 
 ## Wave 6 — CI and releases
 
+Status: **complete** (2026-10-11). T6.1–T6.4 implemented; updater pubkey committed; signing private key stored as GitHub secret `TAURI_SIGNING_PRIVATE_KEY`. Branch rename `master` → `dev` at first push to `MONOGRID/KTXForge`.
+
 Can start any time after Wave 2 (needs T2.4 and the `check` scripts from T1.1). Parallel. These tasks touch only CI, release config, and the updater keys in `tauri.conf.json`, so they never collide with Waves 3–5.
 
 ### Release flow

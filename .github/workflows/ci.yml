@@ -1,0 +1,77 @@
+name: CI
+
+on:
+  push:
+    branches-ignore:
+      - main
+      - beta
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, macos-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Setup Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Cache Rust
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+
+      - name: Cache cargo-machete
+        id: cache-machete
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-machete${{ runner.os == 'Windows' && '.exe' || '' }}
+          key: cargo-machete-${{ runner.os }}-${{ runner.arch }}
+
+      - name: Install cargo-machete
+        if: steps.cache-machete.outputs.cache-hit != 'true'
+        run: cargo install cargo-machete --locked
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Fetch ktx sidecar
+        run: npm run fetch-ktx
+
+      - name: Quality gate
+        run: npm run check
+
+      - name: Rust tests (including ignored)
+        run: cargo test --manifest-path src-tauri/Cargo.toml -- --include-ignored
+
+      - name: Bindings unchanged
+        run: git diff --exit-code src/bindings
+
+      - name: Commitlint (pull requests)
+        if: github.event_name == 'pull_request' && matrix.os == 'ubuntu-22.04'
+        run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }}

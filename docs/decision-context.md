@@ -353,3 +353,9 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 **Decided:** Brand masters live at `assets/icon-simple.png` (anvil + flame + KTX) and `assets/icon-full.png` (adds FORGE wordmark and pixel sparks). `npm run icons` (`scripts/generate-icons.mjs`) resizes them into `src-tauri/icons` and `public/`: sizes **&lt; 128px** from simple, **≥ 128px** from full (ICO layers 16–64 simple / 256 full; ICNS PNG types likewise). Webviews link `public/favicon.ico` + `favicon-32.png`. Regenerating needs `npm install --no-save sharp to-ico @fiahfy/icns` (not permanent deps).
 
 **Why:** `tauri icon` takes one source; the full mark illegibly crushes at taskbar/tray sizes, while the simple mark underuses large dock/installer surfaces.
+
+## 2026-10-11 — Wave 6 CI/release and updater signing key
+
+**Decided:** Ship Wave 6 as `.github/workflows/ci.yml` + `release.yml`, `.releaserc.json`, `scripts/set-version.mjs` / `release-outputs.mjs`, and updater config in `tauri.conf.json` (`createUpdaterArtifacts`, pubkey, `releases/latest/download/latest.json`, Windows `passive`, macOS ad-hoc `-`). Generate the minisign keypair with `tauri signer generate` for this repo; commit only the public key; store the private key as GitHub secret `TAURI_SIGNING_PRIVATE_KEY` (no password). Integration branch is `dev` (renamed from `master`); `main` is created locally for the post–Wave 7 ship merge and is not pushed until then so an empty-repo push does not publish `1.0.0` early.
+
+**Why:** Unblocks CI and the automatic release pipeline on `MONOGRID/KTXForge` while keeping the first public release gated on Wave 7 acceptance.
