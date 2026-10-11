@@ -189,3 +189,21 @@ ASTC `--format` strings keep the Vulkan `_BLOCK` suffix required by v4.4.2. This
 **Decided:** Known `ktx create` defaults are real values in `CreateOptions::default` (and the matching store interim object), not empty fields with placeholder / “Default (…)” / “tool default” chrome. Applies especially when dependents key off “value is set”. Current defaults from [ktx-cli/create.txt](../ktx-cli/create.txt): `scale` 1; mipmap filter `lanczos4`, filter scale `1.0`, wrap `clamp`; BasisLZ `qlevel` 128, `clevel` 1, RDO thresholds `1.25`; UASTC quality `1`, RDO-L/D/B/S `1` / `4096` / `10` / `18`; ASTC quality `medium`; `threads` = `available_parallelism` (or 1). Leave unset only when the CLI default is “flag omitted” with no numeric/enum default (`width`/`height`/`layers`/`depth`/`levels`, `max-endpoints`/`max-selectors`, encode none, color assign/convert). UASTC RDO sub-flags are stored at their defaults but emitted only when `--uastc-rdo` is on. Documented in [AGENTS.md](../AGENTS.md).
 
 **Why:** Placeholders looked like defaults but left `null`/`None`, so enablement gates and argv disagreed with what the user saw. Real defaults match the tool and keep dependent controls honest.
+
+## 2026-10-11 — Option tooltips from Rust `describe_options`
+
+**Decided:** Help copy for every `OptionKey` and every enum choice lives in Rust (`ktx/option_help.rs`) and is returned on each `FieldState` from `describe_options` as `help` (option meaning) and `choices: [{ value, help }]` (select-item meaning). Vue renders shadcn-vue `Tooltip` via `HelpTooltip` / `EnumSelect`; it does not own a parallel help catalog. UI-only controls (format group, animation fields, supercompression scheme) keep short local strings. Replaces the TypeScript `optionHelp.ts` map and the hand-rolled CSS tooltip.
+
+**Why:** Same reason as enablement: tool knowledge stays next to the CLI rules engine, one source of truth, testable in Rust. Select items need the same catalog so each codec/filter/primaries value can explain itself.
+
+## 2026-10-11 — Native File / Help menu for all actions
+
+**Decided:** Expand the native menu (still owned in Rust `menu.rs`) to File → Open…, Encode, Cancel Encode, Save…, Clear Sources, Export…, Exit, plus Help → Check for Updates…. Open and Check for Updates run in Rust (dialog / updater). Encode, Cancel, Save, Clear Sources, and Export emit `menu://action` with a typed `MenuAction`; the encoder and inspector frontends share the same handlers as the on-screen buttons. Enablement is synced from Vue via `set_menu_item_enabled` so menu items match button disabled state. Shortcuts: Cmd/Ctrl+O open, Enter encode, `.` cancel, S save, Shift+E export, Q exit.
+
+**Why:** Desktop apps expose every primary action in the menu bar with accelerators; the previous menu was Exit-only. Keeping definition and dialogs in Rust preserves the “menu is window chrome” decision while job/export state stays in Vue.
+
+## 2026-10-11 — VS Code–inspired light/dark theme tokens
+
+**Decided:** Override shadcn CSS variables and the app bridge tokens in `theme.css` (loaded after `virtual:uno.css`) to match VS Code Dark+/Light+ surfaces: editor `#1e1e1e` / raised `#252526` / borders `#3e3e42` in dark; white / `#f3f3f3` / `#cecece` in light with stronger ink (`#1e1e1e`, `#616161`). `primary` / `ring` use VS Code blue (`#007acc`) so switches and focus rings are accent-colored rather than grey-on-grey. Switch thumbs stay white; inputs/selects use `bg-background` for inset fields. Brand green remains on `brand` for encode/primary app actions only. Preset stays on `neutral` as the structural base; palette ownership is `theme.css`.
+
+**Why:** Stock shadcn neutral reads as flat grey (especially unchecked switches and muted panels); light felt washed. Desktop users expect VS Code–like contrast between chrome, inputs, and active controls.

@@ -4,9 +4,9 @@ import type { OptionKey } from "../../../bindings/OptionKey";
 import type { Supercompression } from "../../../bindings/Supercompression";
 import { Input } from "@/components/ui/input";
 import EnumSelect from "../../../shared/components/EnumSelect.vue";
+import HelpTooltip from "../../../shared/components/HelpTooltip.vue";
 import OptionField from "../../../shared/components/OptionField.vue";
 import Panel from "../../../shared/components/Panel.vue";
-import Tooltip from "../../../shared/components/Tooltip.vue";
 import { fieldState, store } from "../../store";
 import { anyEnabled } from "./optionControls";
 
@@ -31,9 +31,15 @@ const zstdEnabled = computed(() => fieldState("zstd").enabled);
 const zlibEnabled = computed(() => fieldState("zlib").enabled);
 
 const schemes = computed(() => {
+  const helps = {
+    none: "No supercompression after encode.",
+    zstd: fieldState("zstd").help,
+    zlib: fieldState("zlib").help,
+  } satisfies Record<Kind, string>;
   const all = (["none", "zstd", "zlib"] as const).map((value) => ({
     value,
     label: schemeLabels[value],
+    help: helps[value],
   }));
   return all.filter((entry) => {
     if (entry.value === "zstd") {
@@ -114,7 +120,7 @@ function changeZlib(value: string | number): void {
     title="Supercompression"
   >
     <div class="field-row">
-      <Tooltip
+      <HelpTooltip
         text="Optional Zstd or Zlib supercompression after encode. Not valid with BasisLZ."
         class="label"
       >
@@ -123,7 +129,7 @@ function changeZlib(value: string | number): void {
           :for="schemeId"
           title="Scheme"
         >Scheme</label>
-      </Tooltip>
+      </HelpTooltip>
       <div class="min-w-0 flex-1">
         <EnumSelect
           :id="schemeId"

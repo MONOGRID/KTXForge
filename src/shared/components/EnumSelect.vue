@@ -10,19 +10,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import type { EnumSelectGroup, EnumSelectOption } from "../enumSelect";
+import HelpTooltip from "./HelpTooltip.vue";
 import { optionControlIdKey } from "./optionControlId";
 
 const EMPTY_VALUE = "__empty__";
-
-type EnumSelectOption = {
-  value: string;
-  label: string;
-};
-
-type EnumSelectGroup = {
-  label: string;
-  options: readonly EnumSelectOption[];
-};
 
 const props = withDefaults(
   defineProps<{
@@ -31,6 +23,7 @@ const props = withDefaults(
     groups?: readonly EnumSelectGroup[];
     /** Label for the empty/null choice. Pass `false` to omit it. */
     emptyLabel?: string | false;
+    emptyHelp?: string;
     id?: string;
     disabled?: boolean;
     class?: string;
@@ -39,6 +32,7 @@ const props = withDefaults(
     options: () => [],
     groups: () => [],
     emptyLabel: "Default",
+    emptyHelp: undefined,
     id: undefined,
     disabled: false,
     class: undefined,
@@ -89,14 +83,24 @@ function onUpdate(value: unknown): void {
         v-if="emptyLabel !== false"
         :value="EMPTY_VALUE"
       >
-        {{ emptyLabel }}
+        <HelpTooltip
+          :text="emptyHelp ?? ''"
+          side="right"
+        >
+          <span class="block w-full truncate">{{ emptyLabel }}</span>
+        </HelpTooltip>
       </SelectItem>
       <SelectItem
         v-for="option in options"
         :key="option.value"
         :value="option.value"
       >
-        {{ option.label }}
+        <HelpTooltip
+          :text="option.help ?? ''"
+          side="right"
+        >
+          <span class="block w-full truncate">{{ option.label }}</span>
+        </HelpTooltip>
       </SelectItem>
       <SelectGroup
         v-for="group in groups"
@@ -108,7 +112,12 @@ function onUpdate(value: unknown): void {
           :key="option.value"
           :value="option.value"
         >
-          {{ option.label }}
+          <HelpTooltip
+            :text="option.help ?? ''"
+            side="right"
+          >
+            <span class="block w-full truncate">{{ option.label }}</span>
+          </HelpTooltip>
         </SelectItem>
       </SelectGroup>
     </SelectContent>

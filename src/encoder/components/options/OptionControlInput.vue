@@ -5,7 +5,7 @@ import { Switch } from "@/components/ui/switch";
 import EnumSelect from "../../../shared/components/EnumSelect.vue";
 import { optionControlIdKey } from "../../../shared/components/optionControlId";
 import {
-  enumEntries,
+  enumEntriesWithHelp,
   parseNumberField,
   type OptionControlField,
 } from "./optionControls";
@@ -20,7 +20,7 @@ const enumOptions = computed(() => {
   if (props.field.kind !== "enum") {
     return [];
   }
-  return enumEntries(props.field.labels);
+  return enumEntriesWithHelp(props.field.key, props.field.labels);
 });
 
 const numberDisplay = computed((): string => {

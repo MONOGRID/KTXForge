@@ -3,6 +3,7 @@
 use strum::IntoEnumIterator;
 
 use crate::commands::SourceInfo;
+use crate::ktx::option_help;
 use crate::ktx::options::{
     ColorPrimaries, CreateOptions, EncodeCodec, FieldState, OptionKey, OptionReport, OptionWarning,
     Supercompression, TransferFunction, VkFormat, WarningLevel,
@@ -17,6 +18,8 @@ pub fn describe(opts: &CreateOptions, _sources: &[SourceInfo]) -> OptionReport {
             key,
             enabled,
             reason,
+            help: option_help::help_for(key).to_owned(),
+            choices: option_help::choices_for(key),
         });
     }
     let mut warnings = Vec::new();
@@ -150,15 +153,14 @@ fn gates(key: OptionKey) -> &'static [Gate] {
             },
             Gate {
                 pred: RESAMPLE_ANY,
-                reason: "ignored unless --generate-mipmap, --scale, --width or --height are specified",
+                reason:
+                    "ignored unless --generate-mipmap, --scale, --width or --height are specified",
             },
         ],
-        OptionKey::ConvertTf | OptionKey::ConvertTexcoordOrigin | OptionKey::Normalize => {
-            &[Gate {
-                pred: NOT_RAW,
-                reason: "not valid with raw",
-            }]
-        }
+        OptionKey::ConvertTf | OptionKey::ConvertTexcoordOrigin | OptionKey::Normalize => &[Gate {
+            pred: NOT_RAW,
+            reason: "not valid with raw",
+        }],
         OptionKey::ConvertPrimaries => &[
             Gate {
                 pred: NOT_RAW,

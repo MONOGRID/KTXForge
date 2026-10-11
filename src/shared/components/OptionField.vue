@@ -2,15 +2,15 @@
 import { computed, provide, useId } from "vue";
 import type { FieldState } from "../../bindings/FieldState";
 import type { OptionKey } from "../../bindings/OptionKey";
-import { helpFor } from "../optionHelp";
 import { optionControlIdKey } from "./optionControlId";
-import Tooltip from "./Tooltip.vue";
+import HelpTooltip from "./HelpTooltip.vue";
 
 const props = withDefaults(
   defineProps<{
     label: string;
     optionKey: OptionKey;
     state?: FieldState;
+    /** Override Rust help (rare; prefer `state.help`). */
     help?: string;
   }>(),
   {
@@ -25,7 +25,7 @@ provide(optionControlIdKey, controlId);
 /** Hide unless Rust reported the field enabled. No state → hidden. */
 const visible = computed((): boolean => props.state?.enabled === true);
 
-const tooltip = computed((): string => props.help ?? helpFor(props.optionKey));
+const tooltip = computed((): string => props.help ?? props.state?.help ?? "");
 </script>
 
 <template>
@@ -34,7 +34,7 @@ const tooltip = computed((): string => props.help ?? helpFor(props.optionKey));
     class="field-row"
     :data-option-key="optionKey"
   >
-    <Tooltip
+    <HelpTooltip
       :text="tooltip"
       class="label"
     >
@@ -43,7 +43,7 @@ const tooltip = computed((): string => props.help ?? helpFor(props.optionKey));
         :for="controlId"
         :title="label"
       >{{ label }}</label>
-    </Tooltip>
+    </HelpTooltip>
     <div class="min-w-0 flex-1">
       <slot :control-id="controlId" />
     </div>

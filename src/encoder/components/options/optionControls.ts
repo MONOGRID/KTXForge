@@ -1,7 +1,8 @@
 import { computed, type ComputedRef } from "vue";
 import type { OptionKey } from "../../../bindings/OptionKey";
 import type { OptionWarning } from "../../../bindings/OptionWarning";
-import { isOptionEnabled, store } from "../../store";
+import type { EnumSelectOption } from "../../../shared/enumSelect";
+import { fieldState, isOptionEnabled, store } from "../../store";
 
 type BoolOptionField = {
   key: OptionKey;
@@ -84,13 +85,29 @@ export function anyEnabled(keys: readonly OptionKey[]): boolean {
   return keys.some((key) => isOptionEnabled(key));
 }
 
-export function enumEntries(
+/** Labels plus per-value help from Rust `describe_options` / `FieldState.choices`. */
+export function enumEntriesWithHelp(
+  key: OptionKey,
   labels: Record<string, string>,
-): { value: string; label: string }[] {
-  return Object.keys(labels).map((value) => ({
-    value,
-    label: labels[value] ?? value,
-  }));
+): EnumSelectOption[] {
+  const helps = new Map(
+    fieldState(key).choices.map((choice) => [choice.value, choice.help]),
+  );
+  return Object.keys(labels).map((value) => {
+    const help = helps.get(value);
+    const entry: EnumSelectOption = {
+      value,
+      label: labels[value] ?? value,
+    };
+    if (help === undefined) {
+      return entry;
+    }
+    return { ...entry, help };
+  });
+}
+
+export function choiceHelp(key: OptionKey, value: string): string | undefined {
+  return fieldState(key).choices.find((choice) => choice.value === value)?.help;
 }
 
 export function isLabeled<E extends string>(

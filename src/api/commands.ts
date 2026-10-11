@@ -37,6 +37,10 @@ export type Commands = {
   export_images: { args: { request: ExportRequest }; result: ExportResult };
   check_update: { args: EmptyArgs; result: UpdateInfo | null };
   install_update: { args: EmptyArgs; result: null };
+  set_menu_item_enabled: {
+    args: { id: string; enabled: boolean };
+    result: null;
+  };
 };
 
 export async function call<K extends keyof Commands>(

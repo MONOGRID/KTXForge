@@ -147,7 +147,13 @@ export function fieldState(key: OptionKey): FieldState {
   if (found !== undefined) {
     return found;
   }
-  return { key, enabled: false, reason: "waiting for option rules" };
+  return {
+    key,
+    enabled: false,
+    reason: "waiting for option rules",
+    help: "",
+    choices: [],
+  };
 }
 
 export function isOptionEnabled(key: OptionKey): boolean {
@@ -156,6 +162,10 @@ export function isOptionEnabled(key: OptionKey): boolean {
 
 export function addSources(items: readonly SourceInfo[]): void {
   store.sources.push(...items);
+}
+
+export function resetSources(): void {
+  store.sources.splice(0, store.sources.length);
 }
 
 export function removeSource(index: number): void {

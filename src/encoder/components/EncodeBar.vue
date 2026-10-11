@@ -1,13 +1,18 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted } from "vue";
-import { call } from "../../api/commands";
 import { on } from "../../api/events";
-import { toAppError } from "../../api/guards";
 import type { EncodeStage } from "../../bindings/EncodeStage";
 import Button from "../../shared/components/Button.vue";
 import ProgressBar from "../../shared/components/ProgressBar.vue";
-import { toastAppError } from "../../shared/toastAppError";
-import type { JobState, JobStatus } from "../store";
+import {
+  canCancelEncode,
+  canEncode,
+  canSaveEncoded,
+  cancelEncode,
+  encode,
+  saveEncoded,
+} from "../actions";
+import type { JobStatus } from "../store";
 import { store } from "../store";
 
 const STAGE_LABELS = {
@@ -28,20 +33,9 @@ const isRunning = computed(
   (): boolean => isJobStatus(store.job.status, "running"),
 );
 
-const canEncode = computed(
-  (): boolean => store.sources.length > 0 && !isRunning.value,
-);
-
-const canCancel = computed(
-  (): boolean => isRunning.value && store.job.jobId !== null,
-);
-
-const canSave = computed(
-  (): boolean =>
-    isJobStatus(store.job.status, "done") &&
-    store.job.jobId !== null &&
-    store.job.result !== null,
-);
+const encodeEnabled = computed((): boolean => canEncode());
+const cancelEnabled = computed((): boolean => canCancelEncode());
+const saveEnabled = computed((): boolean => canSaveEncoded());
 
 const stageLabel = computed((): string | null => {
   const stage = store.job.stage;
@@ -54,79 +48,6 @@ const stageLabel = computed((): string | null => {
 const stderrTail = computed((): string =>
   store.job.stderrLines.slice(-STDERR_KEEP).join("\n"),
 );
-
-function resetJobForRun(jobId: string): void {
-  const next: JobState = {
-    status: "running",
-    jobId,
-    stage: "converting",
-    stderrLines: [],
-    result: null,
-  };
-  store.job = next;
-}
-
-async function onEncode(): Promise<void> {
-  if (!canEncode.value) {
-    return;
-  }
-
-  const jobId = crypto.randomUUID();
-  resetJobForRun(jobId);
-
-  try {
-    const result = await call("encode", {
-      request: {
-        jobId,
-        sources: store.sources.map((source) => source.path),
-        options: store.options,
-        animation: store.animation,
-      },
-    });
-    if (store.job.jobId !== jobId) {
-      return;
-    }
-    store.job.status = "done";
-    store.job.stage = "done";
-    store.job.result = result;
-  } catch (err: unknown) {
-    if (store.job.jobId !== jobId) {
-      return;
-    }
-    const appError = toAppError(err);
-    store.job.status = appError.kind === "cancelled" ? "idle" : "error";
-    store.job.result = null;
-    if (appError.kind === "cancelled") {
-      store.job.stage = null;
-    } else {
-      toastAppError(appError);
-    }
-  }
-}
-
-async function onCancel(): Promise<void> {
-  const jobId = store.job.jobId;
-  if (jobId === null || !isRunning.value) {
-    return;
-  }
-  try {
-    await call("cancel_encode", { jobId });
-  } catch (err: unknown) {
-    toastAppError(toAppError(err));
-  }
-}
-
-async function onSave(): Promise<void> {
-  const jobId = store.job.jobId;
-  if (jobId === null || !canSave.value) {
-    return;
-  }
-  try {
-    await call("save_encoded", { jobId });
-  } catch (err: unknown) {
-    toastAppError(toAppError(err));
-  }
-}
 
 const unlisteners: Array<() => void> = [];
 
@@ -169,20 +90,20 @@ onUnmounted(() => {
       <div class="flex flex-wrap items-center gap-2">
         <Button
           variant="primary"
-          :disabled="!canEncode"
-          @click="onEncode"
+          :disabled="!encodeEnabled"
+          @click="encode"
         >
           Encode
         </Button>
         <Button
-          :disabled="!canCancel"
-          @click="onCancel"
+          :disabled="!cancelEnabled"
+          @click="cancelEncode"
         >
           Cancel
         </Button>
         <Button
-          :disabled="!canSave"
-          @click="onSave"
+          :disabled="!saveEnabled"
+          @click="saveEncoded"
         >
           Save…
         </Button>

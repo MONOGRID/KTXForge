@@ -17,6 +17,7 @@ export default defineConfig({
     presetAnimations(),
     presetShadcn(
       {
+        // Palette overridden in src/shared/styles/theme.css (VS Code–inspired).
         color: "neutral",
         darkSelector: ".dark",
       },

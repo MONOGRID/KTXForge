@@ -10,6 +10,7 @@ pub const ENCODER_DROP_REJECTED: &str = "encoder://drop-rejected";
 pub const ENCODE_PROGRESS: &str = "encode://progress";
 pub const INSPECTOR_FILE: &str = "inspector://file";
 pub const UPDATE_STATUS: &str = "update://status";
+pub const MENU_ACTION: &str = "menu://action";
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
@@ -72,3 +73,15 @@ pub struct UpdateStatusPayload {
 
 /// Typed payload for `encoder://sources-added` (exported for the frontend).
 pub type SourcesAddedPayload = Vec<SourceInfo>;
+
+/// Native menu command that needs frontend state (encode job, sources, export UI).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "kebab-case")]
+pub enum MenuAction {
+    Encode,
+    CancelEncode,
+    Save,
+    ClearSources,
+    Export,
+}

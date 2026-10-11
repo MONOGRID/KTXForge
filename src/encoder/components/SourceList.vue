@@ -5,6 +5,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { call } from "../../api/commands";
 import { on } from "../../api/events";
 import type { SourceInfo } from "../../bindings/SourceInfo";
+import { openSources } from "../actions";
 import {
   addSources,
   moveSource,
@@ -94,16 +95,8 @@ onUnmounted(() => {
   stopNoticeTimer();
 });
 
-async function onAddFiles(): Promise<void> {
-  try {
-    const picked = await call("pick_sources", {});
-    if (picked.length > 0) {
-      addSources(picked);
-    }
-  } catch (err: unknown) {
-    const message = err instanceof Error ? err.message : "Could not add files";
-    showNotice(message);
-  }
+function onAddFiles(): void {
+  void openSources();
 }
 </script>
 

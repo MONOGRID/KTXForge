@@ -15,11 +15,16 @@ pub fn setup_updater<R: Runtime>(app: &AppHandle<R>) {
 
     let handle = app.clone();
     tauri::async_runtime::spawn(async move {
-        let _ = check_for_update(handle).await;
+        let _ = run_update_check(handle).await;
     });
 }
 
-async fn check_for_update<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+/// Check GitHub Releases and emit `update://status` when an update is available.
+pub async fn run_update_check<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+    if cfg!(debug_assertions) {
+        let _ = app;
+        return Ok(());
+    }
     let updater = match app.updater() {
         Ok(u) => u,
         Err(_) => return Ok(()),

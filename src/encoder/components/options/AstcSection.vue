@@ -7,7 +7,7 @@ import EnumSelect from "../../../shared/components/EnumSelect.vue";
 import OptionField from "../../../shared/components/OptionField.vue";
 import Panel from "../../../shared/components/Panel.vue";
 import { fieldState, store } from "../../store";
-import { anyEnabled } from "./optionControls";
+import { anyEnabled, enumEntriesWithHelp } from "./optionControls";
 
 const KEYS = ["astc-quality", "astc-perceptual"] as const satisfies readonly OptionKey[];
 
@@ -19,9 +19,9 @@ const qualityLabels = {
   exhaustive: "Exhaustive (100)",
 } satisfies Record<AstcQuality, string>;
 
-const qualityChoices = (
-  ["fastest", "fast", "medium", "thorough", "exhaustive"] as const
-).map((value) => ({ value, label: qualityLabels[value] }));
+const qualityChoices = computed(() =>
+  enumEntriesWithHelp("astc-quality", qualityLabels),
+);
 
 const qualityState = computed(() => fieldState("astc-quality"));
 const perceptualState = computed(() => fieldState("astc-perceptual"));

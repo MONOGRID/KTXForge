@@ -3,9 +3,10 @@ import { computed, useId } from "vue";
 import type { EncodeCodec } from "../../../bindings/EncodeCodec";
 import type { VkFormat } from "../../../bindings/VkFormat";
 import EnumSelect from "../../../shared/components/EnumSelect.vue";
+import HelpTooltip from "../../../shared/components/HelpTooltip.vue";
 import OptionField from "../../../shared/components/OptionField.vue";
 import Panel from "../../../shared/components/Panel.vue";
-import Tooltip from "../../../shared/components/Tooltip.vue";
+import { choiceHelp, enumEntriesWithHelp } from "./optionControls";
 import { fieldState, store } from "../../store";
 
 type FormatMode = "uncompressed" | "astc" | "codec";
@@ -149,33 +150,61 @@ const astcBlockValues = [
   "12x12",
 ] as const satisfies readonly AstcBlock[];
 
-const astcColorValues = ["UNORM", "SRGB"] as const satisfies readonly AstcColor[];
-
 const modeValues = [
   "uncompressed",
   "astc",
   "codec",
 ] as const satisfies readonly FormatMode[];
 
-const uncompressedOptions = uncompressedValues.map((value) => ({
-  value,
-  label: uncompressedLabels[value],
-}));
-const encodeOptions = encodeValues.map((value) => ({
-  value,
-  label: encodeLabels[value],
-}));
-const astcBlockOptions = astcBlockValues.map((value) => ({
-  value,
-  label: astcBlockLabels[value],
-}));
-const astcColorOptions = astcColorValues.map((value) => ({
-  value,
-  label: astcColorLabels[value],
-}));
+const modeHelps = {
+  uncompressed: "Pick an uncompressed Vulkan format only (no --encode).",
+  astc: "ASTC block format. Encoder quality options appear in the ASTC panel.",
+  codec: "Uncompressed format plus BasisLZ or UASTC via --encode.",
+} satisfies Record<FormatMode, string>;
+
+const uncompressedOptions = computed(() =>
+  enumEntriesWithHelp(
+    "format",
+    Object.fromEntries(
+      uncompressedValues.map((value) => [value, uncompressedLabels[value]]),
+    ),
+  ),
+);
+
+const encodeOptions = computed(() =>
+  enumEntriesWithHelp(
+    "encode",
+    Object.fromEntries(encodeValues.map((value) => [value, encodeLabels[value]])),
+  ),
+);
+
+const astcBlockOptions = computed(() =>
+  astcBlockValues.map((value) => ({
+    value,
+    label: astcBlockLabels[value],
+    help:
+      choiceHelp("format", `ASTC_${value}_UNORM_BLOCK`) ??
+      `ASTC ${astcBlockLabels[value]} block size.`,
+  })),
+);
+
+const astcColorOptions = [
+  {
+    value: "UNORM" as const,
+    label: astcColorLabels.UNORM,
+    help: "Linear UNORM ASTC (no sRGB decode in the GPU sampler).",
+  },
+  {
+    value: "SRGB" as const,
+    label: astcColorLabels.SRGB,
+    help: "sRGB ASTC. Use for color textures viewed in sRGB.",
+  },
+] as const;
+
 const modeOptions = modeValues.map((value) => ({
   value,
   label: modeLabels[value],
+  help: modeHelps[value],
 }));
 
 const groupId = useId();
@@ -307,13 +336,13 @@ const uncompressedGroups = computed(() => [
   {
     label:
       mode.value === "codec" ? "Uncompressed (with --encode)" : "Uncompressed",
-    options: uncompressedOptions,
+    options: uncompressedOptions.value,
   },
 ]);
 
-const astcBlockGroups = [
-  { label: "ASTC block size", options: astcBlockOptions },
-] as const;
+const astcBlockGroups = computed(() => [
+  { label: "ASTC block size", options: astcBlockOptions.value },
+]);
 
 const astcColorGroups = [
   { label: "sRGB / UNORM", options: astcColorOptions },
@@ -323,7 +352,7 @@ const astcColorGroups = [
 <template>
   <Panel title="Format">
     <div class="field-row">
-      <Tooltip
+      <HelpTooltip
         text="Uncompressed Vulkan format, ASTC block format, or uncompressed plus BasisLZ/UASTC encode."
         class="label"
       >
@@ -332,7 +361,7 @@ const astcColorGroups = [
           :for="groupId"
           title="Group"
         >Group</label>
-      </Tooltip>
+      </HelpTooltip>
       <div class="min-w-0 flex-1">
         <EnumSelect
           :id="groupId"
@@ -387,6 +416,7 @@ const astcColorGroups = [
         :model-value="store.options.encode"
         :options="encodeOptions"
         empty-label="None"
+        empty-help="Leave uncompressed; no BasisLZ or UASTC encode step."
         @update:model-value="onEncode"
       />
     </OptionField>

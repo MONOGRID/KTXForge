@@ -682,6 +682,15 @@ pub enum WarningLevel {
     Warn,
 }
 
+/// One selectable value under an enum option, with help for the select item.
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "camelCase")]
+pub struct OptionChoice {
+    pub value: String,
+    pub help: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "camelCase")]
@@ -689,6 +698,10 @@ pub struct FieldState {
     pub key: OptionKey,
     pub enabled: bool,
     pub reason: Option<String>,
+    /// What this option does (label tooltip).
+    pub help: String,
+    /// Per-value help for enum selects (empty when not an enum).
+    pub choices: Vec<OptionChoice>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

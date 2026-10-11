@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { computed, ref, watch } from "vue";
+import { computed, onMounted, onUnmounted, ref, watch, watchEffect } from "vue";
 import { call } from "../../api/commands";
+import { on } from "../../api/events";
 import { toAppError } from "../../api/guards";
 import type { ExportFormat } from "../../bindings/ExportFormat";
 import type { ExportSelection } from "../../bindings/ExportSelection";
@@ -105,14 +106,14 @@ const canExport = computed(
 );
 
 async function onExport(): Promise<void> {
+  if (!canExport.value) {
+    return;
+  }
+
   writtenFiles.value = [];
 
   const filePath = path.value;
   if (filePath === null || !fileReady.value) {
-    toastAppError({
-      kind: "invalidInput",
-      message: "No file loaded",
-    });
     return;
   }
 
@@ -132,6 +133,33 @@ async function onExport(): Promise<void> {
     busy.value = false;
   }
 }
+
+const unlisteners: Array<() => void> = [];
+
+onMounted(() => {
+  void on("menu://action", (action) => {
+    if (action === "export") {
+      void onExport();
+    }
+  }).then((unlisten) => {
+    unlisteners.push(unlisten);
+  });
+});
+
+onUnmounted(() => {
+  for (const unlisten of unlisteners) {
+    unlisten();
+  }
+});
+
+watchEffect(() => {
+  void call("set_menu_item_enabled", {
+    id: "export",
+    enabled: canExport.value,
+  }).catch(() => {
+    // Menu may be unavailable on some platforms / early boot.
+  });
+});
 </script>
 
 <template>

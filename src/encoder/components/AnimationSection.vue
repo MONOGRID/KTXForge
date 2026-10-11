@@ -3,8 +3,8 @@ import { computed, useId, watch } from "vue";
 import type { AnimationOptions } from "../../bindings/AnimationOptions";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
+import HelpTooltip from "../../shared/components/HelpTooltip.vue";
 import Panel from "../../shared/components/Panel.vue";
-import Tooltip from "../../shared/components/Tooltip.vue";
 import { store } from "../store";
 
 const DEFAULT_ANIMATION = {
@@ -83,7 +83,7 @@ function writeU32(
   <Panel title="Animation">
     <div class="flex flex-col gap-2">
       <div class="field-row">
-        <Tooltip
+        <HelpTooltip
           text="Write KTXanimData after create. Needs at least two source images as array layers."
           class="label"
         >
@@ -92,7 +92,7 @@ function writeU32(
             :for="enableId"
             title="Enable"
           >Enable</label>
-        </Tooltip>
+        </HelpTooltip>
         <div class="min-w-0 flex-1">
           <Switch
             :id="enableId"
@@ -112,7 +112,7 @@ function writeU32(
 
       <template v-if="enabled">
         <div class="field-row">
-          <Tooltip
+          <HelpTooltip
             text="Time units per frame in KTXanimData."
             class="label"
           >
@@ -121,7 +121,7 @@ function writeU32(
               :for="durationId"
               title="Duration"
             >Duration</label>
-          </Tooltip>
+          </HelpTooltip>
           <Input
             :id="durationId"
             type="number"
@@ -134,7 +134,7 @@ function writeU32(
         </div>
 
         <div class="field-row">
-          <Tooltip
+          <HelpTooltip
             text="Time units per second. Frame length is duration / timescale."
             class="label"
           >
@@ -143,7 +143,7 @@ function writeU32(
               :for="timescaleId"
               title="Timescale"
             >Timescale</label>
-          </Tooltip>
+          </HelpTooltip>
           <Input
             :id="timescaleId"
             type="number"
@@ -156,7 +156,7 @@ function writeU32(
         </div>
 
         <div class="field-row">
-          <Tooltip
+          <HelpTooltip
             text="0 loops forever, 1 plays once, n plays n times."
             class="label"
           >
@@ -165,7 +165,7 @@ function writeU32(
               :for="loopCountId"
               title="Loop count"
             >Loop count</label>
-          </Tooltip>
+          </HelpTooltip>
           <Input
             :id="loopCountId"
             type="number"
