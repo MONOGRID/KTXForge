@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useTitle } from "@vueuse/core";
 import { computed, onMounted, ref } from "vue";
+import ModeToggle from "../shared/components/ModeToggle.vue";
 import UpdateBanner from "../shared/components/UpdateBanner.vue";
 import DropOverlay from "./components/DropOverlay.vue";
 import EncodeBar from "./components/EncodeBar.vue";
@@ -37,9 +38,12 @@ onMounted(() => {
       <h1 class="m-0 text-lg font-semibold tracking-tight">
         KTX-GUI
       </h1>
-      <span class="badge font-mono">
-        ktx {{ versionLabel }}
-      </span>
+      <div class="flex items-center gap-2">
+        <span class="badge font-mono">
+          ktx {{ versionLabel }}
+        </span>
+        <ModeToggle />
+      </div>
     </header>
 
     <UpdateBanner />

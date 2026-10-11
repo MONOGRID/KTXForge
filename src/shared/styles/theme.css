@@ -1,6 +1,8 @@
 :root {
   --font-sans: "Segoe UI", "Helvetica Neue", sans-serif;
   --font-mono: "Cascadia Mono", "Consolas", "Menlo", monospace;
+
+  /* App tokens used by existing UnoCSS shortcuts (bridge until UI migrates). */
   --color-surface: #f4f5f7;
   --color-surface-raised: #ffffff;
   --color-surface-sunken: #e8eaee;
@@ -8,33 +10,32 @@
   --color-ink-muted: #4a5160;
   --color-ink-faint: #7a8294;
   --color-line: #cfd3dc;
-  --color-accent: #1f6b4a;
-  --color-accent-fg: #f5fff9;
+  --color-brand: #1f6b4a;
+  --color-brand-fg: #f5fff9;
   --color-danger: #9b2c2c;
   --color-danger-fg: #fff5f5;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --color-surface: #14171c;
-    --color-surface-raised: #1c2128;
-    --color-surface-sunken: #0f1216;
-    --color-ink: #e8eaee;
-    --color-ink-muted: #a8b0c0;
-    --color-ink-faint: #6e7686;
-    --color-line: #2f3640;
-    --color-accent: #3d9b6e;
-    --color-accent-fg: #06140e;
-    --color-danger: #e05353;
-    --color-danger-fg: #1a0808;
-  }
+.dark {
+  --color-surface: #14171c;
+  --color-surface-raised: #1c2128;
+  --color-surface-sunken: #0f1216;
+  --color-ink: #e8eaee;
+  --color-ink-muted: #a8b0c0;
+  --color-ink-faint: #6e7686;
+  --color-line: #2f3640;
+  --color-brand: #3d9b6e;
+  --color-brand-fg: #06140e;
+  --color-danger: #e05353;
+  --color-danger-fg: #1a0808;
 }
 
 html,
 body {
   margin: 0;
-  background: var(--color-surface);
-  color: var(--color-ink);
+  min-height: 100%;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
   font-family: var(--font-sans);
 }
 

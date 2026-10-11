@@ -6,10 +6,34 @@ import {
   transformerDirectives,
   transformerVariantGroup,
 } from "unocss";
+import presetAnimations from "unocss-preset-animations";
+import presetShadcn from "unocss-preset-shadcn/v3";
 
 export default defineConfig({
-  presets: [presetWind3(), presetAttributify(), presetIcons()],
+  presets: [
+    presetWind3(),
+    presetAttributify(),
+    presetIcons(),
+    presetAnimations(),
+    presetShadcn(
+      {
+        color: "neutral",
+        darkSelector: ".dark",
+      },
+      {
+        componentLibrary: "reka",
+      },
+    ),
+  ],
   transformers: [transformerDirectives(), transformerVariantGroup()],
+  content: {
+    pipeline: {
+      include: [
+        /\.(vue|svelte|[jt]sx|mdx?|astro|elm|php|phtml|html)($|\?)/,
+        "(components|src)/**/*.{js,ts}",
+      ],
+    },
+  },
   theme: {
     colors: {
       surface: {
@@ -23,9 +47,9 @@ export default defineConfig({
         faint: "var(--color-ink-faint)",
       },
       line: "var(--color-line)",
-      accent: {
-        DEFAULT: "var(--color-accent)",
-        fg: "var(--color-accent-fg)",
+      brand: {
+        DEFAULT: "var(--color-brand)",
+        fg: "var(--color-brand-fg)",
       },
       danger: {
         DEFAULT: "var(--color-danger)",
@@ -40,9 +64,8 @@ export default defineConfig({
   shortcuts: {
     btn: "inline-flex items-center justify-center gap-1.5 rounded border border-line bg-surface-raised px-2.5 py-1 text-sm text-ink hover:bg-surface disabled:opacity-50 disabled:pointer-events-none",
     "btn-primary":
-      "btn border-accent bg-accent text-accent-fg hover:opacity-90",
-    panel:
-      "rounded border border-line bg-surface-raised text-ink",
+      "btn border-brand bg-brand text-brand-fg hover:opacity-90",
+    panel: "rounded border border-line bg-surface-raised text-ink",
     "field-row": "flex items-start gap-3 py-1.5",
     label: "min-w-28 shrink-0 pt-1 text-sm text-ink-muted",
     hint: "mt-0.5 text-xs text-ink-faint",

@@ -5,10 +5,16 @@ import UnoCSS from "unocss/vite";
 import { defineConfig } from "vite";
 
 const host = process.env.TAURI_DEV_HOST;
+const srcRoot = resolve(import.meta.dirname, "src");
 
 // https://vite.dev/config/
 export default defineConfig(() => ({
   plugins: [vue(), UnoCSS()],
+  resolve: {
+    alias: {
+      "@": srcRoot,
+    },
+  },
   clearScreen: false,
   build: {
     rollupOptions: {

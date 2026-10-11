@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted } from "vue";
 import { useTitle } from "@vueuse/core";
+import ModeToggle from "../shared/components/ModeToggle.vue";
 import ExportPanel from "./components/ExportPanel.vue";
 import BasisGlobalDataPanel from "./components/report/BasisGlobalDataPanel.vue";
 import DfdPanel from "./components/report/DfdPanel.vue";
@@ -59,9 +60,12 @@ onMounted(() => {
   <main class="box-border grid min-h-screen grid-cols-1 gap-4 p-4 font-sans lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
     <section class="flex min-h-0 flex-col gap-3 overflow-auto">
       <header class="panel px-3 py-2">
-        <h1 class="m-0 text-lg font-semibold">
-          KTX-GUI Inspector
-        </h1>
+        <div class="flex items-start justify-between gap-3">
+          <h1 class="m-0 text-lg font-semibold">
+            KTX-GUI Inspector
+          </h1>
+          <ModeToggle />
+        </div>
         <p class="m-0 mt-1 break-all font-mono text-xs text-ink-muted">
           {{ displayValue(path) }}
         </p>

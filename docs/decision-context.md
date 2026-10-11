@@ -131,7 +131,13 @@ ASTC `--format` strings keep the Vulkan `_BLOCK` suffix required by v4.4.2. This
 2. **Shared extract helpers:** `ktx/extract_ops.rs` owns ensure-KTX2, extract+preview PNG (transcode / tone-map), and texture meta from `ktx info` or the `ktx2` crate. Encode, inspect, and export call it.
 3. **KTX1 → KTX2:** Prefer legacy `ktx2ktx2` beside staged binaries or under `target/ktx-cache` (no `ktx convert` on v4.4.2). If missing, extract may still be tried on the original path.
 4. **Process tests without AppHandle:** Encode / inspect / export fixture tests run the staged `ktx-<triple>` via `std::process::Command` when present; they no-op skip when `binaries/` is empty (gitignored). Full `sidecar::run_ktx` + AppHandle inspect remains `#[ignore]`.
-5. **Updater plugin:** Registered always; check/install skipped in debug builds and when endpoints/pubkey are absent (errors never crash). Pubkey/endpoints still land in T6.3.
+5. **Updater plugin:** Registered always; check/install skipped in debug builds and when endpoints/pubkey are absent (errors never crash). Pubkey/endpoints still land in T6.3. Until then `plugins.updater` must be an object (`pubkey: ""`, `endpoints: []`) — a missing/null key panics at plugin init (`invalid type: null, expected struct Config`).
 6. **Drag-drop:** Wired on `Builder::on_window_event` (not only setup), async `open_inspector` for Windows.
 
 **Why:** Wave 4 must ship working commands against the Wave 3 engines and the staged sidecar without waiting for T6.3 updater config or a mocked AppHandle.
+
+## 2026-10-11 — shadcn-vue + UnoCSS for UI components
+
+**Decided:** Adopt [shadcn-vue](https://www.shadcn-vue.com) (Reka UI primitives, New York style, `neutral` base) as the component library, styled through existing UnoCSS via [`unocss-preset-shadcn`](https://github.com/unocss-community/unocss-preset-shadcn) (`/v3` for `presetWind3`) and `unocss-preset-animations`. Do **not** run `shadcn-vue init` (it pulls Tailwind); keep an empty `tailwind.config.js` only so the CLI can add components. Dark/light/system mode uses VueUse `useColorMode` (`.dark` on `html`). Path alias `@/*` → `./src/*`. App-specific brand green stays as UnoCSS `brand` tokens so it does not collide with shadcn's `accent` semantic color. UI components live under `src/components/ui/`; add more with `npx shadcn-vue@latest add <name>`.
+
+**Why:** The hand-rolled controls are inconsistent. shadcn-vue gives accessible, copy-in components while AGENTS.md keeps UnoCSS (not Tailwind) as the styling layer. The UnoCSS community preset is the supported bridge.

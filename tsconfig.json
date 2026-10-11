@@ -14,6 +14,11 @@
     "isolatedModules": true,
     "noEmit": true,
 
+    /* Path aliases (shadcn-vue); Vite resolves the same via resolve.alias */
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+
     /* Linting */
     "strict": true,
     "noUnusedLocals": true,

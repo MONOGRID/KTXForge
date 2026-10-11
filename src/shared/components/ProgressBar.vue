@@ -33,11 +33,11 @@ function clamped(value: number): number {
     >
       <div
         v-if="value === null || value === undefined"
-        class="progress-indeterminate h-full w-1/3 bg-accent"
+        class="progress-indeterminate h-full w-1/3 bg-brand"
       />
       <div
         v-else
-        class="h-full bg-accent duration-150"
+        class="h-full bg-brand duration-150"
         :style="{ width: `${clamped(value)}%` }"
       />
     </div>

@@ -29,7 +29,7 @@ onUnmounted(() => {
 <template>
   <div
     class="pointer-events-none fixed inset-0 z-50 border-4 border-transparent transition-colors"
-    :class="{ 'border-accent bg-accent/10': active }"
+    :class="{ 'border-brand bg-brand/10': active }"
     aria-hidden="true"
   />
 </template>
