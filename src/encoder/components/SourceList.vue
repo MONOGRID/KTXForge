@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useTimeoutFn } from "@vueuse/core";
 import { onMounted, onUnmounted, reactive, watch } from "vue";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { call } from "../../api/commands";
 import { on } from "../../api/events";
 import type { SourceInfo } from "../../bindings/SourceInfo";
@@ -129,62 +130,64 @@ async function onAddFiles(): Promise<void> {
       {{ notice.message }}
     </p>
 
-    <ul
+    <ScrollArea
       v-if="store.sources.length > 0"
-      class="m-0 min-h-0 flex-1 list-none overflow-auto p-2"
+      class="min-h-0 flex-1"
     >
-      <li
-        v-for="(source, index) in store.sources"
-        :key="source.path"
-        class="mb-1 flex items-center gap-2 rounded border border-line bg-surface px-2 py-1.5 last:mb-0"
-      >
-        <div class="h-10 w-10 shrink-0 overflow-hidden rounded bg-surface-sunken">
-          <img
-            v-if="thumbnails.get(source.path)"
-            :src="thumbnails.get(source.path)"
-            :alt="source.name"
-            class="h-full w-full object-contain"
-          >
-        </div>
-        <div class="min-w-0 flex-1">
-          <div class="truncate text-sm font-medium">
-            {{ source.name }}
-          </div>
-          <div class="hint">
-            {{ source.width }}×{{ source.height }} · {{ source.kind }}
-            <span v-if="source.needsConversion"> · convert</span>
-          </div>
-        </div>
-        <div class="flex shrink-0 flex-col gap-0.5">
-          <button
-            type="button"
-            class="btn px-1.5 py-0.5 text-xs"
-            :disabled="index === 0"
-            aria-label="Move up"
-            @click="moveSource(index, -1)"
-          >
-            ↑
-          </button>
-          <button
-            type="button"
-            class="btn px-1.5 py-0.5 text-xs"
-            :disabled="index === store.sources.length - 1"
-            aria-label="Move down"
-            @click="moveSource(index, 1)"
-          >
-            ↓
-          </button>
-        </div>
-        <button
-          type="button"
-          class="btn shrink-0 px-1.5 py-0.5 text-xs"
-          aria-label="Remove"
-          @click="removeSource(index)"
+      <ul class="m-0 list-none p-2 pr-3">
+        <li
+          v-for="(source, index) in store.sources"
+          :key="source.path"
+          class="mb-1 flex items-center gap-2 rounded border border-line bg-surface px-2 py-1.5 last:mb-0"
         >
-          ✕
-        </button>
-      </li>
-    </ul>
+          <div class="h-10 w-10 shrink-0 overflow-hidden rounded bg-surface-sunken">
+            <img
+              v-if="thumbnails.get(source.path)"
+              :src="thumbnails.get(source.path)"
+              :alt="source.name"
+              class="h-full w-full object-contain"
+            >
+          </div>
+          <div class="min-w-0 flex-1">
+            <div class="truncate text-sm font-medium">
+              {{ source.name }}
+            </div>
+            <div class="hint">
+              {{ source.width }}×{{ source.height }} · {{ source.kind }}
+              <span v-if="source.needsConversion"> · convert</span>
+            </div>
+          </div>
+          <div class="flex shrink-0 flex-col gap-0.5">
+            <button
+              type="button"
+              class="btn px-1.5 py-0.5 text-xs"
+              :disabled="index === 0"
+              aria-label="Move up"
+              @click="moveSource(index, -1)"
+            >
+              ↑
+            </button>
+            <button
+              type="button"
+              class="btn px-1.5 py-0.5 text-xs"
+              :disabled="index === store.sources.length - 1"
+              aria-label="Move down"
+              @click="moveSource(index, 1)"
+            >
+              ↓
+            </button>
+          </div>
+          <button
+            type="button"
+            class="btn shrink-0 px-1.5 py-0.5 text-xs"
+            aria-label="Remove"
+            @click="removeSource(index)"
+          >
+            ✕
+          </button>
+        </li>
+      </ul>
+    </ScrollArea>
 
     <p
       v-else

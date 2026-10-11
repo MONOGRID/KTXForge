@@ -1,11 +1,10 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import OptionField from "../../../shared/components/OptionField.vue";
 import Panel from "../../../shared/components/Panel.vue";
 import { fieldState, store } from "../../store";
-
-const boxClass =
-  "w-full rounded border border-line bg-surface px-2 py-1 text-sm text-ink";
 
 const encoder = computed(() => store.options.encoder);
 
@@ -16,12 +15,8 @@ const flagWarnings = computed(() => {
   );
 });
 
-function writeThreads(event: Event): void {
-  const el = event.target;
-  if (!(el instanceof HTMLInputElement)) {
-    return;
-  }
-  const text = el.value.trim();
+function writeThreads(value: string | number): void {
+  const text = String(value).trim();
   if (text === "") {
     store.options.encoder.threads = null;
     return;
@@ -29,81 +24,65 @@ function writeThreads(event: Event): void {
   const n = Number(text);
   store.options.encoder.threads = Number.isFinite(n) ? Math.trunc(n) : null;
 }
-
-function writeNoSse(event: Event): void {
-  const el = event.target;
-  if (el instanceof HTMLInputElement) {
-    store.options.encoder.noSse = el.checked;
-  }
-}
-
-function writeCompareSsim(event: Event): void {
-  const el = event.target;
-  if (el instanceof HTMLInputElement) {
-    store.options.encoder.compareSsim = el.checked;
-  }
-}
-
-function writeComparePsnr(event: Event): void {
-  const el = event.target;
-  if (el instanceof HTMLInputElement) {
-    store.options.encoder.comparePsnr = el.checked;
-  }
-}
 </script>
 
 <template>
   <Panel title="Encoder flags">
     <OptionField
+      v-slot="{ controlId }"
       label="Threads"
       option-key="threads"
       :state="fieldState('threads')"
     >
-      <input
-        :class="boxClass"
+      <Input
+        :id="controlId"
+        class="h-8 font-mono"
         type="number"
         min="1"
         step="1"
-        :value="encoder.threads === null ? '' : String(encoder.threads)"
+        :model-value="encoder.threads === null ? '' : String(encoder.threads)"
         placeholder="tool default"
-        @input="writeThreads"
-      >
+        @update:model-value="writeThreads"
+      />
     </OptionField>
     <OptionField
+      v-slot="{ controlId }"
       label="No SSE"
       option-key="no-sse"
       :state="fieldState('no-sse')"
     >
-      <input
-        type="checkbox"
-        class="mt-1"
+      <Switch
+        :id="controlId"
+        class="mt-0.5"
         :checked="encoder.noSse"
-        @change="writeNoSse"
-      >
+        @update:checked="store.options.encoder.noSse = $event"
+      />
     </OptionField>
     <OptionField
+      v-slot="{ controlId }"
       label="Compare SSIM"
       option-key="compare-ssim"
       :state="fieldState('compare-ssim')"
     >
-      <input
-        type="checkbox"
-        class="mt-1"
+      <Switch
+        :id="controlId"
+        class="mt-0.5"
         :checked="encoder.compareSsim"
-        @change="writeCompareSsim"
-      >
+        @update:checked="store.options.encoder.compareSsim = $event"
+      />
     </OptionField>
     <OptionField
+      v-slot="{ controlId }"
       label="Compare PSNR"
       option-key="compare-psnr"
       :state="fieldState('compare-psnr')"
     >
-      <input
-        type="checkbox"
-        class="mt-1"
+      <Switch
+        :id="controlId"
+        class="mt-0.5"
         :checked="encoder.comparePsnr"
-        @change="writeComparePsnr"
-      >
+        @update:checked="store.options.encoder.comparePsnr = $event"
+      />
     </OptionField>
     <aside
       v-if="flagWarnings.length > 0"

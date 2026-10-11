@@ -141,3 +141,27 @@ ASTC `--format` strings keep the Vulkan `_BLOCK` suffix required by v4.4.2. This
 **Decided:** Adopt [shadcn-vue](https://www.shadcn-vue.com) (Reka UI primitives, New York style, `neutral` base) as the component library, styled through existing UnoCSS via [`unocss-preset-shadcn`](https://github.com/unocss-community/unocss-preset-shadcn) (`/v3` for `presetWind3`) and `unocss-preset-animations`. Do **not** run `shadcn-vue init` (it pulls Tailwind); keep an empty `tailwind.config.js` only so the CLI can add components. Dark/light/system mode uses VueUse `useColorMode` (`.dark` on `html`). Path alias `@/*` → `./src/*`. App-specific brand green stays as UnoCSS `brand` tokens so it does not collide with shadcn's `accent` semantic color. UI components live under `src/components/ui/`; add more with `npx shadcn-vue@latest add <name>`.
 
 **Why:** The hand-rolled controls are inconsistent. shadcn-vue gives accessible, copy-in components while AGENTS.md keeps UnoCSS (not Tailwind) as the styling layer. The UnoCSS community preset is the supported bridge.
+
+## 2026-10-11 — Encoder layout: resizable Sources | Preview | Options
+
+**Decided:** Encoder chrome is three horizontal panels — **Sources** (left), **Preview** (center), **Options + Encode bar** (right) — using shadcn-vue `Resizable` (Reka `Splitter`) with `auto-save-id` so sizes persist in `localStorage`. Option rows use a shared two-column grid (`field-row` / `label` UnoCSS shortcuts): labels share one column, truncate with ellipsis when the options panel is narrow, and are real `<label>` elements so a click focuses or toggles the control. Full label text stays on `title` for hover.
+
+**Why:** Preview is the primary visual surface and belongs in the wide center; options are secondary and sit in a narrower, user-resizable rail. Fixed CSS grid columns fought that. Aligned, clickable, truncating labels keep the dense option list readable when the rail is squeezed.
+
+## 2026-10-11 — Encoder controls: Switch, Select, ScrollArea, Input
+
+**Decided:** Encoder option booleans use shadcn-vue `Switch` (not checkboxes). Enumerations use a shared `EnumSelect` over shadcn `Select` (portal popover, not native `<select>`). Number/text fields use shadcn `Input`. Scrollable panes (options rail, sources list, preview body) use shadcn `ScrollArea`. `OptionField` associates labels via `for`/`id` + provide/inject so Switch/Select buttons do not double-toggle inside a wrapping `<label>`. Icons in generated UI components import from `@lucide/vue` (not `lucide-vue-next`).
+
+**Why:** Native selects/scrollbars look unstyled in the desktop webview; switches match a denser settings rail; staying on the already-adopted shadcn-vue + Reka stack keeps one control language.
+
+## 2026-10-11 — Sidecar cancel watcher must not hang on success
+
+**Decided:** `run_ktx_collect` finishes its cancel-watcher task with `abort()` on the success/error path, and only `await`s when the cancel flag was set. The watcher loops until `CancellationHandle` is cancelled, so awaiting it after a normal `ktx` exit blocked forever.
+
+**Why:** Inspector stayed on "Loading…" after `ktx info` completed (~40ms); every successful sidecar call hung on the same await. Encode/export share this path.
+
+## 2026-10-11 — ValidationMessage matches info_v0
+
+**Decided:** `ValidationMessage` is `{ id: u32, type, message, details }` per [info_v0](https://schema.khronos.org/ktx/info_v0.json) (`type` is `fatal` | `error` | `warning`). The previous `level` / string `id` shape was wrong; samples had empty `messages` so it never failed until a file with warnings was opened.
+
+**Why:** Inspector failed to parse `barracuda_base_alpha.ktx2` with `invalid type: integer 6030, expected a string`.

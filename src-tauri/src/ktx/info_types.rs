@@ -62,14 +62,17 @@ pub struct InspectReport {
     pub preview: PreviewKind,
 }
 
+/// One entry from `ktx info` `messages` ([info_v0](https://schema.khronos.org/ktx/info_v0.json)).
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "camelCase")]
 pub struct ValidationMessage {
-    pub level: Option<String>,
-    pub id: Option<String>,
-    pub message: Option<String>,
-    pub details: Option<String>,
+    pub id: u32,
+    /// Severity: `fatal` | `error` | `warning` (JSON field name is `type`).
+    #[serde(rename = "type")]
+    pub type_: String,
+    pub message: String,
+    pub details: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
@@ -362,5 +365,18 @@ mod tests {
         assert_eq!(anim.duration, 1);
         assert_eq!(anim.timescale, 10);
         assert_eq!(anim.loop_count, 0);
+    }
+
+    #[test]
+    fn validation_message_id_is_integer_per_info_v0() {
+        let path = samples_dir().join("basis_lz_with_warning.info.json");
+        let text = std::fs::read_to_string(path).unwrap();
+        let info: Ktx2Info = serde_json::from_str(&text).unwrap();
+        assert_eq!(info.messages.len(), 1);
+        let msg = &info.messages[0];
+        assert_eq!(msg.id, 6030);
+        assert_eq!(msg.type_, "warning");
+        assert!(!msg.message.is_empty());
+        assert!(!msg.details.is_empty());
     }
 }

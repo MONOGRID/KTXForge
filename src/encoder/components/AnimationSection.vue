@@ -1,6 +1,8 @@
 <script setup lang="ts">
-import { computed, watch } from "vue";
+import { computed, useId, watch } from "vue";
 import type { AnimationOptions } from "../../bindings/AnimationOptions";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
 import Panel from "../../shared/components/Panel.vue";
 import { store } from "../store";
 
@@ -9,6 +11,11 @@ const DEFAULT_ANIMATION = {
   timescale: 10,
   loopCount: 0,
 } as const satisfies AnimationOptions;
+
+const enableId = useId();
+const durationId = useId();
+const timescaleId = useId();
+const loopCountId = useId();
 
 const canEnable = computed((): boolean => store.sources.length >= 2);
 
@@ -51,26 +58,15 @@ function setEnabled(next: boolean): void {
   store.animation = next ? { ...DEFAULT_ANIMATION } : null;
 }
 
-function onEnableChange(event: Event): void {
-  const el = event.target;
-  if (el instanceof HTMLInputElement) {
-    setEnabled(el.checked);
-  }
-}
-
 function writeU32(
   field: keyof AnimationOptions,
-  event: Event,
+  value: string | number,
 ): void {
   const current = store.animation;
   if (current === null) {
     return;
   }
-  const el = event.target;
-  if (!(el instanceof HTMLInputElement)) {
-    return;
-  }
-  const text = el.value.trim();
+  const text = String(value).trim();
   if (text === "") {
     return;
   }
@@ -85,16 +81,20 @@ function writeU32(
 <template>
   <Panel title="Animation">
     <div class="flex flex-col gap-2">
-      <label class="field-row">
-        <span class="label">Enable</span>
+      <div class="field-row">
+        <label
+          class="label"
+          :for="enableId"
+          title="Enable"
+        >Enable</label>
         <div class="min-w-0 flex-1">
-          <input
-            type="checkbox"
-            class="mt-1"
+          <Switch
+            :id="enableId"
+            class="mt-0.5"
             :checked="enabled"
             :disabled="!canEnable"
-            @change="onEnableChange"
-          >
+            @update:checked="setEnabled"
+          />
           <p
             v-if="!canEnable"
             class="hint"
@@ -102,46 +102,61 @@ function writeU32(
             Add at least two sources to encode an animation.
           </p>
         </div>
-      </label>
+      </div>
 
-      <label class="field-row">
-        <span class="label">Duration</span>
-        <input
+      <div class="field-row">
+        <label
+          class="label"
+          :for="durationId"
+          title="Duration"
+        >Duration</label>
+        <Input
+          :id="durationId"
           type="number"
           min="0"
           step="1"
-          class="w-full rounded border border-line bg-surface px-2 py-1 text-sm font-mono"
+          class="h-8 min-w-0 font-mono"
           :disabled="!enabled"
-          :value="anim.duration"
-          @change="writeU32('duration', $event)"
-        >
-      </label>
+          :model-value="anim.duration"
+          @update:model-value="writeU32('duration', $event)"
+        />
+      </div>
 
-      <label class="field-row">
-        <span class="label">Timescale</span>
-        <input
+      <div class="field-row">
+        <label
+          class="label"
+          :for="timescaleId"
+          title="Timescale"
+        >Timescale</label>
+        <Input
+          :id="timescaleId"
           type="number"
           min="1"
           step="1"
-          class="w-full rounded border border-line bg-surface px-2 py-1 text-sm font-mono"
+          class="h-8 min-w-0 font-mono"
           :disabled="!enabled"
-          :value="anim.timescale"
-          @change="writeU32('timescale', $event)"
-        >
-      </label>
+          :model-value="anim.timescale"
+          @update:model-value="writeU32('timescale', $event)"
+        />
+      </div>
 
-      <label class="field-row">
-        <span class="label">Loop count</span>
-        <input
+      <div class="field-row">
+        <label
+          class="label"
+          :for="loopCountId"
+          title="Loop count"
+        >Loop count</label>
+        <Input
+          :id="loopCountId"
           type="number"
           min="0"
           step="1"
-          class="w-full rounded border border-line bg-surface px-2 py-1 text-sm font-mono"
+          class="h-8 min-w-0 font-mono"
           :disabled="!enabled"
-          :value="anim.loopCount"
-          @change="writeU32('loopCount', $event)"
-        >
-      </label>
+          :model-value="anim.loopCount"
+          @update:model-value="writeU32('loopCount', $event)"
+        />
+      </div>
 
       <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs font-mono text-ink-muted">
         <span>Frame {{ formatSeconds(frameLengthSec) }}</span>

@@ -1,6 +1,8 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { AstcQuality } from "../../../bindings/AstcQuality";
+import { Switch } from "@/components/ui/switch";
+import EnumSelect from "../../../shared/components/EnumSelect.vue";
 import OptionField from "../../../shared/components/OptionField.vue";
 import Panel from "../../../shared/components/Panel.vue";
 import { fieldState, store } from "../../store";
@@ -17,9 +19,6 @@ const qualityChoices = (
   ["fastest", "fast", "medium", "thorough", "exhaustive"] as const
 ).map((value) => ({ value, label: qualityLabels[value] }));
 
-const selectClass =
-  "w-full rounded border border-line bg-surface px-2 py-1 text-sm text-ink";
-
 const qualityState = computed(() => fieldState("astc-quality"));
 const perceptualState = computed(() => fieldState("astc-perceptual"));
 
@@ -33,24 +32,13 @@ function isQuality(value: string): value is AstcQuality {
   return value in qualityLabels;
 }
 
-function pickQuality(event: Event): void {
-  const el = event.target;
-  if (!(el instanceof HTMLSelectElement)) {
-    return;
-  }
-  if (el.value === "") {
+function pickQuality(value: string | null): void {
+  if (value === null) {
     store.options.astc.astcQuality = null;
     return;
   }
-  if (isQuality(el.value)) {
-    store.options.astc.astcQuality = el.value;
-  }
-}
-
-function togglePerceptual(event: Event): void {
-  const el = event.target;
-  if (el instanceof HTMLInputElement) {
-    store.options.astc.astcPerceptual = el.checked;
+  if (isQuality(value)) {
+    store.options.astc.astcQuality = value;
   }
 }
 </script>
@@ -62,34 +50,25 @@ function togglePerceptual(event: Event): void {
       option-key="astc-quality"
       :state="qualityState"
     >
-      <select
-        :class="selectClass"
-        :value="store.options.astc.astcQuality ?? ''"
-        @change="pickQuality"
-      >
-        <option value="">
-          Default (medium)
-        </option>
-        <option
-          v-for="choice in qualityChoices"
-          :key="choice.value"
-          :value="choice.value"
-        >
-          {{ choice.label }}
-        </option>
-      </select>
+      <EnumSelect
+        :model-value="store.options.astc.astcQuality"
+        :options="qualityChoices"
+        empty-label="Default (medium)"
+        @update:model-value="pickQuality"
+      />
     </OptionField>
     <OptionField
+      v-slot="{ controlId }"
       label="ASTC perceptual"
       option-key="astc-perceptual"
       :state="perceptualState"
     >
-      <input
-        type="checkbox"
-        class="mt-1"
+      <Switch
+        :id="controlId"
+        class="mt-0.5"
         :checked="store.options.astc.astcPerceptual"
-        @change="togglePerceptual"
-      >
+        @update:checked="store.options.astc.astcPerceptual = $event"
+      />
     </OptionField>
     <template
       v-for="(warning, idx) in astcWarnings"

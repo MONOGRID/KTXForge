@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from "vue";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { call } from "../../api/commands";
 import type { EncodeResult } from "../../bindings/EncodeResult";
 import { store } from "../store";
@@ -110,107 +111,109 @@ onUnmounted(() => {
       </h2>
     </header>
 
-    <div class="flex min-h-0 flex-1 flex-col gap-3 overflow-auto p-3">
-      <div class="grid grid-cols-2 gap-3">
-        <div class="flex flex-col gap-1">
-          <div class="text-xs text-ink-muted">
-            Source
+    <ScrollArea class="min-h-0 flex-1">
+      <div class="flex min-h-0 flex-col gap-3 p-3">
+        <div class="grid min-h-48 flex-1 grid-cols-2 gap-3">
+          <div class="flex min-h-0 flex-col gap-1">
+            <div class="text-xs text-ink-muted">
+              Source
+            </div>
+            <div class="preview-box flex min-h-0 flex-1 w-full items-center justify-center overflow-hidden rounded border border-line bg-surface-sunken">
+              <img
+                v-if="sourceUrl"
+                :src="sourceUrl"
+                alt="Source"
+                class="max-h-full max-w-full object-contain"
+              >
+              <span
+                v-else
+                class="px-2 text-center text-xs text-ink-faint"
+              >No source</span>
+            </div>
           </div>
-          <div class="preview-box flex h-40 w-full items-center justify-center overflow-hidden rounded border border-line bg-surface-sunken">
-            <img
-              v-if="sourceUrl"
-              :src="sourceUrl"
-              alt="Source"
-              class="max-h-full max-w-full object-contain"
+
+          <div class="flex min-h-0 flex-col gap-1">
+            <div class="text-xs text-ink-muted">
+              Encoded
+            </div>
+            <div class="preview-box flex min-h-0 flex-1 w-full items-center justify-center overflow-hidden rounded border border-line bg-surface-sunken">
+              <img
+                v-if="encodedUrl"
+                :src="encodedUrl"
+                alt="Encoded preview"
+                class="max-h-full max-w-full object-contain"
+              >
+              <span
+                v-else
+                class="px-2 text-center text-xs text-ink-faint"
+              >Encode to preview</span>
+            </div>
+            <p
+              v-if="showTonemapLabel"
+              class="m-0 shrink-0 text-xs text-ink-muted"
             >
-            <span
-              v-else
-              class="px-2 text-center text-xs text-ink-faint"
-            >No source</span>
+              Preview, not stored data
+            </p>
           </div>
         </div>
 
-        <div class="flex flex-col gap-1">
-          <div class="text-xs text-ink-muted">
-            Encoded
-          </div>
-          <div class="preview-box flex h-40 w-full items-center justify-center overflow-hidden rounded border border-line bg-surface-sunken">
-            <img
-              v-if="encodedUrl"
-              :src="encodedUrl"
-              alt="Encoded preview"
-              class="max-h-full max-w-full object-contain"
-            >
-            <span
-              v-else
-              class="px-2 text-center text-xs text-ink-faint"
-            >Encode to preview</span>
-          </div>
-          <p
-            v-if="showTonemapLabel"
-            class="m-0 text-xs text-ink-muted"
-          >
-            Preview, not stored data
-          </p>
-        </div>
-      </div>
+        <dl class="m-0 shrink-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+          <dt class="text-ink-muted">
+            Size
+          </dt>
+          <dd class="m-0 font-mono">
+            {{ result ? formatBytes(result.outputBytes) : "—" }}
+          </dd>
+          <dt class="text-ink-muted">
+            Dimensions
+          </dt>
+          <dd class="m-0 font-mono">
+            {{ result ? `${String(result.width)}×${String(result.height)}` : "—" }}
+          </dd>
+          <dt class="text-ink-muted">
+            Codec
+          </dt>
+          <dd class="m-0 font-mono">
+            {{ result?.codec ?? "—" }}
+          </dd>
+          <dt class="text-ink-muted">
+            Levels
+          </dt>
+          <dd class="m-0 font-mono">
+            {{ result ? String(result.levels) : "—" }}
+          </dd>
+          <dt class="text-ink-muted">
+            Layers
+          </dt>
+          <dd class="m-0 font-mono">
+            {{ result ? String(result.layers) : "—" }}
+          </dd>
+          <dt class="text-ink-muted">
+            SSIM
+          </dt>
+          <dd class="m-0 font-mono">
+            {{ result ? formatMetric(result.ssim) : "—" }}
+          </dd>
+          <dt class="text-ink-muted">
+            PSNR
+          </dt>
+          <dd class="m-0 font-mono">
+            {{ result ? formatMetric(result.psnr) : "—" }}
+          </dd>
+        </dl>
 
-      <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-        <dt class="text-ink-muted">
-          Size
-        </dt>
-        <dd class="m-0 font-mono">
-          {{ result ? formatBytes(result.outputBytes) : "—" }}
-        </dd>
-        <dt class="text-ink-muted">
-          Dimensions
-        </dt>
-        <dd class="m-0 font-mono">
-          {{ result ? `${String(result.width)}×${String(result.height)}` : "—" }}
-        </dd>
-        <dt class="text-ink-muted">
-          Codec
-        </dt>
-        <dd class="m-0 font-mono">
-          {{ result?.codec ?? "—" }}
-        </dd>
-        <dt class="text-ink-muted">
-          Levels
-        </dt>
-        <dd class="m-0 font-mono">
-          {{ result ? String(result.levels) : "—" }}
-        </dd>
-        <dt class="text-ink-muted">
-          Layers
-        </dt>
-        <dd class="m-0 font-mono">
-          {{ result ? String(result.layers) : "—" }}
-        </dd>
-        <dt class="text-ink-muted">
-          SSIM
-        </dt>
-        <dd class="m-0 font-mono">
-          {{ result ? formatMetric(result.ssim) : "—" }}
-        </dd>
-        <dt class="text-ink-muted">
-          PSNR
-        </dt>
-        <dd class="m-0 font-mono">
-          {{ result ? formatMetric(result.psnr) : "—" }}
-        </dd>
-      </dl>
-
-      <ul
-        v-if="result && result.warnings.length > 0"
-        class="m-0 list-disc pl-4 text-xs text-ink-muted"
-      >
-        <li
-          v-for="(warning, index) in result.warnings"
-          :key="index"
+        <ul
+          v-if="result && result.warnings.length > 0"
+          class="m-0 list-disc pl-4 text-xs text-ink-muted"
         >
-          {{ warning }}
-        </li>
-      </ul>
-    </div>
+          <li
+            v-for="(warning, index) in result.warnings"
+            :key="index"
+          >
+            {{ warning }}
+          </li>
+        </ul>
+      </div>
+    </ScrollArea>
   </section>
 </template>

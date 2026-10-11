@@ -38,8 +38,8 @@ const rows = computed((): ValidationMessage[] => props.messages ?? []);
       class="mt-2 rounded border border-line bg-surface-sunken p-2"
     >
       <ReportField
-        label="level"
-        :value="displayValue(msg.level)"
+        label="type"
+        :value="displayValue(msg.type)"
       />
       <ReportField
         label="id"

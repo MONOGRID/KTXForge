@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, useId } from "vue";
 import type { EncodeCodec } from "../../../bindings/EncodeCodec";
 import type { VkFormat } from "../../../bindings/VkFormat";
+import EnumSelect from "../../../shared/components/EnumSelect.vue";
 import OptionField from "../../../shared/components/OptionField.vue";
 import Panel from "../../../shared/components/Panel.vue";
 import { fieldState, store } from "../../store";
@@ -176,8 +177,7 @@ const modeOptions = modeValues.map((value) => ({
   label: modeLabels[value],
 }));
 
-const controlClass =
-  "w-full rounded border border-line bg-surface px-2 py-1 text-sm text-ink";
+const groupId = useId();
 
 function isAstcFormat(format: VkFormat): boolean {
   return format.startsWith("ASTC_");
@@ -260,89 +260,81 @@ function setMode(next: FormatMode): void {
   }
 }
 
-function onModeChange(event: Event): void {
-  const target = event.target;
-  if (!(target instanceof HTMLSelectElement)) {
-    return;
-  }
-  if (isFormatMode(target.value)) {
-    setMode(target.value);
+function onModeChange(value: string | null): void {
+  if (value !== null && isFormatMode(value)) {
+    setMode(value);
   }
 }
 
-function onUncompressedFormat(event: Event): void {
-  const target = event.target;
-  if (!(target instanceof HTMLSelectElement)) {
-    return;
-  }
-  if (isUncompressedFormat(target.value)) {
-    store.options.format = target.value;
+function onUncompressedFormat(value: string | null): void {
+  if (value !== null && isUncompressedFormat(value)) {
+    store.options.format = value;
     if (mode.value !== "codec") {
       store.options.encode = null;
     }
   }
 }
 
-function onAstcBlock(event: Event): void {
-  const target = event.target;
-  if (!(target instanceof HTMLSelectElement)) {
-    return;
-  }
-  if (isAstcBlock(target.value)) {
-    store.options.format = astcFormat(target.value, astcParts.value.color);
+function onAstcBlock(value: string | null): void {
+  if (value !== null && isAstcBlock(value)) {
+    store.options.format = astcFormat(value, astcParts.value.color);
     store.options.encode = null;
   }
 }
 
-function onAstcColor(event: Event): void {
-  const target = event.target;
-  if (!(target instanceof HTMLSelectElement)) {
-    return;
-  }
-  if (isAstcColor(target.value)) {
-    store.options.format = astcFormat(astcParts.value.block, target.value);
+function onAstcColor(value: string | null): void {
+  if (value !== null && isAstcColor(value)) {
+    store.options.format = astcFormat(astcParts.value.block, value);
     store.options.encode = null;
   }
 }
 
-function onEncode(event: Event): void {
-  const target = event.target;
-  if (!(target instanceof HTMLSelectElement)) {
-    return;
-  }
-  if (target.value === "") {
+function onEncode(value: string | null): void {
+  if (value === null) {
     store.options.encode = null;
     return;
   }
-  if (isEncodeCodec(target.value)) {
+  if (isEncodeCodec(value)) {
     if (!isUncompressedFormat(store.options.format)) {
       store.options.format = "R8G8B8A8_SRGB";
     }
-    store.options.encode = target.value;
+    store.options.encode = value;
   }
 }
+
+const uncompressedGroups = computed(() => [
+  {
+    label:
+      mode.value === "codec" ? "Uncompressed (with --encode)" : "Uncompressed",
+    options: uncompressedOptions,
+  },
+]);
+
+const astcBlockGroups = [
+  { label: "ASTC block size", options: astcBlockOptions },
+] as const;
+
+const astcColorGroups = [
+  { label: "sRGB / UNORM", options: astcColorOptions },
+] as const;
 </script>
 
 <template>
   <Panel title="Format">
     <div class="field-row">
-      <div class="label">
-        Group
-      </div>
+      <label
+        class="label"
+        :for="groupId"
+        title="Group"
+      >Group</label>
       <div class="min-w-0 flex-1">
-        <select
-          :class="controlClass"
-          :value="mode"
-          @change="onModeChange"
-        >
-          <option
-            v-for="option in modeOptions"
-            :key="option.value"
-            :value="option.value"
-          >
-            {{ option.label }}
-          </option>
-        </select>
+        <EnumSelect
+          :id="groupId"
+          :model-value="mode"
+          :options="modeOptions"
+          :empty-label="false"
+          @update:model-value="onModeChange"
+        />
       </div>
     </div>
 
@@ -351,58 +343,31 @@ function onEncode(event: Event): void {
       option-key="format"
       :state="fieldState('format')"
     >
-      <select
+      <EnumSelect
         v-if="mode === 'uncompressed' || mode === 'codec'"
-        :class="controlClass"
-        :value="store.options.format"
-        @change="onUncompressedFormat"
-      >
-        <optgroup :label="mode === 'codec' ? 'Uncompressed (with --encode)' : 'Uncompressed'">
-          <option
-            v-for="option in uncompressedOptions"
-            :key="option.value"
-            :value="option.value"
-          >
-            {{ option.label }}
-          </option>
-        </optgroup>
-      </select>
+        :model-value="store.options.format"
+        :groups="uncompressedGroups"
+        :empty-label="false"
+        @update:model-value="onUncompressedFormat"
+      />
       <div
         v-else
         class="flex flex-col gap-2"
       >
-        <select
-          :class="controlClass"
-          :value="astcParts.block"
+        <EnumSelect
+          :model-value="astcParts.block"
+          :groups="astcBlockGroups"
+          :empty-label="false"
           aria-label="ASTC block size"
-          @change="onAstcBlock"
-        >
-          <optgroup label="ASTC block size">
-            <option
-              v-for="option in astcBlockOptions"
-              :key="option.value"
-              :value="option.value"
-            >
-              {{ option.label }}
-            </option>
-          </optgroup>
-        </select>
-        <select
-          :class="controlClass"
-          :value="astcParts.color"
+          @update:model-value="onAstcBlock"
+        />
+        <EnumSelect
+          :model-value="astcParts.color"
+          :groups="astcColorGroups"
+          :empty-label="false"
           aria-label="ASTC color space"
-          @change="onAstcColor"
-        >
-          <optgroup label="sRGB / UNORM">
-            <option
-              v-for="option in astcColorOptions"
-              :key="option.value"
-              :value="option.value"
-            >
-              {{ option.label }}
-            </option>
-          </optgroup>
-        </select>
+          @update:model-value="onAstcColor"
+        />
       </div>
     </OptionField>
 
@@ -411,23 +376,13 @@ function onEncode(event: Event): void {
       option-key="encode"
       :state="fieldState('encode')"
     >
-      <select
-        :class="controlClass"
-        :value="store.options.encode ?? ''"
+      <EnumSelect
+        :model-value="store.options.encode"
+        :options="encodeOptions"
+        empty-label="None"
         :disabled="mode === 'astc'"
-        @change="onEncode"
-      >
-        <option value="">
-          None
-        </option>
-        <option
-          v-for="option in encodeOptions"
-          :key="option.value"
-          :value="option.value"
-        >
-          {{ option.label }}
-        </option>
-      </select>
+        @update:model-value="onEncode"
+      />
     </OptionField>
 
     <div

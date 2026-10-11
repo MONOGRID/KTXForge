@@ -66,8 +66,10 @@ export default defineConfig({
     "btn-primary":
       "btn border-brand bg-brand text-brand-fg hover:opacity-90",
     panel: "rounded border border-line bg-surface-raised text-ink",
-    "field-row": "flex items-start gap-3 py-1.5",
-    label: "min-w-28 shrink-0 pt-1 text-sm text-ink-muted",
+    "field-row":
+      "grid grid-cols-[minmax(0,42%)_minmax(0,1fr)] items-start gap-x-2 py-1.5",
+    label:
+      "min-w-0 cursor-pointer truncate pt-1 text-sm text-ink-muted select-none",
     hint: "mt-0.5 text-xs text-ink-faint",
     badge:
       "inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-surface-sunken text-ink-muted",

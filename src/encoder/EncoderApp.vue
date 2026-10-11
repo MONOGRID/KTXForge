@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { useTitle } from "@vueuse/core";
 import { computed, onMounted, ref } from "vue";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import ModeToggle from "../shared/components/ModeToggle.vue";
 import UpdateBanner from "../shared/components/UpdateBanner.vue";
 import DropOverlay from "./components/DropOverlay.vue";
@@ -56,17 +62,59 @@ onMounted(() => {
       {{ initError }}
     </p>
 
-    <main class="grid min-h-0 flex-1 grid-cols-[minmax(220px,280px)_minmax(0,1fr)_minmax(220px,300px)] gap-3 p-3">
-      <SourceList class="min-h-0" />
+    <main class="min-h-0 flex-1 p-2">
+      <ResizablePanelGroup
+        id="encoder-layout"
+        auto-save-id="encoder-layout"
+        direction="horizontal"
+        class="h-full min-h-0"
+      >
+        <ResizablePanel
+          id="encoder-sources"
+          :default-size="22"
+          :min-size="14"
+          :max-size="40"
+          class="min-h-0 min-w-0"
+        >
+          <SourceList class="h-full min-h-0" />
+        </ResizablePanel>
 
-      <section class="flex min-h-0 flex-col gap-2 overflow-hidden">
-        <div class="min-h-0 flex-1 overflow-auto">
-          <OptionsPanel />
-        </div>
-        <EncodeBar />
-      </section>
+        <ResizableHandle
+          with-handle
+          class="mx-1"
+        />
 
-      <PreviewPane class="min-h-0" />
+        <ResizablePanel
+          id="encoder-preview"
+          :default-size="48"
+          :min-size="28"
+          class="min-h-0 min-w-0"
+        >
+          <PreviewPane class="h-full min-h-0" />
+        </ResizablePanel>
+
+        <ResizableHandle
+          with-handle
+          class="mx-1"
+        />
+
+        <ResizablePanel
+          id="encoder-options"
+          :default-size="30"
+          :min-size="18"
+          :max-size="48"
+          class="min-h-0 min-w-0"
+        >
+          <section class="flex h-full min-h-0 flex-col gap-2 overflow-hidden">
+            <ScrollArea class="min-h-0 flex-1">
+              <div class="pr-3">
+                <OptionsPanel />
+              </div>
+            </ScrollArea>
+            <EncodeBar />
+          </section>
+        </ResizablePanel>
+      </ResizablePanelGroup>
     </main>
   </div>
 </template>

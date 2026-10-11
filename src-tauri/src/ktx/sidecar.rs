@@ -43,6 +43,22 @@ pub fn exit_meaning(code: i32) -> &'static str {
     AppError::exit_meaning(code)
 }
 
+/// Stop the cancel-watcher task.
+///
+/// When cancelled, await so the child kill can finish. Otherwise abort — the
+/// watcher loops until the cancel flag is set, so awaiting it on the success
+/// path hangs forever (inspector stuck on "Loading…").
+async fn finish_cancel_watcher(
+    cancel_task: tauri::async_runtime::JoinHandle<()>,
+    cancelled: bool,
+) {
+    if cancelled {
+        let _ = cancel_task.await;
+    } else {
+        cancel_task.abort();
+    }
+}
+
 /// Collect sidecar output. Returns `Ok` for any exit code (including non-zero).
 /// Used by inspect when invalid files still emit JSON on stdout.
 pub async fn run_ktx_collect(
@@ -81,7 +97,7 @@ pub async fn run_ktx_collect(
 
     while let Some(event) = rx.recv().await {
         if cancel.is_cancelled() {
-            let _ = cancel_task.await;
+            finish_cancel_watcher(cancel_task, true).await;
             return Err(AppError::cancelled());
         }
         match event {
@@ -98,14 +114,14 @@ pub async fn run_ktx_collect(
                 code = payload.code.unwrap_or(-1);
             }
             CommandEvent::Error(err) => {
-                let _ = cancel_task.await;
+                finish_cancel_watcher(cancel_task, cancel.is_cancelled()).await;
                 return Err(AppError::io(format!("ktx process error: {err}")));
             }
             _ => {}
         }
     }
 
-    let _ = cancel_task.await;
+    finish_cancel_watcher(cancel_task, cancel.is_cancelled()).await;
 
     if cancel.is_cancelled() {
         return Err(AppError::cancelled());
@@ -193,5 +209,64 @@ mod tests {
             stdout.to_ascii_lowercase().contains("ktx") || !stdout.trim().is_empty(),
             "unexpected version stdout: {stdout}"
         );
+    }
+
+    /// Awaiting the cancel watcher without setting the flag hangs (the old bug).
+    #[tokio::test]
+    async fn awaiting_cancel_watcher_without_flag_hangs() {
+        let cancel = CancellationHandle::new();
+        let cancel_flag = cancel.cancelled.clone();
+        let cancel_task = tokio::spawn(async move {
+            while !cancel_flag.load(Ordering::SeqCst) {
+                tokio::time::sleep(Duration::from_millis(25)).await;
+            }
+        });
+
+        let result = tokio::time::timeout(Duration::from_millis(200), cancel_task).await;
+        assert!(
+            result.is_err(),
+            "await without cancel should hang; if this fails the watcher model changed"
+        );
+    }
+
+    /// Success-path cleanup must finish quickly (inspector "Loading…" regression).
+    #[tokio::test]
+    async fn finish_cancel_watcher_on_success_completes_quickly() {
+        let cancel = CancellationHandle::new();
+        let cancel_flag = cancel.cancelled.clone();
+        let cancel_task = tauri::async_runtime::spawn(async move {
+            while !cancel_flag.load(Ordering::SeqCst) {
+                tokio::time::sleep(Duration::from_millis(25)).await;
+            }
+        });
+
+        let result = tokio::time::timeout(
+            Duration::from_millis(200),
+            finish_cancel_watcher(cancel_task, false),
+        )
+        .await;
+        assert!(
+            result.is_ok(),
+            "success-path cancel-watcher cleanup hung (inspector would stay on Loading…)"
+        );
+    }
+
+    #[tokio::test]
+    async fn finish_cancel_watcher_on_cancel_awaits_exit() {
+        let cancel = CancellationHandle::new();
+        let cancel_flag = cancel.cancelled.clone();
+        let cancel_task = tauri::async_runtime::spawn(async move {
+            while !cancel_flag.load(Ordering::SeqCst) {
+                tokio::time::sleep(Duration::from_millis(25)).await;
+            }
+        });
+        cancel.cancel();
+
+        let result = tokio::time::timeout(
+            Duration::from_millis(200),
+            finish_cancel_watcher(cancel_task, true),
+        )
+        .await;
+        assert!(result.is_ok(), "cancelled watcher cleanup hung");
     }
 }

@@ -84,57 +84,21 @@ export function enumEntries(
   }));
 }
 
-function inputValue(event: Event): string {
-  const target = event.target;
-  if (target instanceof HTMLInputElement || target instanceof HTMLSelectElement) {
-    return target.value;
-  }
-  return "";
-}
-
-export function checkboxChecked(event: Event): boolean {
-  const target = event.target;
-  return target instanceof HTMLInputElement && target.checked;
-}
-
-function isValidOptionalNumber(value: number, integer: boolean): boolean {
-  return Number.isFinite(value) && (!integer || Number.isInteger(value));
-}
-
-function parseOptionalNumber(raw: string, integer: boolean): number | null {
-  const trimmed = raw.trim();
-  if (trimmed === "") {
-    return null;
-  }
-  const value = Number(trimmed);
-  return isValidOptionalNumber(value, integer) ? value : null;
-}
-
-export function onEnumChange(field: EnumOptionField, event: Event): void {
-  const raw = inputValue(event);
-  field.set(raw === "" ? null : raw);
-}
-
-export function onNumberChange(field: NumberOptionField, event: Event): void {
-  const raw = inputValue(event);
-  if (raw.trim() === "") {
-    field.set(null);
-    return;
-  }
-  const parsed = parseOptionalNumber(raw, field.step === "1");
-  if (parsed !== null) {
-    field.set(parsed);
-  }
-}
-
-export function onTextChange(field: TextOptionField, event: Event): void {
-  const raw = inputValue(event).trim();
-  field.set(raw === "" ? null : raw);
-}
-
 export function isLabeled<E extends string>(
   labels: Record<E, string>,
   value: string,
 ): value is E {
   return Object.prototype.hasOwnProperty.call(labels, value);
+}
+
+export function parseNumberField(raw: string, integer: boolean): number | null {
+  const trimmed = raw.trim();
+  if (trimmed === "") {
+    return null;
+  }
+  const value = Number(trimmed);
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+  return integer ? Math.trunc(value) : value;
 }
