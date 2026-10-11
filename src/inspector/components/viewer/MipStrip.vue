@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { report, selection } from "../../store";
-import RangeTickLabels from "./RangeTickLabels.vue";
+import RangeTickLabels from "../../../shared/components/RangeTickLabels.vue";
 
 function formatMipTick(level: number): string {
   return `L${String(level)}`;

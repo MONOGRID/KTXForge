@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
-import { rangeTickValues } from "../../sliderTicks";
+import { rangeTickValues } from "../sliderTicks";
 
 const props = withDefaults(
   defineProps<{
@@ -11,6 +11,7 @@ const props = withDefaults(
   }>(),
   {
     maxTicks: 8,
+    format: undefined,
   },
 );
 

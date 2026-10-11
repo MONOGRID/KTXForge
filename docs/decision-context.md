@@ -294,3 +294,9 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 4. Internal `InputRole::Base2D` stays for encode/rules when every output is a single image.
 
 **Why:** Full-window green made targets ambiguous. Base 2D in the role list was noise for the default batch case; packing should be an explicit choice (panel, +, or preview dialog).
+
+## 2026-10-11 — Role-aware Preview: pack sliders, cubemap cross wipe, generated mips
+
+**Decided:** Encoder Preview browses **inputs** by `InputRole` immediately (layer / mip-chain / depth sliders; cubemap as a classic cross with no face slider). After encode, the same frame wipes input vs extract. When the KTX has generated mips (`levels > 1` and role is not `MipChain`), add a **Mip** slider: left stays full-res input(s), right is the extracted mip for resolution-loss compare. Cubemap uses one canvas-composited cross per side under a **single** wipe. `encoded_preview` takes `ImageSelection` and reuses the job preview-cache / `extract_preview_png`. CSS3D depth volume deferred to a follow-up plan.
+
+**Why:** Preview only showed `inputs[0]` vs L0/F0; packing roles were invisible until the inspector. Artists need to verify layers/mips/faces before and after encode without leaving the encoder, and to judge mip filter quality with the same wipe.

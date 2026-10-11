@@ -229,12 +229,24 @@ SSIM and PSNR, when requested, are shown next to the preview.
 
 ### Encode preview
 
-After a successful encode, Rust extracts a viewable image and the UI shows it beside the source.
+The center Preview is role-aware and always starts from the selected output’s **inputs** (encode is not required to browse).
+
+| Input role | Before encode | After encode |
+|---|---|---|
+| Base 2D | Single source | Wipe source vs encoded; **Mip** slider when the KTX has more than one level |
+| Array layers | **Layer** slider over inputs | Wipe that layer vs the matching extract; **Mip** slider when levels > 1 |
+| Mip chain | **Mip** slider over inputs | Wipe that input vs encoded level (generate-mipmap is off for this role) |
+| Cubemap faces | Classic face **cross** (empty cells if fewer than six) | Same cross on both sides of **one** wipe; **Mip** slider when levels > 1 |
+| Depth slices | **Depth** slider over inputs (2D slice) | Wipe that slice vs extract |
+
+Wipe compare always shows input vs output in the same frame. When scrubbing a **generated** mip, the left side stays the full-resolution input(s) and the right side is the extracted mip so resolution loss is visible. Cubemap uses one composite cross per side under a single wipe handle (not per-face wipes).
+
+After a successful encode, Rust extracts viewable PNG slices (`encoded_preview` with an `ImageSelection`):
 
 - BasisLZ and UASTC: `ktx extract --transcode` to `r8`, `rg8`, `rgb8`, `rgba8`, or a half-float target chosen from the channel count, then a PNG for the webview.
-- Uncompressed PNG-exportable formats: `ktx extract` of level 0.
+- Uncompressed PNG-exportable formats: `ktx extract` of the selected level/face/layer/depth.
 - HDR: Rust tone-maps the EXR extract to a PNG for the preview and labels it as a preview, not the stored data.
-- The preview also shows byte size of the KTX2 file, dimensions, codec, mip count, and frame/layer count.
+- The preview also shows byte size of the KTX2 file, dimensions, codec, mip count, layer count, and face count.
 
 Block-compressed transcode targets (`etc-rgb`, `etc-rgba`, `eac-r11`, `eac-rg11`, `bc1`, `bc3`, `bc4`, `bc5`, `bc7`, `astc`) can only be extracted as raw, so they are not the preview path. The preview always uses an unpacked target the webview can show.
 

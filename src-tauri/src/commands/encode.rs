@@ -9,7 +9,7 @@ use crate::events::{EncodeProgressPayload, EncodeStage, ENCODE_PROGRESS};
 use crate::image::convert::{prepare_input, read_source_info};
 use crate::ktx::anim::write_anim_data;
 use crate::ktx::create_args::build_create_args;
-use crate::ktx::extract_ops::{extract_preview_png, read_texture_meta};
+use crate::ktx::extract_ops::{cached_preview_png, extract_preview_png, read_texture_meta};
 use crate::ktx::info_types::{ImageSelection, PreviewKind};
 use crate::ktx::input_role::{self, InputRole};
 use crate::ktx::metrics::parse_metrics;
@@ -54,6 +54,7 @@ pub async fn run_encode(
                 output_path: job_dir.join("output.ktx2"),
                 preview_png: job_dir.join("preview.png"),
                 preview_kind: PreviewKind::Png,
+                meta: None,
                 cancel: cancel.clone(),
                 default_save_name: default_save_name(&request.sources),
             },
@@ -182,6 +183,7 @@ pub async fn run_encode(
             job.output_path = output_path;
             job.preview_png = preview_png;
             job.preview_kind = resolved_preview.clone();
+            job.meta = Some(meta.clone());
         }
     }
 
@@ -260,17 +262,59 @@ pub async fn cancel_encode(state: State<'_, AppState>, job_id: String) -> Result
 
 #[tauri::command]
 pub async fn encoded_preview(
+    app: AppHandle,
     state: State<'_, AppState>,
     job_id: String,
+    selection: ImageSelection,
 ) -> Result<tauri::ipc::Response, AppError> {
-    let jobs = state
-        .jobs
-        .lock()
-        .map_err(|_| AppError::io("jobs lock poisoned"))?;
-    let job = jobs
-        .get(&job_id)
-        .ok_or_else(|| AppError::invalid_input(format!("unknown job: {job_id}")))?;
-    let bytes = std::fs::read(&job.preview_png).map_err(|e| AppError::io(e.to_string()))?;
+    let (output_path, cache, meta, preview_png) = {
+        let jobs = state
+            .jobs
+            .lock()
+            .map_err(|_| AppError::io("jobs lock poisoned"))?;
+        let job = jobs
+            .get(&job_id)
+            .ok_or_else(|| AppError::invalid_input(format!("unknown job: {job_id}")))?;
+        (
+            job.output_path.clone(),
+            job.dir.join("preview-cache"),
+            job.meta.clone(),
+            job.preview_png.clone(),
+        )
+    };
+
+    std::fs::create_dir_all(&cache).map_err(|e| AppError::io(e.to_string()))?;
+
+    if let Some(bytes) = cached_preview_png(&cache, &selection) {
+        return Ok(tauri::ipc::Response::new(bytes));
+    }
+
+    // Fast path for the warm L0 extract written at encode finish.
+    if selection.level == 0
+        && selection.face == 0
+        && selection.layer == 0
+        && selection.depth_slice == 0
+        && preview_png.is_file()
+    {
+        let bytes = std::fs::read(&preview_png).map_err(|e| AppError::io(e.to_string()))?;
+        return Ok(tauri::ipc::Response::new(bytes));
+    }
+
+    let meta = match meta {
+        Some(m) => m,
+        None => read_texture_meta(&output_path)?,
+    };
+
+    let (bytes, _) = extract_preview_png(
+        &app,
+        &output_path,
+        &selection,
+        &meta,
+        &cache,
+        CancellationHandle::new(),
+    )
+    .await?;
+
     Ok(tauri::ipc::Response::new(bytes))
 }
 

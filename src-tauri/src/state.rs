@@ -15,6 +15,8 @@ pub struct Job {
     pub output_path: PathBuf,
     pub preview_png: PathBuf,
     pub preview_kind: PreviewKind,
+    /// Texture dims / preview hints from the finished encode (for subresource extracts).
+    pub meta: Option<TextureMeta>,
     pub cancel: CancellationHandle,
     pub default_save_name: String,
 }
