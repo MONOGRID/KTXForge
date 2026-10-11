@@ -251,7 +251,7 @@ ASTC `--format` strings keep the Vulkan `_BLOCK` suffix required by v4.4.2. This
 1. **Hard rule:** The GUI never allows a sources+options combination the app already knows will fail `ktx create`. Rust `describe_options` filters choices and disables fields; when the current options are invalid for the sources it returns an `OptionSuggestion` that Vue must apply; encode validates again and refuses. Documented in [AGENTS.md](../AGENTS.md) and [requirements.md](requirements.md).
 2. **HDR sources** (EXR / Radiance): default / suggest `R16G16B16A16_SFLOAT`; only `R16G16B16_SFLOAT` and `R16G16B16A16_SFLOAT` appear; ASTC and `--encode` (BasisLZ / UASTC LDR) are hidden — UASTC HDR is deferred on the v4.4.2 pin.
 3. **LDR sources:** keep `R8G8B8A8_SRGB` as the default; hide half-float formats (they mismatch PNG/8-bit inputs).
-4. **Mixed LDR+HDR** in one encode is refused (warning + encode blocked). Multi-source still means one KTX (layers / animation), not batch encode — batch vs single-KTX product wording left open.
+4. **Mixed LDR+HDR** in one encode is refused (warning + encode blocked). Superseded for product wording by the 2026-10-11 batch outputs entry below: multi-image drop defaults to a **batch of KTX outputs**; packing into one file uses the Inputs role (array layers / cubemap / …) on a selected output.
 5. **Tone-map HDR→LDR for compression** is out of scope; stay aligned with what `ktx create` accepts.
 6. Split: Rust owns compatibility, filtered choices, and suggestion; Vue applies the suggestion when sources/options change and only renders allowed choices.
 
@@ -268,3 +268,29 @@ ASTC `--format` strings keep the Vulkan `_BLOCK` suffix required by v4.4.2. This
 **Decided:** `*_SRGB` vs transfer-function pairing is a hard rules-engine constraint, not a soft warning. For `*_SRGB` formats, `--convert-tf` choices omit `linear` and `--assign-tf` only lists sRGB aliases; for UNORM/ASTC UNORM formats that have an sRGB twin, `--convert-tf` only offers `linear`. Invalid current values are cleared via `OptionSuggestion` (`convertTf` / `assignTf`); `validate` refuses encode. Soft warnings remain for lossy sRGB→linear and encode color-space advice.
 
 **Why:** The GUI let users pick `--convert-tf linear` with `R8G8B8A8_SRGB`, which `ktx create` fatals on. Same “never offer known-fail combos” rule as source/format pairing.
+
+## 2026-10-11 — Batch KTX outputs + role-typed inputs
+
+**Decided:** Replace the ambiguous single Sources list with:
+
+1. **Top-left:** queue of KTX **outputs** (batch). Add / delete / select; no reorder. Drop → one new output per image.
+2. **Bottom-left:** **Inputs** for the selected output, with an **InputRole** selector (`Base2D`, `ArrayLayers`, `CubemapFaces`, `MipChain`, `DepthSlices`). List length is the arity; Container `--layers` / cubemap / depth / (mip-chain) levels are derived, not free-typed. Compound shapes (cube arrays, etc.) deferred.
+3. **Center drop** = new outputs (same as top). Panel-targeted drops only; never silently append to layers from chrome.
+4. **Shared** `CreateOptions` (+ animation when role is ArrayLayers) for the whole queue. No per-output options, copy/paste, or apply-all. Reject adding an output incompatible with the first (LDR/HDR).
+5. **Encode all** with limited parallelism (cap 2), queue modal (`Done i/N`, Cancel queue), Save / Save all.
+6. Preview and `describe_options` bind to the selected output’s inputs; revoke object URLs on selection change.
+
+Closes the open “batch vs single-KTX” note from the source-aware format defaults entry.
+
+**Why:** Dropping many albedos was treated as one `ktx create` with 1×1×1×1 expected inputs → fatal. The UI looked like a batch queue but packed every file into one KTX. Splitting outputs vs role-typed inputs makes arity structural and matches artist batch workflows while keeping array/cubemap/mip/depth packing explicit.
+
+## 2026-10-11 — Per-panel drop targets; Inputs on demand; preview drop dialog
+
+**Decided:** Refine the batch-outputs UX:
+
+1. **Drop highlight** is per panel (Outputs / Inputs / Preview), not a full-window green overlay. Zone is committed on the webview `drop` event so routing still works after the highlight clears.
+2. **Outputs drop** → one KTX output per image. **Inputs drop** → append to the selected output. **Preview drop** → dialog: separate outputs, or pack into one KTX with a pack role (array layers / cubemap / mip / depth).
+3. **Inputs panel** is hidden for single-image outputs. Each Outputs row has **+** to open Inputs and add more images for that output. Role UI drops **Base 2D** (implicit when Inputs is hidden); pack roles remain.
+4. Internal `InputRole::Base2D` stays for encode/rules when every output is a single image.
+
+**Why:** Full-window green made targets ambiguous. Base 2D in the role list was noise for the default batch case; packing should be an explicit choice (panel, +, or preview dialog).

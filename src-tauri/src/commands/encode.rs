@@ -11,9 +11,9 @@ use crate::ktx::anim::write_anim_data;
 use crate::ktx::create_args::build_create_args;
 use crate::ktx::extract_ops::{extract_preview_png, read_texture_meta};
 use crate::ktx::info_types::{ImageSelection, PreviewKind};
+use crate::ktx::input_role::{self, InputRole};
 use crate::ktx::metrics::parse_metrics;
 use crate::ktx::options::{CreateOptions, EncodeCodec};
-use crate::ktx::rules;
 use crate::ktx::sidecar::{self, CancellationHandle};
 use crate::state::{AppState, Job};
 
@@ -75,11 +75,22 @@ pub async fn run_encode(
     }
 
     let mut options = request.options.clone();
+    input_role::apply_role(&mut options, request.input_role, prepared_paths.len());
     if request.animation.is_some() {
+        if request.input_role != InputRole::ArrayLayers {
+            return Err(AppError::invalid_input(
+                "animation requires Input role = Array layers",
+            ));
+        }
+        if prepared_paths.len() < 2 {
+            return Err(AppError::invalid_input(
+                "animation requires at least two layer images",
+            ));
+        }
         options.container.layers = Some(prepared_paths.len() as u32);
     }
 
-    if let Err(errors) = rules::validate_for_sources(&options, &source_infos) {
+    if let Err(errors) = input_role::validate_output(&options, request.input_role, &source_infos) {
         return Err(AppError::invalid_input(errors.join("; ")));
     }
 
@@ -295,6 +306,44 @@ pub async fn save_encoded(
         .map_err(|e| AppError::io(format!("dialog path: {e}")))?;
     std::fs::copy(&output_path, &dest).map_err(|e| AppError::io(e.to_string()))?;
     Ok(Some(dest.to_string_lossy().into_owned()))
+}
+
+/// Save multiple encoded jobs into a chosen directory.
+#[tauri::command]
+pub async fn save_encoded_batch(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    job_ids: Vec<String>,
+) -> Result<Option<u32>, AppError> {
+    if job_ids.is_empty() {
+        return Ok(None);
+    }
+
+    let picked = app.dialog().file().blocking_pick_folder();
+    let Some(folder) = picked else {
+        return Ok(None);
+    };
+    let dir = folder
+        .into_path()
+        .map_err(|e| AppError::io(format!("dialog path: {e}")))?;
+
+    let mut saved = 0u32;
+    for job_id in &job_ids {
+        let (output_path, default_name) = {
+            let jobs = state
+                .jobs
+                .lock()
+                .map_err(|_| AppError::io("jobs lock poisoned"))?;
+            let job = jobs
+                .get(job_id)
+                .ok_or_else(|| AppError::invalid_input(format!("unknown job: {job_id}")))?;
+            (job.output_path.clone(), job.default_save_name.clone())
+        };
+        let dest = dir.join(&default_name);
+        std::fs::copy(&output_path, &dest).map_err(|e| AppError::io(e.to_string()))?;
+        saved += 1;
+    }
+    Ok(Some(saved))
 }
 
 #[cfg(test)]

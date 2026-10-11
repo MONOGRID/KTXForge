@@ -7,13 +7,15 @@ import ProgressBar from "../../shared/components/ProgressBar.vue";
 import {
   canCancelEncode,
   canEncode,
+  canSaveAllEncoded,
   canSaveEncoded,
   cancelEncode,
   encode,
+  saveAllEncoded,
   saveEncoded,
+  slotByJobId,
 } from "../actions";
-import type { JobStatus } from "../store";
-import { store } from "../store";
+import { selectedOutput, store } from "../store";
 
 const STAGE_LABELS = {
   converting: "Converting…",
@@ -25,44 +27,52 @@ const STAGE_LABELS = {
 
 const STDERR_KEEP = 40;
 
-function isJobStatus(status: JobStatus, expected: JobStatus): boolean {
-  return status === expected;
-}
-
-const isRunning = computed(
-  (): boolean => isJobStatus(store.job.status, "running"),
-);
-
 const encodeEnabled = computed((): boolean => canEncode());
 const cancelEnabled = computed((): boolean => canCancelEncode());
 const saveEnabled = computed((): boolean => canSaveEncoded());
+const saveAllEnabled = computed((): boolean => canSaveAllEncoded());
 
-const stageLabel = computed((): string | null => {
-  const stage = store.job.stage;
-  if (stage === null) {
+const queueActive = computed((): boolean => store.queue !== null);
+
+const selectedStageLabel = computed((): string | null => {
+  const slot = selectedOutput.value;
+  if (slot === null || slot.job.stage === null) {
     return null;
   }
-  return STAGE_LABELS[stage];
+  return STAGE_LABELS[slot.job.stage];
 });
 
-const stderrTail = computed((): string =>
-  store.job.stderrLines.slice(-STDERR_KEEP).join("\n"),
-);
+const stderrTail = computed((): string => {
+  const slot = selectedOutput.value;
+  if (slot === null) {
+    return "";
+  }
+  return slot.job.stderrLines.slice(-STDERR_KEEP).join("\n");
+});
+
+const selectedError = computed((): string | null => {
+  const slot = selectedOutput.value;
+  if (slot === null || slot.job.status !== "error") {
+    return null;
+  }
+  return slot.job.errorMessage;
+});
 
 const unlisteners: Array<() => void> = [];
 
 onMounted(() => {
   void on("encode://progress", (payload) => {
-    if (store.job.jobId === null || payload.jobId !== store.job.jobId) {
+    const slot = slotByJobId(payload.jobId);
+    if (slot === undefined) {
       return;
     }
-    store.job.stage = payload.stage;
+    slot.job.stage = payload.stage;
     if (payload.stderrLine !== null) {
-      store.job.stderrLines.push(payload.stderrLine);
-      if (store.job.stderrLines.length > STDERR_KEEP) {
-        store.job.stderrLines.splice(
+      slot.job.stderrLines.push(payload.stderrLine);
+      if (slot.job.stderrLines.length > STDERR_KEEP) {
+        slot.job.stderrLines.splice(
           0,
-          store.job.stderrLines.length - STDERR_KEEP,
+          slot.job.stderrLines.length - STDERR_KEEP,
         );
       }
     }
@@ -93,13 +103,13 @@ onUnmounted(() => {
           :disabled="!encodeEnabled"
           @click="encode"
         >
-          Encode
+          Encode all
         </Button>
         <Button
           :disabled="!cancelEnabled"
           @click="cancelEncode"
         >
-          Cancel
+          Cancel queue
         </Button>
         <Button
           :disabled="!saveEnabled"
@@ -107,17 +117,38 @@ onUnmounted(() => {
         >
           Save…
         </Button>
+        <Button
+          :disabled="!saveAllEnabled"
+          @click="saveAllEncoded"
+        >
+          Save all…
+        </Button>
         <span
-          v-if="stageLabel"
+          v-if="!queueActive && selectedStageLabel"
           class="text-xs text-ink-muted"
-        >{{ stageLabel }}</span>
+        >{{ selectedStageLabel }}</span>
       </div>
 
       <ProgressBar
-        v-if="isRunning"
-        :value="null"
-        :label="stageLabel ?? 'Working…'"
+        v-if="queueActive"
+        :value="
+          store.queue !== null && store.queue.total > 0
+            ? (store.queue.done / store.queue.total) * 100
+            : null
+        "
+        :label="
+          store.queue !== null
+            ? `Done ${String(store.queue.done)} / ${String(store.queue.total)}`
+            : 'Working…'
+        "
       />
+
+      <p
+        v-if="selectedError"
+        class="m-0 text-xs text-danger"
+      >
+        {{ selectedError }}
+      </p>
 
       <pre
         v-if="stderrTail"

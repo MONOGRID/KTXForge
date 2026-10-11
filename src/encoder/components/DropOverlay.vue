@@ -1,20 +1,43 @@
 <script setup lang="ts">
 import { getCurrentWebview } from "@tauri-apps/api/webview";
-import { onMounted, onUnmounted, ref } from "vue";
+import { onMounted, onUnmounted } from "vue";
+import {
+  commitDropZone,
+  dropHintLabel,
+  isFileDragActive,
+  setDropZone,
+  setFileDragActive,
+  type DropZone,
+} from "../dropTarget";
 
-const active = ref(false);
 let unlisten: (() => void) | undefined;
+
+function zoneFromPoint(x: number, y: number): DropZone | null {
+  const el = document.elementFromPoint(x, y);
+  const zoneEl = el?.closest("[data-drop-zone]");
+  const zone = zoneEl?.getAttribute("data-drop-zone");
+  if (zone === "outputs" || zone === "inputs" || zone === "center") {
+    return zone;
+  }
+  return null;
+}
 
 onMounted(() => {
   void getCurrentWebview()
     .onDragDropEvent((event) => {
       const type = event.payload.type;
       if (type === "enter" || type === "over") {
-        active.value = true;
+        setFileDragActive(true);
+        const pos = event.payload.position;
+        setDropZone(zoneFromPoint(pos.x, pos.y));
         return;
       }
-      // leave / drop — reset highlight; Rust owns path handling on drop
-      active.value = false;
+      if (type === "drop") {
+        const pos = event.payload.position;
+        setDropZone(zoneFromPoint(pos.x, pos.y));
+        commitDropZone();
+      }
+      setFileDragActive(false);
     })
     .then((fn) => {
       unlisten = fn;
@@ -28,8 +51,14 @@ onUnmounted(() => {
 
 <template>
   <div
-    class="pointer-events-none fixed inset-0 z-50 border-4 border-transparent transition-colors"
-    :class="{ 'border-brand bg-brand/10': active }"
+    v-if="isFileDragActive"
+    class="pointer-events-none fixed inset-0 z-50"
     aria-hidden="true"
-  />
+  >
+    <div
+      class="absolute bottom-4 left-1/2 -translate-x-1/2 rounded bg-surface-raised px-3 py-1.5 text-xs font-medium shadow"
+    >
+      Drop → {{ dropHintLabel }}
+    </div>
+  </div>
 </template>

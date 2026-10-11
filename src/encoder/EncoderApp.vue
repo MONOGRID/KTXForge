@@ -9,17 +9,23 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { on } from "../api/events";
 import { toAppError } from "../api/guards";
 import ModeToggle from "../shared/components/ModeToggle.vue";
 import UpdateBanner from "../shared/components/UpdateBanner.vue";
 import { toastAppError } from "../shared/toastAppError";
+import { handleDroppedSources } from "./actions";
+import DropIntentDialog from "./components/DropIntentDialog.vue";
 import DropOverlay from "./components/DropOverlay.vue";
 import EncodeBar from "./components/EncodeBar.vue";
+import InputsPanel from "./components/InputsPanel.vue";
+import OutputsQueue from "./components/OutputsQueue.vue";
 import PreviewPane from "./components/PreviewPane.vue";
-import SourceList from "./components/SourceList.vue";
+import QueueModal from "./components/QueueModal.vue";
 import OptionsPanel from "./components/options/OptionsPanel.vue";
+import { consumeCommittedDropZone } from "./dropTarget";
 import { bindEncoderMenu } from "./menuBridge";
-import { initStore, store } from "./store";
+import { initStore, showInputsPanel, store } from "./store";
 
 useTitle("KTX-GUI");
 
@@ -32,16 +38,35 @@ const versionLabel = computed((): string => {
 });
 
 let unbindMenu: (() => void) | undefined;
+const dropUnlisteners: Array<() => void> = [];
 
 onMounted(() => {
   unbindMenu = bindEncoderMenu();
   void initStore().catch((err: unknown) => {
     toastAppError(toAppError(err));
   });
+  void on("encoder://sources-added", (sources) => {
+    void handleDroppedSources(sources, consumeCommittedDropZone());
+  }).then((unlisten) => {
+    dropUnlisteners.push(unlisten);
+  });
+  void on("encoder://drop-rejected", (payload) => {
+    const paths =
+      payload.paths.length > 0 ? ` (${payload.paths.join(", ")})` : "";
+    toastAppError({
+      kind: "invalidInput",
+      message: `${payload.reason}${paths}`,
+    });
+  }).then((unlisten) => {
+    dropUnlisteners.push(unlisten);
+  });
 });
 
 onUnmounted(() => {
   unbindMenu?.();
+  for (const unlisten of dropUnlisteners) {
+    unlisten();
+  }
 });
 </script>
 
@@ -53,6 +78,8 @@ onUnmounted(() => {
         close-button
       />
       <DropOverlay />
+      <DropIntentDialog />
+      <QueueModal />
 
       <header class="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-surface-raised px-4 py-2">
         <h1 class="m-0 text-lg font-semibold tracking-tight">
@@ -82,7 +109,38 @@ onUnmounted(() => {
             :max-size="40"
             class="min-h-0 min-w-0"
           >
-            <SourceList class="h-full min-h-0" />
+            <ResizablePanelGroup
+              v-if="showInputsPanel"
+              id="encoder-left"
+              auto-save-id="encoder-left"
+              direction="vertical"
+              class="h-full min-h-0"
+            >
+              <ResizablePanel
+                id="encoder-outputs"
+                :default-size="45"
+                :min-size="20"
+                class="min-h-0 min-w-0"
+              >
+                <OutputsQueue class="h-full min-h-0" />
+              </ResizablePanel>
+              <ResizableHandle
+                with-handle
+                class="my-1"
+              />
+              <ResizablePanel
+                id="encoder-inputs"
+                :default-size="55"
+                :min-size="20"
+                class="min-h-0 min-w-0"
+              >
+                <InputsPanel class="h-full min-h-0" />
+              </ResizablePanel>
+            </ResizablePanelGroup>
+            <OutputsQueue
+              v-else
+              class="h-full min-h-0"
+            />
           </ResizablePanel>
 
           <ResizableHandle

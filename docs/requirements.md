@@ -66,7 +66,16 @@ The pinned tool version is recorded in the repo and shown in the UI. Bumping it 
 
 ## Encoder
 
-Drop one or more ordinary images onto the main window. The window shows the source list, every encoding control, a preview, and encode / save actions. Encoding runs in the background. The UI stays usable and shows progress and the tool's stderr if the command fails.
+Drop one or more ordinary images onto the main window. The encoder session is a **batch of KTX outputs**, not a single packed file by default. Each drop panel highlights on its own (not the whole window):
+
+- **Top-left — KTX outputs:** queue of independent outputs. Drop here → one new output per image. Selectable rows; Add / delete; no reorder. A **+** on each row opens Inputs for that output and picks more images.
+- **Bottom-left — Inputs:** shown only when the selected output has (or is about to have) multiple inputs. Role selector is array layers, cubemap faces, mip chain, or depth slices (single-image Base 2D is implicit when Inputs is hidden). List length **is** the arity (`--layers`, `--cubemap` + 6 faces, `--levels`, `--depth`). Drop here → append inputs for the selected output.
+- **Center — Preview** for the selected output (source vs encoded wipe). Drop here opens a dialog: separate KTX outputs, or pack into one KTX with a chosen input kind.
+- **Right — Shared encode options** for every output in the queue. New outputs incompatible with the first (e.g. HDR vs LDR) are rejected.
+
+Encode runs a limited-parallel queue with a modal (`Done i / N`, Cancel queue). Save can write the selected result or all completed results to a folder.
+
+The UI stays usable and shows progress and the tool's stderr if a command fails.
 
 `ktx create` exit codes are surfaced as:
 
@@ -120,7 +129,7 @@ The UI must never offer a combination of inputs and options that the app already
 | --- | --- |
 | `--1d` | 1D texture |
 | `--cubemap` | Faces in order +X, −X, +Y, −Y, +Z, −Z. Origin must be top-left |
-| `--layers` | Array texture. Also the frame count for animation |
+| `--layers` | Array texture / animation frame count. **Derived** from the Inputs panel when role is Array layers (list length); omitted otherwise. Not a free number field in the options rail. |
 | `--depth` | 3D texture. Requires a front/back texture-coordinate origin |
 | `--levels` | Mip count. With generate-mipmap, this many levels are built. Otherwise this many input images are required |
 | `--generate-mipmap` | Full chain if `--levels` is omitted. Not valid for SINT, UINT, 3D, or raw |
@@ -277,9 +286,9 @@ Frame length in seconds is `duration / timescale`. Sequence length is that value
 
 Encoding multiple frames:
 
-- The user drops a sequence (numbered frames, or several images).
-- Rust calls `ktx create --layers <count>` with one image per layer, in order.
-- The UI exposes duration, timescale, and loop count.
+- Set Inputs role to **Array layers**, select (or create) one KTX output, and drop/reorder frame images in the bottom list.
+- Rust calls `ktx create --layers <count>` with one image per layer, in order (`count` = list length).
+- The UI exposes duration, timescale, and loop count when that role is active and the selected output has ≥ 2 layers.
 - The current `ktx create` reference has no flag for `KTXanimData`. Rust writes that key onto the file after a successful create, using the 12-byte layout above, so the encoded file is a real animation and not only an array texture. The inspector reads the key back via `ktx info`.
 
 Decoding:

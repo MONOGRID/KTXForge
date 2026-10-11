@@ -3,6 +3,7 @@
 use strum::IntoEnumIterator;
 
 use crate::commands::{SourceInfo, SourceKind};
+use crate::ktx::input_role::{self, InputRole};
 use crate::ktx::option_help;
 use crate::ktx::options::{
     ColorPrimaries, ConvertTransferFunction, CreateOptions, EncodeCodec, FieldState, OptionKey,
@@ -15,13 +16,25 @@ use crate::ktx::options::{
 /// Filters format / encode choices from the source set so the UI cannot pick a combination
 /// known to fail `ktx create`. When current options are invalid, [`OptionReport::suggestion`]
 /// tells Vue what to apply.
-pub fn describe(opts: &CreateOptions, sources: &[SourceInfo]) -> OptionReport {
+pub fn describe(opts: &CreateOptions, sources: &[SourceInfo], role: InputRole) -> OptionReport {
+    let mut effective = opts.clone();
+    input_role::apply_role(&mut effective, role, sources.len().max(1));
+
     let sources_class = classify_sources(sources);
     let mut fields = Vec::new();
     for key in OptionKey::iter() {
-        let (mut enabled, mut reason) = field_enabled(opts, key);
+        let (mut enabled, mut reason) = field_enabled(&effective, key);
+        if input_role::hidden_for_role(role, key) {
+            enabled = false;
+            reason = Some("set by the input role on the Inputs panel".to_owned());
+        }
         apply_source_enablement(key, sources_class, &mut enabled, &mut reason);
-        let choices = filter_choices(key, opts, sources_class, option_help::choices_for(key));
+        let choices = filter_choices(
+            key,
+            &effective,
+            sources_class,
+            option_help::choices_for(key),
+        );
         fields.push(FieldState {
             key,
             enabled,
@@ -31,10 +44,19 @@ pub fn describe(opts: &CreateOptions, sources: &[SourceInfo]) -> OptionReport {
         });
     }
     let mut warnings = Vec::new();
-    warn_nonlinear_mipmap(opts, &mut warnings);
-    warn_encode_color_space(opts, &mut warnings);
-    warn_srgb_to_linear_lossy(opts, &mut warnings);
+    warn_nonlinear_mipmap(&effective, &mut warnings);
+    warn_encode_color_space(&effective, &mut warnings);
+    warn_srgb_to_linear_lossy(&effective, &mut warnings);
     warn_mixed_sources(sources_class, &mut warnings);
+    if let Err(msg) = input_role::validate_arity(role, sources.len()) {
+        if !sources.is_empty() {
+            warnings.push(OptionWarning {
+                key: None,
+                level: WarningLevel::Warn,
+                message: msg,
+            });
+        }
+    }
     let suggestion = suggestion_for(opts, sources_class);
     OptionReport {
         fields,
@@ -647,10 +669,7 @@ fn warn_srgb_to_linear_lossy(opts: &CreateOptions, warnings: &mut Vec<OptionWarn
                 | TransferFunction::ScrgbEotf
         )
     );
-    let to_linear = matches!(
-        opts.color.convert_tf,
-        Some(ConvertTransferFunction::Linear)
-    );
+    let to_linear = matches!(opts.color.convert_tf, Some(ConvertTransferFunction::Linear));
     if from_srgb && to_linear {
         warnings.push(OptionWarning {
             key: Some(OptionKey::ConvertTf),
@@ -825,7 +844,11 @@ mod tests {
     }
 
     fn report(o: &CreateOptions) -> OptionReport {
-        describe(o, &[])
+        describe(o, &[], InputRole::Base2D)
+    }
+
+    fn report_role(o: &CreateOptions, role: InputRole) -> OptionReport {
+        describe(o, &[], role)
     }
 
     fn field(report: &OptionReport, key: OptionKey) -> &FieldState {
@@ -880,11 +903,17 @@ mod tests {
 
     #[test]
     fn generate_mipmap_not_with_3d() {
-        // "Not valid for … 3D …"
+        // "Not valid for … 3D …" — depth is owned by InputRole::DepthSlices
         let mut o = opts();
         o.container.depth = Some(4);
         o.color.assign_texcoord_origin = Some(TexcoordOrigin::TopLeftFront);
-        assert!(!field(&report(&o), OptionKey::GenerateMipmap).enabled);
+        assert!(
+            !field(
+                &report_role(&o, InputRole::DepthSlices),
+                OptionKey::GenerateMipmap
+            )
+            .enabled
+        );
         o.container.generate_mipmap = true;
         assert!(validate(&o).is_err());
     }
@@ -1069,7 +1098,7 @@ mod tests {
     fn one_d_not_with_cubemap() {
         let mut o = opts();
         o.container.cubemap = true;
-        assert!(!field(&report(&o), OptionKey::OneD).enabled);
+        assert!(!field(&report_role(&o, InputRole::CubemapFaces), OptionKey::OneD).enabled);
     }
 
     #[test]
@@ -1214,7 +1243,7 @@ mod tests {
     #[test]
     fn hdr_suggests_rgba16_float_and_hides_ldr_formats() {
         let o = opts();
-        let r = describe(&o, &[hdr_source()]);
+        let r = describe(&o, &[hdr_source()], InputRole::Base2D);
         assert_eq!(r.sources_class, SourcesClass::Hdr);
         assert_eq!(
             r.suggestion,
@@ -1243,7 +1272,7 @@ mod tests {
         let mut o = opts();
         o.format = VkFormat::R16G16B16A16Sfloat;
         o.encode = None;
-        let r = describe(&o, &[hdr_source()]);
+        let r = describe(&o, &[hdr_source()], InputRole::Base2D);
         assert!(r.suggestion.is_none());
         assert!(validate_for_sources(&o, &[hdr_source()]).is_ok());
     }
@@ -1252,7 +1281,7 @@ mod tests {
     fn ldr_hides_float_formats_and_rejects_float_selection() {
         let mut o = opts();
         o.format = VkFormat::R16G16B16A16Sfloat;
-        let r = describe(&o, &[ldr_source()]);
+        let r = describe(&o, &[ldr_source()], InputRole::Base2D);
         assert_eq!(r.sources_class, SourcesClass::Ldr);
         assert_eq!(
             r.suggestion,
@@ -1275,7 +1304,7 @@ mod tests {
     #[test]
     fn mixed_sources_warn_and_fail_validate() {
         let o = opts();
-        let r = describe(&o, &[ldr_source(), hdr_source()]);
+        let r = describe(&o, &[ldr_source(), hdr_source()], InputRole::Base2D);
         assert_eq!(r.sources_class, SourcesClass::Mixed);
         assert!(r.suggestion.is_none());
         assert!(r.warnings.iter().any(|w| w.message.contains("all LDR")));

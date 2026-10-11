@@ -10,6 +10,7 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use crate::ktx::info_types::{ImageSelection, PreviewKind};
+use crate::ktx::input_role::InputRole;
 use crate::ktx::options::{AnimationOptions, CreateOptions};
 
 #[allow(unused_imports)]
@@ -43,6 +44,7 @@ pub struct EncodeRequest {
     pub sources: Vec<String>,
     pub options: CreateOptions,
     pub animation: Option<AnimationOptions>,
+    pub input_role: InputRole,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

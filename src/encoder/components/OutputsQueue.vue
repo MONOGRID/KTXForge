@@ -1,0 +1,147 @@
+<script setup lang="ts">
+import { computed } from "vue";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { addInputsForOutput, openSourcesAsOutputs } from "../actions";
+import { isDropTarget, setDropZone } from "../dropTarget";
+import {
+  outputLabel,
+  removeOutput,
+  selectOutput,
+  store,
+  type OutputSlot,
+} from "../store";
+
+const rows = computed((): OutputSlot[] => store.outputs);
+
+const highlighted = computed((): boolean => isDropTarget("outputs"));
+
+function statusLabel(slot: OutputSlot): string {
+  switch (slot.job.status) {
+    case "idle":
+      return "";
+    case "queued":
+      return "queued";
+    case "running":
+      return "encoding";
+    case "done":
+      return "done";
+    case "error":
+      return "error";
+  }
+}
+
+function onAdd(): void {
+  void openSourcesAsOutputs();
+}
+
+function onAddInputs(slot: OutputSlot): void {
+  void addInputsForOutput(slot.id);
+}
+
+function onPointerEnter(): void {
+  setDropZone("outputs");
+}
+
+function canRemove(slot: OutputSlot): boolean {
+  return (
+    store.queue === null &&
+    slot.job.status !== "running" &&
+    slot.job.status !== "queued"
+  );
+}
+
+function canAddInputs(slot: OutputSlot): boolean {
+  return (
+    store.queue === null &&
+    slot.job.status !== "running" &&
+    slot.job.status !== "queued"
+  );
+}
+</script>
+
+<template>
+  <section
+    class="panel flex h-full min-h-0 flex-col overflow-hidden transition-colors"
+    :class="
+      highlighted ? 'ring-2 ring-inset ring-brand bg-brand/10' : ''
+    "
+    data-drop-zone="outputs"
+    @pointerenter="onPointerEnter"
+  >
+    <header class="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
+      <h2 class="m-0 text-sm font-semibold">
+        KTX outputs
+      </h2>
+      <button
+        type="button"
+        class="btn"
+        :disabled="store.queue !== null"
+        @click="onAdd"
+      >
+        Add…
+      </button>
+    </header>
+
+    <ScrollArea
+      v-if="rows.length > 0"
+      class="min-h-0 flex-1"
+    >
+      <ul class="m-0 list-none p-2 pr-3">
+        <li
+          v-for="slot in rows"
+          :key="slot.id"
+          class="mb-1 flex items-center gap-2 rounded border px-2 py-1.5 last:mb-0"
+          :class="
+            slot.id === store.selectedId
+              ? 'border-primary bg-primary/10'
+              : 'border-line bg-surface'
+          "
+        >
+          <button
+            type="button"
+            class="min-w-0 flex-1 border-0 bg-transparent p-0 text-left"
+            @click="selectOutput(slot.id)"
+          >
+            <div class="truncate text-sm font-medium">
+              {{ outputLabel(slot) }}
+            </div>
+            <div class="hint">
+              {{ slot.inputs.length }}
+              input{{ slot.inputs.length === 1 ? "" : "s" }}
+              <span
+                v-if="statusLabel(slot)"
+                class="text-ink-muted"
+              > · {{ statusLabel(slot) }}</span>
+            </div>
+          </button>
+          <button
+            type="button"
+            class="btn shrink-0 px-1.5 py-0.5 text-xs"
+            aria-label="Add inputs for this output"
+            title="Add inputs"
+            :disabled="!canAddInputs(slot)"
+            @click="onAddInputs(slot)"
+          >
+            +
+          </button>
+          <button
+            type="button"
+            class="btn shrink-0 px-1.5 py-0.5 text-xs"
+            aria-label="Remove output"
+            :disabled="!canRemove(slot)"
+            @click="removeOutput(slot.id)"
+          >
+            ✕
+          </button>
+        </li>
+      </ul>
+    </ScrollArea>
+
+    <p
+      v-else
+      class="m-0 flex flex-1 items-center justify-center px-4 text-center text-sm text-ink-muted"
+    >
+      Drop images here to create KTX outputs (one file → one output)
+    </p>
+  </section>
+</template>

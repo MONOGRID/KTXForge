@@ -4,6 +4,7 @@ pub mod extract_args;
 pub mod extract_ops;
 pub mod info;
 pub mod info_types;
+pub mod input_role;
 pub mod ktx1;
 pub mod metrics;
 pub mod option_help;

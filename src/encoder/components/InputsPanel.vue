@@ -1,15 +1,20 @@
 <script setup lang="ts">
 import { useTimeoutFn } from "@vueuse/core";
-import { onMounted, onUnmounted, reactive, watch } from "vue";
+import { computed, onMounted, onUnmounted, reactive, watch } from "vue";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { call } from "../../api/commands";
-import { on } from "../../api/events";
+import type { InputRole } from "../../bindings/InputRole";
 import type { SourceInfo } from "../../bindings/SourceInfo";
-import { openSources } from "../actions";
+import EnumSelect from "../../shared/components/EnumSelect.vue";
+import type { EnumSelectOption } from "../../shared/enumSelect";
+import { openSourcesAsInputs } from "../actions";
+import { isDropTarget, setDropZone } from "../dropTarget";
+import { INPUT_ROLE_OPTIONS, isPackRole } from "../inputRole";
 import {
-  addSources,
-  moveSource,
-  removeSource,
+  moveInput,
+  removeInput,
+  selectedOutput,
+  setInputRole,
   store,
 } from "../store";
 
@@ -47,12 +52,35 @@ async function loadThumbnail(source: SourceInfo): Promise<void> {
     const url = URL.createObjectURL(new Blob([bytes], { type: "image/png" }));
     thumbnails.set(source.path, url);
   } catch {
-    // Leave the slot empty; list still shows name and size.
+    // Leave the slot empty.
   }
 }
 
+const inputs = computed((): SourceInfo[] => selectedOutput.value?.inputs ?? []);
+
+const highlighted = computed((): boolean => isDropTarget("inputs"));
+
+const roleOptions = computed((): EnumSelectOption[] =>
+  INPUT_ROLE_OPTIONS.map((opt) => ({
+    value: opt.value,
+    label: opt.label,
+    help: opt.help,
+  })),
+);
+
+/** Pack roles only — Base 2D is implicit when the Inputs panel is hidden. */
+const roleModel = computed((): string =>
+  isPackRole(store.inputRole) ? store.inputRole : "arrayLayers",
+);
+
+onMounted(() => {
+  if (!isPackRole(store.inputRole)) {
+    setInputRole("arrayLayers");
+  }
+});
+
 watch(
-  () => store.sources.map((s) => s.path),
+  () => inputs.value.map((s) => s.path),
   (paths, prev) => {
     const next = new Set(paths);
     for (const path of prev ?? []) {
@@ -60,59 +88,72 @@ watch(
         revokeThumbnail(path);
       }
     }
-    for (const source of store.sources) {
+    for (const source of inputs.value) {
       void loadThumbnail(source);
     }
   },
   { immediate: true },
 );
 
-const unlisteners: Array<() => void> = [];
-
-onMounted(() => {
-  void on("encoder://sources-added", (sources) => {
-    addSources(sources);
-  }).then((unlisten) => {
-    unlisteners.push(unlisten);
-  });
-
-  void on("encoder://drop-rejected", (payload) => {
-    const paths =
-      payload.paths.length > 0 ? ` (${payload.paths.join(", ")})` : "";
-    showNotice(`${payload.reason}${paths}`);
-  }).then((unlisten) => {
-    unlisteners.push(unlisten);
-  });
-});
-
 onUnmounted(() => {
-  for (const unlisten of unlisteners) {
-    unlisten();
-  }
   for (const path of [...thumbnails.keys()]) {
     revokeThumbnail(path);
   }
   stopNoticeTimer();
 });
 
-function onAddFiles(): void {
-  void openSources();
+function onAdd(): void {
+  void openSourcesAsInputs();
 }
+
+function onRoleChange(value: string | null): void {
+  if (value === null) {
+    return;
+  }
+  setInputRole(value as InputRole);
+}
+
+function onPointerEnter(): void {
+  setDropZone("inputs");
+}
+
+defineExpose({ showNotice });
 </script>
 
 <template>
-  <section class="panel flex h-full min-h-0 flex-col overflow-hidden">
-    <header class="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
-      <h2 class="m-0 text-sm font-semibold">
-        Sources
-      </h2>
-      <button
-        type="button"
-        class="btn"
-        @click="onAddFiles"
-      >
-        Add files…
-      </button>
+  <section
+    class="panel flex h-full min-h-0 flex-col overflow-hidden transition-colors"
+    :class="
+      highlighted ? 'ring-2 ring-inset ring-brand bg-brand/10' : ''
+    "
+    data-drop-zone="inputs"
+    @pointerenter="onPointerEnter"
+  >
+    <header class="flex flex-col gap-2 border-b border-line px-3 py-2">
+      <div class="flex items-center justify-between gap-2">
+        <h2 class="m-0 text-sm font-semibold">
+          Inputs
+        </h2>
+        <button
+          type="button"
+          class="btn"
+          :disabled="selectedOutput === null || store.queue !== null"
+          @click="onAdd"
+        >
+          Add…
+        </button>
+      </div>
+      <div class="field-row">
+        <span class="label truncate">Role</span>
+        <EnumSelect
+          class="min-w-0 flex-1"
+          :model-value="roleModel"
+          :options="roleOptions"
+          :empty-label="false"
+          :disabled="store.queue !== null"
+          @update:model-value="onRoleChange"
+        />
+      </div>
     </header>
 
     <p
@@ -123,14 +164,21 @@ function onAddFiles(): void {
       {{ notice.message }}
     </p>
 
+    <p
+      v-if="selectedOutput === null"
+      class="m-0 flex flex-1 items-center justify-center px-4 text-center text-sm text-ink-muted"
+    >
+      Select a KTX output to edit its inputs
+    </p>
+
     <ScrollArea
-      v-if="store.sources.length > 0"
+      v-else-if="inputs.length > 0"
       class="min-h-0 flex-1"
     >
       <ul class="m-0 list-none p-2 pr-3">
         <li
-          v-for="(source, index) in store.sources"
-          :key="source.path"
+          v-for="(source, index) in inputs"
+          :key="`${source.path}:${String(index)}`"
           class="mb-1 flex items-center gap-2 rounded border border-line bg-surface px-2 py-1.5 last:mb-0"
         >
           <div class="h-10 w-10 shrink-0 overflow-hidden rounded bg-surface-sunken">
@@ -147,25 +195,24 @@ function onAddFiles(): void {
             </div>
             <div class="hint">
               {{ source.width }}×{{ source.height }} · {{ source.kind }}
-              <span v-if="source.needsConversion"> · convert</span>
             </div>
           </div>
           <div class="flex shrink-0 flex-col gap-0.5">
             <button
               type="button"
               class="btn px-1.5 py-0.5 text-xs"
-              :disabled="index === 0"
+              :disabled="index === 0 || store.queue !== null"
               aria-label="Move up"
-              @click="moveSource(index, -1)"
+              @click="moveInput(index, -1)"
             >
               ↑
             </button>
             <button
               type="button"
               class="btn px-1.5 py-0.5 text-xs"
-              :disabled="index === store.sources.length - 1"
+              :disabled="index === inputs.length - 1 || store.queue !== null"
               aria-label="Move down"
-              @click="moveSource(index, 1)"
+              @click="moveInput(index, 1)"
             >
               ↓
             </button>
@@ -174,7 +221,8 @@ function onAddFiles(): void {
             type="button"
             class="btn shrink-0 px-1.5 py-0.5 text-xs"
             aria-label="Remove"
-            @click="removeSource(index)"
+            :disabled="store.queue !== null"
+            @click="removeInput(index)"
           >
             ✕
           </button>
@@ -186,7 +234,7 @@ function onAddFiles(): void {
       v-else
       class="m-0 flex flex-1 items-center justify-center px-4 text-center text-sm text-ink-muted"
     >
-      Drop images here or use Add files…
+      Drop images here to add inputs for the selected output
     </p>
   </section>
 </template>

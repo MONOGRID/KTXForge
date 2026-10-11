@@ -5,11 +5,9 @@ import { store } from "../../store";
 import OptionControls from "./OptionControls.vue";
 import { anyEnabled, type OptionControlField } from "./optionControls";
 
+/** Arity fields (layers / cubemap / depth) are owned by the Inputs role panel. */
 const KEYS = [
   "1d",
-  "cubemap",
-  "layers",
-  "depth",
   "levels",
   "width",
   "height",
@@ -25,35 +23,6 @@ const fields: OptionControlField[] = [
     get: () => store.options.container.oneD,
     set: (value) => {
       store.options.container.oneD = value;
-    },
-  },
-  {
-    key: "cubemap",
-    label: "Cubemap",
-    kind: "bool",
-    get: () => store.options.container.cubemap,
-    set: (value) => {
-      store.options.container.cubemap = value;
-    },
-  },
-  {
-    key: "layers",
-    label: "Layers",
-    kind: "number",
-    step: "1",
-    get: () => store.options.container.layers,
-    set: (value) => {
-      store.options.container.layers = value;
-    },
-  },
-  {
-    key: "depth",
-    label: "Depth",
-    kind: "number",
-    step: "1",
-    get: () => store.options.container.depth,
-    set: (value) => {
-      store.options.container.depth = value;
     },
   },
   {

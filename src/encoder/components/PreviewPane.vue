@@ -6,14 +6,23 @@ import { toAppError } from "../../api/guards";
 import type { EncodeResult } from "../../bindings/EncodeResult";
 import ImageViewport from "../../shared/components/ImageViewport.vue";
 import { toastAppError } from "../../shared/toastAppError";
-import { store } from "../store";
+import { isDropTarget, setDropZone } from "../dropTarget";
+import { selectedOutput } from "../store";
+
+const highlighted = computed((): boolean => isDropTarget("center"));
 
 const sourceUrl = ref<string | null>(null);
 const encodedUrl = ref<string | null>(null);
 const sourceLoading = ref(false);
 const encodedLoading = ref(false);
 
-const result = computed((): EncodeResult | null => store.job.result);
+const result = computed((): EncodeResult | null => {
+  const slot = selectedOutput.value;
+  if (slot === null || slot.job.status !== "done") {
+    return null;
+  }
+  return slot.job.result;
+});
 
 const showTonemapHint = computed((): string | null =>
   result.value?.preview.kind === "tonemappedFromExr"
@@ -42,12 +51,22 @@ const loading = computed(
     (sourceLoading.value || encodedLoading.value),
 );
 
-function sourcePathAt(index: number): string | undefined {
-  if (index < 0 || index >= store.sources.length) {
-    return undefined;
+const primaryPath = computed((): string | undefined => {
+  const slot = selectedOutput.value;
+  return slot?.inputs[0]?.path;
+});
+
+const selectedJobId = computed((): string | null => {
+  const slot = selectedOutput.value;
+  if (
+    slot === null ||
+    slot.job.status !== "done" ||
+    slot.job.jobId === null
+  ) {
+    return null;
   }
-  return store.sources[index].path;
-}
+  return slot.job.jobId;
+});
 
 function revoke(url: string | null): void {
   if (url !== null) {
@@ -73,7 +92,7 @@ function formatMetric(value: number | null): string {
 }
 
 watch(
-  () => sourcePathAt(0),
+  primaryPath,
   (path) => {
     revoke(sourceUrl.value);
     sourceUrl.value = null;
@@ -84,7 +103,7 @@ watch(
     sourceLoading.value = true;
     void call("source_preview", { path })
       .then((bytes) => {
-        if (sourcePathAt(0) !== path) {
+        if (primaryPath.value !== path) {
           return;
         }
         sourceUrl.value = URL.createObjectURL(
@@ -95,7 +114,7 @@ watch(
         // Leave the source slot empty.
       })
       .finally(() => {
-        if (sourcePathAt(0) === path) {
+        if (primaryPath.value === path) {
           sourceLoading.value = false;
         }
       });
@@ -104,10 +123,7 @@ watch(
 );
 
 watch(
-  () =>
-    store.job.status === "done" && store.job.jobId !== null
-      ? store.job.jobId
-      : null,
+  selectedJobId,
   (jobId) => {
     revoke(encodedUrl.value);
     encodedUrl.value = null;
@@ -118,7 +134,7 @@ watch(
     encodedLoading.value = true;
     void call("encoded_preview", { jobId })
       .then((bytes) => {
-        if (store.job.jobId !== jobId || store.job.status !== "done") {
+        if (selectedJobId.value !== jobId) {
           return;
         }
         encodedUrl.value = URL.createObjectURL(
@@ -126,13 +142,13 @@ watch(
         );
       })
       .catch((err: unknown) => {
-        if (store.job.jobId !== jobId || store.job.status !== "done") {
+        if (selectedJobId.value !== jobId) {
           return;
         }
         toastAppError(toAppError(err));
       })
       .finally(() => {
-        if (store.job.jobId === jobId && store.job.status === "done") {
+        if (selectedJobId.value === jobId) {
           encodedLoading.value = false;
         }
       });
@@ -149,7 +165,14 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="panel flex h-full min-h-0 flex-col overflow-hidden">
+  <section
+    class="panel flex h-full min-h-0 flex-col overflow-hidden transition-colors"
+    :class="
+      highlighted ? 'ring-2 ring-inset ring-brand bg-brand/10' : ''
+    "
+    data-drop-zone="center"
+    @pointerenter="setDropZone('center')"
+  >
     <header class="shrink-0 border-b border-line px-3 py-2">
       <h2 class="m-0 text-sm font-semibold">
         Preview
@@ -164,7 +187,7 @@ onUnmounted(() => {
         alt="Source"
         compare-alt="Encoded preview"
         :loading="loading"
-        empty-label="Drop or add a source to preview"
+        empty-label="Drop images here to choose batch outputs or pack into one KTX"
         :hint="showTonemapHint"
         original-label="Original"
         result-label="Encoded"

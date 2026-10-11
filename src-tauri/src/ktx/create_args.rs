@@ -406,7 +406,11 @@ mod tests {
         o.color.convert_texcoord_origin = Some(TexcoordOrigin::BottomLeftFront);
         note(emit(o));
 
-        let mut o = CreateOptions::default();
+        // UNORM (not *_SRGB) so --convert-tf linear is valid under the hard TF rules.
+        let mut o = CreateOptions {
+            format: VkFormat::R8G8B8A8Unorm,
+            ..Default::default()
+        };
         o.color.assign_tf = Some(TransferFunction::Srgb);
         o.color.convert_tf = Some(ConvertTransferFunction::Linear);
         o.color.assign_primaries = Some(ColorPrimaries::Bt709);

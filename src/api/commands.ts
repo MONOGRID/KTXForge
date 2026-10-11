@@ -5,6 +5,7 @@ import type { EncodeResult } from "../bindings/EncodeResult";
 import type { ExportRequest } from "../bindings/ExportRequest";
 import type { ExportResult } from "../bindings/ExportResult";
 import type { ImageSelection } from "../bindings/ImageSelection";
+import type { InputRole } from "../bindings/InputRole";
 import type { InspectReport } from "../bindings/InspectReport";
 import type { KtxVersion } from "../bindings/KtxVersion";
 import type { OptionReport } from "../bindings/OptionReport";
@@ -18,8 +19,16 @@ export type Commands = {
   ktx_version: { args: EmptyArgs; result: KtxVersion };
   default_create_options: { args: EmptyArgs; result: CreateOptions };
   describe_options: {
-    args: { options: CreateOptions; sources: SourceInfo[] };
+    args: {
+      options: CreateOptions;
+      sources: SourceInfo[];
+      inputRole: InputRole;
+    };
     result: OptionReport;
+  };
+  check_output_compatible: {
+    args: { anchor: SourceInfo; candidate: SourceInfo };
+    result: null;
   };
   pick_sources: { args: EmptyArgs; result: SourceInfo[] };
   source_thumbnail: { args: { path: string }; result: ArrayBuffer };
@@ -28,6 +37,10 @@ export type Commands = {
   cancel_encode: { args: { jobId: string }; result: null };
   encoded_preview: { args: { jobId: string }; result: ArrayBuffer };
   save_encoded: { args: { jobId: string }; result: string | null };
+  save_encoded_batch: {
+    args: { jobIds: string[] };
+    result: number | null;
+  };
   open_inspector: { args: { path: string }; result: null };
   inspector_current_file: { args: EmptyArgs; result: string | null };
   inspect: { args: { path: string }; result: InspectReport };

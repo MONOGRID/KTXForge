@@ -8,6 +8,7 @@ use crate::commands::{OptionReport, SourceInfo};
 use crate::error::AppError;
 use crate::image::classify::{classify, FileKind};
 use crate::image::convert::{read_source_info, source_preview_png, thumbnail_png};
+use crate::ktx::input_role::{self, InputRole};
 use crate::ktx::options::CreateOptions;
 use crate::ktx::rules;
 use crate::state::AppState;
@@ -28,8 +29,15 @@ pub fn default_create_options() -> Result<CreateOptions, AppError> {
 pub fn describe_options(
     options: CreateOptions,
     sources: Vec<SourceInfo>,
+    input_role: InputRole,
 ) -> Result<OptionReport, AppError> {
-    Ok(rules::describe(&options, &sources))
+    Ok(rules::describe(&options, &sources, input_role))
+}
+
+/// Whether `candidate` may be added as a new KTX output given the queue's first primary.
+#[tauri::command]
+pub fn check_output_compatible(anchor: SourceInfo, candidate: SourceInfo) -> Result<(), AppError> {
+    input_role::compatible_with_anchor(&anchor, &candidate).map_err(AppError::invalid_input)
 }
 
 #[tauri::command]

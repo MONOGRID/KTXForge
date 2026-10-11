@@ -5,7 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import HelpTooltip from "../../shared/components/HelpTooltip.vue";
 import Panel from "../../shared/components/Panel.vue";
-import { store } from "../store";
+import { selectedOutput, store } from "../store";
 
 const DEFAULT_ANIMATION = {
   duration: 1,
@@ -18,7 +18,12 @@ const durationId = useId();
 const timescaleId = useId();
 const loopCountId = useId();
 
-const canEnable = computed((): boolean => store.sources.length >= 2);
+const layerCount = computed((): number => selectedOutput.value?.inputs.length ?? 0);
+
+const canEnable = computed(
+  (): boolean =>
+    store.inputRole === "arrayLayers" && layerCount.value >= 2,
+);
 
 const enabled = computed((): boolean => store.animation !== null);
 
@@ -35,7 +40,7 @@ const frameLengthSec = computed((): number => {
 });
 
 const sequenceLengthSec = computed(
-  (): number => frameLengthSec.value * store.sources.length,
+  (): number => frameLengthSec.value * layerCount.value,
 );
 
 watch(canEnable, (ok) => {
@@ -80,11 +85,14 @@ function writeU32(
 </script>
 
 <template>
-  <Panel title="Animation">
+  <Panel
+    v-if="store.inputRole === 'arrayLayers'"
+    title="Animation"
+  >
     <div class="flex flex-col gap-2">
       <div class="field-row">
         <HelpTooltip
-          text="Write KTXanimData after create. Needs at least two source images as array layers."
+          text="Write KTXanimData after create. Needs Input role = Array layers and at least two images on the selected output. Applied to every output with ≥2 layers."
           class="label"
         >
           <label
@@ -105,7 +113,7 @@ function writeU32(
             v-if="!canEnable"
             class="hint"
           >
-            Add at least two sources to encode an animation.
+            Select an output with at least two layer images.
           </p>
         </div>
       </div>
