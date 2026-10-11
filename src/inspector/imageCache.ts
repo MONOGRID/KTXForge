@@ -5,9 +5,18 @@ function selectionKey(filePath: string, sel: ImageSelection): string {
   return `${filePath}\0${String(sel.level)}:${String(sel.face)}:${String(sel.layer)}:${String(sel.depthSlice)}`;
 }
 
+/**
+ * Soft cap on decoded preview blobs in the webview. Disk PNG cache in Rust
+ * stays unbounded; revisits rehydrate from disk without keeping every layer hot.
+ * ~16 × 1024² RGBA-ish PNGs is a few tens of MB — not 400 layers × dual sides.
+ */
+const MAX_MEMORY_ENTRIES = 16;
+
 const urls = new Map<string, string>();
 /** In-flight fetches by key (shared by interactive + prefetch). */
 const inflight = new Map<string, Promise<string>>();
+/** Keys that must not be revoked (active viewport / depth volume planes). */
+const pinCounts = new Map<string, number>();
 
 /** At most one `ktx extract` / IPC at a time (scrubbing must not stampede). */
 type PrefetchItem = ImageSelection & { filePath: string };
@@ -25,11 +34,78 @@ let interactiveQueued: QueuedLoad | null = null;
 const ensureQueue: QueuedLoad[] = [];
 const prefetchQueue: PrefetchItem[] = [];
 
+function isPinned(key: string): boolean {
+  return (pinCounts.get(key) ?? 0) > 0;
+}
+
+function rememberUrl(key: string, url: string): void {
+  // Re-insert so Map iteration order is LRU (oldest = first key).
+  if (urls.has(key)) {
+    urls.delete(key);
+  }
+  urls.set(key, url);
+  evictOverflow();
+}
+
+function evictOverflow(): void {
+  for (const key of urls.keys()) {
+    if (urls.size <= MAX_MEMORY_ENTRIES) {
+      return;
+    }
+    if (isPinned(key)) {
+      continue;
+    }
+    const url = urls.get(key);
+    if (url === undefined) {
+      urls.delete(key);
+      continue;
+    }
+    URL.revokeObjectURL(url);
+    urls.delete(key);
+  }
+}
+
 export function peekInspectorImageUrl(
   filePath: string,
   sel: ImageSelection,
 ): string | null {
   return urls.get(selectionKey(filePath, sel)) ?? null;
+}
+
+/** Mark a cached URL as most-recently used (call when binding to the viewport). */
+export function touchInspectorImageUrl(
+  filePath: string,
+  sel: ImageSelection,
+): void {
+  const key = selectionKey(filePath, sel);
+  const url = urls.get(key);
+  if (url === undefined) {
+    return;
+  }
+  rememberUrl(key, url);
+}
+
+/** Keep an object URL alive across LRU eviction (viewport / volume planes). */
+export function retainInspectorImage(
+  filePath: string,
+  sel: ImageSelection,
+): void {
+  const key = selectionKey(filePath, sel);
+  pinCounts.set(key, (pinCounts.get(key) ?? 0) + 1);
+}
+
+export function releaseInspectorImage(
+  filePath: string,
+  sel: ImageSelection,
+): void {
+  const key = selectionKey(filePath, sel);
+  const prev = pinCounts.get(key) ?? 0;
+  if (prev <= 1) {
+    pinCounts.delete(key);
+  } else {
+    pinCounts.set(key, prev - 1);
+  }
+  evictOverflow();
 }
 
 export function clearInspectorImageCache(): void {
@@ -38,6 +114,7 @@ export function clearInspectorImageCache(): void {
   }
   urls.clear();
   inflight.clear();
+  pinCounts.clear();
   if (interactiveQueued !== null) {
     interactiveQueued.reject(new DOMException("Cleared", "AbortError"));
     interactiveQueued = null;
@@ -75,7 +152,7 @@ async function runFetch(
       },
     });
     const url = URL.createObjectURL(new Blob([bytes], { type: "image/png" }));
-    urls.set(key, url);
+    rememberUrl(key, url);
     return url;
   })();
 

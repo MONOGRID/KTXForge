@@ -4,6 +4,7 @@ import { toAppError } from "../api/guards";
 import type { EncodeResult } from "../bindings/EncodeResult";
 import type { ImageSelection } from "../bindings/ImageSelection";
 import type { InputRole } from "../bindings/InputRole";
+import { createScrubGate } from "../shared/scrubGate";
 import { toastAppError } from "../shared/toastAppError";
 import { composeCubemapCross } from "../shared/cubemapCross";
 import { selectedOutput, store, type OutputSlot } from "./store";
@@ -101,6 +102,10 @@ export function usePreviewPane() {
 
   let sourceGen = 0;
   let encodedGen = 0;
+  /** One in-flight source decode; slider ticks coalesce to the latest index. */
+  const sourceGate = createScrubGate();
+  /** One in-flight encoded extract; prevents UASTC/Zstd stampede on scrub. */
+  const encodedGate = createScrubGate();
 
   const role = computed((): InputRole => store.inputRole);
 
@@ -302,6 +307,7 @@ export function usePreviewPane() {
 
   function wipeSourcePreview(): void {
     sourceGen += 1;
+    sourceGate.clearPending();
     revoke(sourceUrl.value);
     sourceUrl.value = null;
     revokeFaceList(faceSourceUrls.value);
@@ -483,14 +489,26 @@ export function usePreviewPane() {
 
     // Output/role/input changes must not keep showing the previous slot.
     if (mode === "replace") {
+      sourceGen += 1;
+      sourceGate.clearPending();
       clearSourceSurfaces();
     }
 
-    void fetchSourcePreview(slot, currentRole, (sourceGen += 1));
+    const gen = sourceGen;
+    const slotId = slot.id;
+    const gateKey = `src:${slotId}:${currentRole}:${String(previewIndex.value)}`;
+    sourceGate.schedule(gateKey, async () => {
+      const live = selectedOutput.value;
+      if (live === null || live.id !== slotId || gen !== sourceGen) {
+        return;
+      }
+      await fetchSourcePreview(live, role.value, gen);
+    });
   }
 
   function wipeEncodedPreview(): void {
     encodedGen += 1;
+    encodedGate.clearPending();
     revoke(encodedUrl.value);
     encodedUrl.value = null;
     revokeFaceList(faceEncodedUrls.value);
@@ -652,10 +670,25 @@ export function usePreviewPane() {
     }
 
     if (mode === "replace") {
+      encodedGen += 1;
+      encodedGate.clearPending();
       clearEncodedSurfaces();
     }
 
-    void fetchEncodedPreview(jobId, currentRole, (encodedGen += 1));
+    const gen = encodedGen;
+    const gateKey = [
+      "enc",
+      jobId,
+      currentRole,
+      String(previewIndex.value),
+      String(encodedMip.value),
+    ].join(":");
+    encodedGate.schedule(gateKey, async () => {
+      if (selectedJobId.value !== jobId || gen !== encodedGen) {
+        return;
+      }
+      await fetchEncodedPreview(jobId, role.value, gen);
+    });
   }
 
   watch(
@@ -689,6 +722,8 @@ export function usePreviewPane() {
   onUnmounted(() => {
     sourceGen += 1;
     encodedGen += 1;
+    sourceGate.clearPending();
+    encodedGate.clearPending();
     revoke(sourceUrl.value);
     revoke(encodedUrl.value);
     revokeFaceList(faceSourceUrls.value);

@@ -25,8 +25,6 @@ const STAGE_LABELS = {
   done: "Done",
 } as const satisfies Record<EncodeStage, string>;
 
-const STDERR_KEEP = 40;
-
 const encodeEnabled = computed((): boolean => canEncode());
 const cancelEnabled = computed((): boolean => canCancelEncode());
 const saveEnabled = computed((): boolean => canSaveEncoded());
@@ -42,22 +40,6 @@ const selectedStageLabel = computed((): string | null => {
   return STAGE_LABELS[slot.job.stage];
 });
 
-const stderrTail = computed((): string => {
-  const slot = selectedOutput.value;
-  if (slot === null) {
-    return "";
-  }
-  return slot.job.stderrLines.slice(-STDERR_KEEP).join("\n");
-});
-
-const selectedError = computed((): string | null => {
-  const slot = selectedOutput.value;
-  if (slot === null || slot.job.status !== "error") {
-    return null;
-  }
-  return slot.job.errorMessage;
-});
-
 const unlisteners: Array<() => void> = [];
 
 onMounted(() => {
@@ -67,15 +49,6 @@ onMounted(() => {
       return;
     }
     slot.job.stage = payload.stage;
-    if (payload.stderrLine !== null) {
-      slot.job.stderrLines.push(payload.stderrLine);
-      if (slot.job.stderrLines.length > STDERR_KEEP) {
-        slot.job.stderrLines.splice(
-          0,
-          slot.job.stderrLines.length - STDERR_KEEP,
-        );
-      }
-    }
   }).then((unlisten) => {
     unlisteners.push(unlisten);
   });
@@ -142,18 +115,6 @@ onUnmounted(() => {
             : 'Working…'
         "
       />
-
-      <p
-        v-if="selectedError"
-        class="m-0 text-xs text-danger"
-      >
-        {{ selectedError }}
-      </p>
-
-      <pre
-        v-if="stderrTail"
-        class="m-0 max-h-28 overflow-auto rounded bg-surface-sunken p-2 font-mono text-xs whitespace-pre-wrap text-ink-muted"
-      >{{ stderrTail }}</pre>
     </div>
   </section>
 </template>

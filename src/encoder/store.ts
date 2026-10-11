@@ -25,7 +25,6 @@ export type JobState = {
   status: JobStatus;
   jobId: string | null;
   stage: EncodeStage | null;
-  stderrLines: string[];
   result: EncodeResult | null;
   errorMessage: string | null;
 };
@@ -68,7 +67,6 @@ function emptyJob(): JobState {
     status: "idle",
     jobId: null,
     stage: null,
-    stderrLines: [],
     result: null,
     errorMessage: null,
   };

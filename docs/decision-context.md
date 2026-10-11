@@ -324,3 +324,20 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 **Decided:** `DepthVolumeView` supports click-drag orbit (`useOrbitDrag`: rotateX / rotateZ with clamped pitch; double-click resets). Cubemap cross compositing (`composeCubemapCross`) lives in `src/shared` and is used by both encoder Preview and inspector when `faceCount > 1`. Inspector face buttons still drive export / selection; the viewport shows the full cross, not a single face.
 
 **Why:** Artists need to tumble the depth stack to read shape, and cubemap layout should match across windows so packing and inspection use one mental model.
+
+## 2026-10-11 — Bound preview RAM: scrub coalesce + LRU + one extract slot
+
+**Decided:**
+1. Encoder wipe scrub uses `createScrubGate` (latest-only, single-flight) for source and encoded sides — same coalescing idea as inspector `loadInspectorImageUrl`, so slider ticks do not start a `source_preview` / `encoded_preview` per intermediate frame.
+2. Inspector in-memory object-URL map is an LRU soft-capped at 16 entries; active viewport / depth-volume planes are refcount-pinned so eviction cannot revoke displayed blobs. Rust disk PNG cache stays the unbounded fast path.
+3. `run_extract` takes a process-wide semaphore of 1 so even a buggy caller cannot spawn parallel UASTC/Zstd `ktx extract` workers.
+
+**Why:** Scrubbing a ~400×1024² array after UASTC+Zstd encode stampeded extracts (right wipe side never caught up) and ballooned RAM to tens of GB. Speed stays on the disk cache + one hot extract; webview RAM stays proportional to pinned/recent frames, not layer count.
+
+## 2026-10-11 — Safe ktx input staging; encode failures via alert + OS notify
+
+**Decided:**
+1. `prepare_input` stages basenames that are unsafe for `ktx create` (`,` path lists, leading `@` response files) into the job `inputs/` dir under a hashed `input_<hash>.{png,exr}` name. Converted JPEG/etc. always use that safe name (never the original stem). Safe PNG/EXR still passthrough.
+2. Encode failures surface as **one** formatted message via a native dialog alert (`dialog.message`) **and** a native OS notification. No Sonner toast for encode failures, and no inline Encode panel error + stderr duplication. Soft failures elsewhere may still use `toastAppError`.
+
+**Why:** `ktx create` truncates input paths at commas, so files like `…06_08_2026, 18_33_22.jpg` failed with “No such file”. The Encode bar showed `ktx exited with code N` plus a stderr dump while a toast repeated a summary — three surfaces for one failure.

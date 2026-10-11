@@ -4,6 +4,8 @@ import type { ImageSelection } from "../bindings/ImageSelection";
 import {
   ensureInspectorImageUrl,
   peekInspectorImageUrl,
+  releaseInspectorImage,
+  retainInspectorImage,
 } from "./imageCache";
 
 function baseDepthFromReport(current: InspectReport | null): number {
@@ -38,6 +40,9 @@ export function useDepthVolume(args: {
   const depthSliceUrls = ref<Array<string | null>>([]);
   const volumeLoading = ref(false);
   let volumeGen = 0;
+  /** Pins so LRU cannot revoke planes still bound to the CSS3D stack. */
+  let volumePins: ImageSelection[] = [];
+  let volumePinPath: string | null = null;
 
   const baseDepthCount = computed((): number =>
     baseDepthFromReport(args.report.value),
@@ -59,7 +64,43 @@ export function useDepthVolume(args: {
     ),
   );
 
+  function releaseVolumePins(): void {
+    if (volumePinPath !== null) {
+      for (const sel of volumePins) {
+        releaseInspectorImage(volumePinPath, sel);
+      }
+    }
+    volumePins = [];
+    volumePinPath = null;
+  }
+
+  function pinVolumeSlice(filePath: string, sel: ImageSelection): void {
+    if (volumePinPath !== null && volumePinPath !== filePath) {
+      releaseVolumePins();
+    }
+    volumePinPath = filePath;
+    retainInspectorImage(filePath, sel);
+    volumePins.push({ ...sel });
+  }
+
+  function unpinVolumeSlice(filePath: string, sel: ImageSelection): void {
+    releaseInspectorImage(filePath, sel);
+    volumePins = volumePins.filter(
+      (pinned) =>
+        !(
+          pinned.level === sel.level &&
+          pinned.face === sel.face &&
+          pinned.layer === sel.layer &&
+          pinned.depthSlice === sel.depthSlice
+        ),
+    );
+    if (volumePins.length === 0) {
+      volumePinPath = null;
+    }
+  }
+
   function resetVolume(): void {
+    releaseVolumePins();
     depthSliceUrls.value = [];
     volumeLoading.value = false;
   }
@@ -92,15 +133,18 @@ export function useDepthVolume(args: {
     depthSlice: number,
     gen: number,
   ): Promise<void> {
+    const sel = { ...baseSel, depthSlice };
+    // Pin before insert so a later ensure cannot LRU-revoke this plane mid-load.
+    pinVolumeSlice(filePath, sel);
     try {
-      const url = await ensureInspectorImageUrl(filePath, {
-        ...baseSel,
-        depthSlice,
-      });
-      if (gen === volumeGen) {
-        setDepthUrl(depthSlice, url);
+      const url = await ensureInspectorImageUrl(filePath, sel);
+      if (gen !== volumeGen) {
+        unpinVolumeSlice(filePath, sel);
+        return;
       }
+      setDepthUrl(depthSlice, url);
     } catch {
+      unpinVolumeSlice(filePath, sel);
       // Leave the plane empty; active-slice ImageViewport surfaces real errors.
     }
   }
@@ -110,11 +154,16 @@ export function useDepthVolume(args: {
     baseSel: Omit<ImageSelection, "depthSlice">,
     count: number,
   ): Array<string | null> {
-    return Array.from({ length: count }, (_, depthSlice) =>
-      peekInspectorImageUrl(filePath, { ...baseSel, depthSlice }),
-    );
+    releaseVolumePins();
+    return Array.from({ length: count }, (_, depthSlice) => {
+      const sel = { ...baseSel, depthSlice };
+      const url = peekInspectorImageUrl(filePath, sel);
+      if (url !== null) {
+        pinVolumeSlice(filePath, sel);
+      }
+      return url;
+    });
   }
-
   function missingDepthIndexes(
     seeded: ReadonlyArray<string | null>,
   ): number[] {

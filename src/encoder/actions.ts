@@ -2,6 +2,8 @@ import { call } from "../api/commands";
 import { toAppError } from "../api/guards";
 import type { EncodeResult } from "../bindings/EncodeResult";
 import type { SourceInfo } from "../bindings/SourceInfo";
+import { alertErrorText } from "../shared/alertAppError";
+import { formatAppError } from "../shared/formatAppError";
 import { toastAppError } from "../shared/toastAppError";
 import type { DropZone } from "./dropTarget";
 import type { PackInputRole } from "./inputRole";
@@ -13,6 +15,7 @@ import {
   beginAddInputs,
   clearOutputs,
   clearPendingCenterDrop,
+  outputLabel,
   selectedOutput,
   setPendingCenterDrop,
   store,
@@ -163,7 +166,7 @@ function applyEncodeFailure(slot: OutputSlot, jobId: string, err: unknown): void
   }
   slot.job.status = "error";
   slot.job.result = null;
-  slot.job.errorMessage = appError.message;
+  slot.job.errorMessage = formatAppError(appError);
 }
 
 async function encodeOne(slot: OutputSlot): Promise<void> {
@@ -172,7 +175,6 @@ async function encodeOne(slot: OutputSlot): Promise<void> {
     status: "running",
     jobId,
     stage: "converting",
-    stderrLines: [],
     result: null,
     errorMessage: null,
   };
@@ -202,7 +204,6 @@ function markSlotsQueued(slots: readonly OutputSlot[]): void {
       status: "queued",
       jobId: null,
       stage: null,
-      stderrLines: [],
       result: null,
       errorMessage: null,
     };
@@ -216,7 +217,6 @@ function resetStillQueued(slots: readonly OutputSlot[]): void {
         status: "idle",
         jobId: null,
         stage: null,
-        stderrLines: [],
         result: null,
         errorMessage: null,
       };
@@ -274,13 +274,28 @@ export async function encode(): Promise<void> {
     return;
   }
 
+  await alertEncodeFailures(slots);
+}
+
+function alertEncodeFailures(slots: readonly OutputSlot[]): Promise<void> {
   const errors = slots.filter((s) => s.job.status === "error");
-  if (errors.length > 0) {
-    toastAppError({
-      kind: "invalidInput",
-      message: `${String(errors.length)} of ${String(slots.length)} encodes failed`,
-    });
+  if (errors.length === 0) {
+    return Promise.resolve();
   }
+  if (errors.length === 1) {
+    return alertErrorText(
+      errors[0].job.errorMessage ?? "Encode failed",
+      "Encode failed",
+    );
+  }
+  const body = [
+    `${String(errors.length)} of ${String(slots.length)} encodes failed`,
+    ...errors.map((slot) => {
+      const detail = slot.job.errorMessage ?? "Encode failed";
+      return `${outputLabel(slot)}:\n${detail}`;
+    }),
+  ].join("\n\n");
+  return alertErrorText(body, "Encode failed");
 }
 
 export async function cancelEncode(): Promise<void> {

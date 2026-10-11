@@ -1,5 +1,7 @@
 //! Input conversion and thumbnails for `ktx create`.
 
+use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 use image::imageops::FilterType;
@@ -16,6 +18,42 @@ pub struct PreparedInput {
     pub passthrough: bool,
 }
 
+/// `ktx create` splits input paths on `,` and treats a leading `@` as a response file.
+fn basename_unsafe_for_ktx(path: &Path) -> bool {
+    let name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or_default();
+    name.contains(',') || name.starts_with('@')
+}
+
+/// Stable workdir name free of characters that break `ktx create` argv parsing.
+fn staged_path(workdir: &Path, src: &Path, ext: &str) -> PathBuf {
+    let mut hasher = DefaultHasher::new();
+    src.hash(&mut hasher);
+    workdir.join(format!("input_{:016x}.{ext}", hasher.finish()))
+}
+
+fn stage_copy(src: &Path, workdir: &Path, ext: &str) -> Result<PathBuf, AppError> {
+    let out = staged_path(workdir, src, ext);
+    std::fs::copy(src, &out).map_err(|e| AppError::io(e.to_string()))?;
+    Ok(out)
+}
+
+fn passthrough_or_stage(src: &Path, workdir: &Path, ext: &str) -> Result<PreparedInput, AppError> {
+    if basename_unsafe_for_ktx(src) {
+        Ok(PreparedInput {
+            path: stage_copy(src, workdir, ext)?,
+            passthrough: false,
+        })
+    } else {
+        Ok(PreparedInput {
+            path: src.to_path_buf(),
+            passthrough: true,
+        })
+    }
+}
+
 /// PNG and EXR pass through; JPEG/WebP/BMP/GIF/TIFF → PNG; Radiance HDR → half-float EXR.
 pub fn prepare_input(src: &Path, workdir: &Path) -> Result<PreparedInput, AppError> {
     std::fs::create_dir_all(workdir).map_err(|e| AppError::io(e.to_string()))?;
@@ -23,24 +61,17 @@ pub fn prepare_input(src: &Path, workdir: &Path) -> Result<PreparedInput, AppErr
         FileKind::Image {
             kind: SourceKind::Ldr,
             needs_conversion: false,
-        } => Ok(PreparedInput {
-            path: src.to_path_buf(),
-            passthrough: true,
-        }),
+        } => passthrough_or_stage(src, workdir, "png"),
         FileKind::Image {
             kind: SourceKind::Hdr,
             needs_conversion: false,
-        } => Ok(PreparedInput {
-            path: src.to_path_buf(),
-            passthrough: true,
-        }),
+        } => passthrough_or_stage(src, workdir, "exr"),
         FileKind::Image {
             kind: SourceKind::Hdr,
             needs_conversion: true,
         } => {
             let img = image::open(src).map_err(|e| AppError::image(e.to_string()))?;
-            let stem = src.file_stem().and_then(|s| s.to_str()).unwrap_or("input");
-            let out = workdir.join(format!("{stem}.exr"));
+            let out = staged_path(workdir, src, "exr");
             img.save_with_format(&out, ImageFormat::OpenExr)
                 .map_err(|e| AppError::image(e.to_string()))?;
             Ok(PreparedInput {
@@ -53,8 +84,7 @@ pub fn prepare_input(src: &Path, workdir: &Path) -> Result<PreparedInput, AppErr
             needs_conversion: true,
         } => {
             let img = load_for_png(src)?;
-            let stem = src.file_stem().and_then(|s| s.to_str()).unwrap_or("input");
-            let out = workdir.join(format!("{stem}.png"));
+            let out = staged_path(workdir, src, "png");
             img.save_with_format(&out, ImageFormat::Png)
                 .map_err(|e| AppError::image(e.to_string()))?;
             Ok(PreparedInput {
@@ -193,6 +223,15 @@ mod tests {
             prepared.path.extension().and_then(|e| e.to_str()),
             Some("png")
         );
+        let name = prepared
+            .path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or_default();
+        assert!(
+            !name.contains(','),
+            "staged name must be safe for ktx create: {name}"
+        );
         let (w, h) = image::image_dimensions(&prepared.path).unwrap();
         let (sw, sh) = image::image_dimensions(root.join("rgb.jpg")).unwrap();
         assert_eq!((w, h), (sw, sh));
@@ -209,6 +248,46 @@ mod tests {
         let a = std::fs::read(&src).unwrap();
         let b = std::fs::read(&prepared.path).unwrap();
         assert_eq!(a, b);
+    }
+
+    #[test]
+    fn stages_comma_in_basename_for_passthrough_png() {
+        let root = fixtures();
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir
+            .path()
+            .join("snapshot_camera_cucina_nfc31_irwg_06_08_2026, 18_33_22.png");
+        std::fs::copy(root.join("rgba.png"), &src).unwrap();
+        let prepared = prepare_input(&src, dir.path()).unwrap();
+        assert!(!prepared.passthrough);
+        assert!(prepared.path.exists());
+        let name = prepared
+            .path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or_default();
+        assert!(!name.contains(','));
+        assert!(!basename_unsafe_for_ktx(&prepared.path));
+    }
+
+    #[test]
+    fn stages_comma_in_basename_for_jpeg_convert() {
+        let root = fixtures();
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("foo, bar.jpg");
+        std::fs::copy(root.join("rgb.jpg"), &src).unwrap();
+        let prepared = prepare_input(&src, dir.path()).unwrap();
+        assert!(!prepared.passthrough);
+        let name = prepared
+            .path
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or_default();
+        assert!(!name.contains(','));
+        assert_eq!(
+            prepared.path.extension().and_then(|e| e.to_str()),
+            Some("png")
+        );
     }
 
     #[test]

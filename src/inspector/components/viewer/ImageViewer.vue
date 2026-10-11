@@ -10,6 +10,9 @@ import {
   loadInspectorImageUrl,
   peekInspectorImageUrl,
   prefetchInspectorNeighbors,
+  releaseInspectorImage,
+  retainInspectorImage,
+  touchInspectorImageUrl,
   warmInspectorMipChain,
   type SubresourceDims,
 } from "../../imageCache";
@@ -28,6 +31,8 @@ const cachedPath = ref<string | null>(null);
 
 let missTimer: ReturnType<typeof setTimeout> | null = null;
 let prefetchTimer: ReturnType<typeof setTimeout> | null = null;
+/** Flat viewport pin so LRU cannot revoke the displayed blob. */
+let pinnedFlat: { filePath: string; sel: ImageSelection } | null = null;
 
 const previewUnavailable = computed((): string | null => {
   const preview = report.value?.preview;
@@ -175,6 +180,32 @@ function isAbortError(err: unknown): boolean {
   return err instanceof DOMException && err.name === "AbortError";
 }
 
+function releaseFlatPin(): void {
+  if (pinnedFlat === null) {
+    return;
+  }
+  releaseInspectorImage(pinnedFlat.filePath, pinnedFlat.sel);
+  pinnedFlat = null;
+}
+
+function bindFlatPin(filePath: string, sel: ImageSelection): void {
+  const same =
+    pinnedFlat !== null &&
+    pinnedFlat.filePath === filePath &&
+    pinnedFlat.sel.level === sel.level &&
+    pinnedFlat.sel.face === sel.face &&
+    pinnedFlat.sel.layer === sel.layer &&
+    pinnedFlat.sel.depthSlice === sel.depthSlice;
+  if (same) {
+    touchInspectorImageUrl(filePath, sel);
+    return;
+  }
+  releaseFlatPin();
+  retainInspectorImage(filePath, sel);
+  touchInspectorImageUrl(filePath, sel);
+  pinnedFlat = { filePath, sel: { ...sel } };
+}
+
 function clearMissTimer(): void {
   if (missTimer !== null) {
     clearTimeout(missTimer);
@@ -208,14 +239,20 @@ async function fetchMiss(
   gen: number,
 ): Promise<void> {
   loading.value = objectUrl.value === null;
+  // Protect the in-flight key without dropping the pin on the still-visible frame.
+  retainInspectorImage(filePath, sel);
   try {
     const url = await loadInspectorImageUrl(filePath, sel);
     if (gen !== fetchGen.value) {
+      releaseInspectorImage(filePath, sel);
       return;
     }
+    releaseInspectorImage(filePath, sel);
+    bindFlatPin(filePath, sel);
     objectUrl.value = url;
     scheduleIdlePrefetch(filePath, sel);
   } catch (err: unknown) {
+    releaseInspectorImage(filePath, sel);
     if (gen !== fetchGen.value || isAbortError(err)) {
       return;
     }
@@ -229,6 +266,7 @@ async function fetchMiss(
 }
 
 function clearViewerState(): void {
+  releaseFlatPin();
   if (cachedPath.value !== null) {
     clearInspectorImageCache();
     cachedPath.value = null;
@@ -240,6 +278,7 @@ function clearViewerState(): void {
 }
 
 function showCachedHit(filePath: string, sel: ImageSelection, hit: string): void {
+  bindFlatPin(filePath, sel);
   objectUrl.value = hit;
   loading.value = false;
   scheduleIdlePrefetch(filePath, sel);
@@ -264,6 +303,7 @@ function scheduleMissFetch(
 }
 
 function clearFlatPreview(): void {
+  releaseFlatPin();
   objectUrl.value = null;
   loading.value = false;
 }
@@ -330,6 +370,7 @@ onUnmounted(() => {
   invalidateCross();
   clearMissTimer();
   clearPrefetchTimer();
+  releaseFlatPin();
   clearInspectorImageCache();
   cachedPath.value = null;
   objectUrl.value = null;

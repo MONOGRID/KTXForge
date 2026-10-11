@@ -6,6 +6,7 @@ use std::time::SystemTime;
 
 use ktx2::Reader;
 use tauri::AppHandle;
+use tokio::sync::Semaphore;
 
 use crate::error::AppError;
 use crate::image::classify::{classify, FileKind};
@@ -18,6 +19,11 @@ use crate::ktx::info::{self, preview_kind_from_vk_format};
 use crate::ktx::info_types::{ImageSelection, InspectKind, InspectReport, PreviewKind};
 use crate::ktx::sidecar::{self, CancellationHandle};
 use crate::workspace::Workspace;
+
+/// Global cap on concurrent `ktx extract` processes.
+/// Disk-cached PNG reads skip this path; only real sidecar work takes a slot.
+/// One slot stops scrub stampedes from spawning dozens of UASTC/Zstd decompressors.
+static EXTRACT_SLOTS: Semaphore = Semaphore::const_new(1);
 
 #[derive(Debug, Clone)]
 pub struct TextureMeta {
@@ -220,6 +226,10 @@ pub async fn run_extract(
     transcode: Option<TranscodeTarget>,
     cancel: CancellationHandle,
 ) -> Result<(), AppError> {
+    let _permit = EXTRACT_SLOTS
+        .acquire()
+        .await
+        .map_err(|_| AppError::io("extract slot closed"))?;
     if let Some(parent) = output.parent() {
         std::fs::create_dir_all(parent).map_err(|e| AppError::io(e.to_string()))?;
     }
@@ -367,5 +377,38 @@ pub async fn texture_meta_via_info(app: &AppHandle, path: &Path) -> Result<Textu
                 needs_transcode: false,
             })
         }
+    }
+}
+
+#[cfg(test)]
+mod extract_slot_tests {
+    use super::EXTRACT_SLOTS;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+    use std::time::Duration;
+
+    #[tokio::test]
+    async fn extract_slots_serialize_concurrent_acquirers() {
+        let concurrent = Arc::new(AtomicUsize::new(0));
+        let peak = Arc::new(AtomicUsize::new(0));
+
+        let mut joins = Vec::new();
+        for _ in 0..8 {
+            let concurrent = Arc::clone(&concurrent);
+            let peak = Arc::clone(&peak);
+            joins.push(tokio::spawn(async move {
+                let _permit = EXTRACT_SLOTS.acquire().await.expect("slot");
+                let now = concurrent.fetch_add(1, Ordering::SeqCst) + 1;
+                peak.fetch_max(now, Ordering::SeqCst);
+                tokio::time::sleep(Duration::from_millis(15)).await;
+                concurrent.fetch_sub(1, Ordering::SeqCst);
+            }));
+        }
+
+        for join in joins {
+            join.await.expect("join");
+        }
+
+        assert_eq!(peak.load(Ordering::SeqCst), 1);
     }
 }
