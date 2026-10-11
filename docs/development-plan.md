@@ -15,7 +15,7 @@ Read [AGENTS.md](../AGENTS.md) and [decision-context.md](decision-context.md) fi
 ### Branches and commits
 
 - Development happens on the integration branch `dev`. `main` is the release branch: every push to `main` can publish a release (see Wave 6). `dev` merges into `main` only when the orchestrator decides to ship, the first time after Wave 7.
-- The local default branch is currently `master`. Rename it to `dev` and create `main` from it before the first push to `https://github.com/MONOGRID/KTX-GUI`.
+- The local default branch is currently `master`. Rename it to `dev` and create `main` from it before the first push to `https://github.com/MONOGRID/KTXForge`.
 - Every commit follows [Conventional Commits](https://www.conventionalcommits.org/). The commit message drives the version bump and the changelog, so it matters. Task commits use `<type>(<scope>): <summary> [<task ID>]`, for example `feat(encoder): option rules engine [T3.3]`.
 
 | Wave | Default type |
@@ -167,8 +167,8 @@ Logged in [decision-context.md](decision-context.md).
 | Topic | Answer |
 | --- | --- |
 | `ktx` version | v4.4.2. **Settled:** stay on 4.4.2; defer missing CLI options (see [ktx-cli/README.md](ktx-cli/README.md)). |
-| Repository | `https://github.com/MONOGRID/KTX-GUI` |
-| Product | name `KTX-GUI`, identifier `com.monogrid.ktx-gui` |
+| Repository | `https://github.com/MONOGRID/KTXForge` |
+| Product | name `KTXForge`, identifier `com.monogrid.ktxforge` |
 | Updater signing key | The user generates it (`npx tauri signer generate`), stores the private key and password as GitHub secrets, and provides the public key for T6.3. |
 | Quality | fallow dead code, duplication, and health run in `npm run check` next to lint and typecheck, at every task and wave gate and in CI. |
 | Releases | semantic-release on `main`: version from commit messages, `CHANGELOG.md`, tag, GitHub Release, Tauri artifacts, published automatically. |
@@ -581,7 +581,7 @@ This replaces the manual "publish the draft" step in requirements.md. The change
 
 - **Owns:** `src-tauri/tauri.conf.json` (`bundle.createUpdaterArtifacts`, `plugins.updater`, `bundle.macOS.signingIdentity` only), `src-tauri/capabilities/default.json` (add `updater:default`, `process:allow-restart` only)
 - **Needs:** the updater public key from the user.
-- **Do:** `bundle.createUpdaterArtifacts: true`; `plugins.updater.pubkey` = the provided public key; `plugins.updater.endpoints: ["https://github.com/MONOGRID/KTX-GUI/releases/latest/download/latest.json"]`; `plugins.updater.windows.installMode: "passive"`; `bundle.macOS.signingIdentity: "-"`.
+- **Do:** `bundle.createUpdaterArtifacts: true`; `plugins.updater.pubkey` = the provided public key; `plugins.updater.endpoints: ["https://github.com/MONOGRID/KTXForge/releases/latest/download/latest.json"]`; `plugins.updater.windows.installMode: "passive"`; `bundle.macOS.signingIdentity: "-"`.
 - **Done when:** `npm run tauri build` succeeds locally with `TAURI_SIGNING_PRIVATE_KEY` set and produces a `.sig` next to the installer; `npm run check` passes.
 
 ### T6.4 semantic-release configuration

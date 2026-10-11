@@ -24,10 +24,10 @@ import {
 
 const title = computed((): string => {
   if (path.value === null || path.value.length === 0) {
-    return "KTX-GUI Inspector";
+    return "KTXForge Inspector";
   }
   const base = path.value.replace(/\\/g, "/").split("/").pop() ?? path.value;
-  return `KTX-GUI Inspector — ${base}`;
+  return `KTXForge Inspector — ${base}`;
 });
 
 useTitle(title);

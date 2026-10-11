@@ -44,7 +44,7 @@ pub async fn open_inspector_path(
         .and_then(|n| n.to_str())
         .unwrap_or("file")
         .to_owned();
-    let title = format!("KTX-GUI Inspector — {file_name}");
+    let title = format!("KTXForge Inspector — {file_name}");
     let payload = InspectorFilePayload {
         path: path.to_string_lossy().into_owned(),
     };

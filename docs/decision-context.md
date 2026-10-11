@@ -341,3 +341,9 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 2. Encode failures surface as **one** formatted message via a native dialog alert (`dialog.message`) **and** a native OS notification. No Sonner toast for encode failures, and no inline Encode panel error + stderr duplication. Soft failures elsewhere may still use `toastAppError`.
 
 **Why:** `ktx create` truncates input paths at commas, so files like `…06_08_2026, 18_33_22.jpg` failed with “No such file”. The Encode bar showed `ktx exited with code N` plus a stderr dump while a toast repeated a summary — three surfaces for one failure.
+
+## 2026-10-11 — Product rename to KTXForge
+
+**Decided:** The product is **KTXForge** (not `KTX-GUI`). Package / crate names are `ktxforge` / `ktxforge_lib`; Tauri `productName` is `KTXForge`; identifier is `com.monogrid.ktxforge`; planned repository is `https://github.com/MONOGRID/KTXForge`. Window titles and in-app header use KTXForge / KTXForge Inspector. README describes the app as a KTX GUI that exposes the full encode and inspect surface, with described screenshot placeholders under `docs/screenshots/`. This supersedes the product naming in the 2026-10-04 GitHub / identity entry.
+
+**Why:** A distinct product name for the desktop GUI, separate from the generic “KTX GUI” label used during scaffolding.

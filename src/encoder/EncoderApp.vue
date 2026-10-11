@@ -27,7 +27,7 @@ import { consumeCommittedDropZone } from "./dropTarget";
 import { bindEncoderMenu } from "./menuBridge";
 import { initStore, showInputsPanel, store } from "./store";
 
-useTitle("KTX-GUI");
+useTitle("KTXForge");
 
 const versionLabel = computed((): string => {
   const version = store.ktxVersion;
@@ -83,7 +83,7 @@ onUnmounted(() => {
 
       <header class="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-surface-raised px-4 py-2">
         <h1 class="m-0 text-lg font-semibold tracking-tight">
-          KTX-GUI
+          KTXForge
         </h1>
         <div class="flex items-center gap-2">
           <span class="badge font-mono">

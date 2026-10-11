@@ -1,6 +1,6 @@
-# KTX encoder and inspector
+# KTXForge — encoder and inspector
 
-Requirements for turning this Tauri app into a desktop tool that encodes ordinary images to KTX and inspects existing KTX files. This document records the product requirements and the constraints taken from the current Khronos and Tauri documentation. It is the source of truth before implementation.
+Requirements for **KTXForge**, a Tauri desktop GUI that encodes ordinary images to KTX and inspects existing KTX files. This document records the product requirements and the constraints taken from the current Khronos and Tauri documentation. It is the source of truth before implementation.
 
 The app is a local desktop tool. It does not upload textures. The installed app must run on Windows, macOS, and Linux with no KTX tools installed on the machine.
 
@@ -335,13 +335,13 @@ Releases are built with [`tauri-apps/tauri-action`](https://v2.tauri.app/distrib
 - Ubuntu arm64 (public runners)
 - Windows x64
 
-The workflow needs `contents: write`. It checks out the repo, installs Linux webkit and packaging packages, sets up Node and Rust, installs frontend dependencies, downloads and stages the pinned `ktx` binaries, then runs `tauri-action` to build and attach artifacts to a GitHub Release. Releases are automatic: on every push to `main`, semantic-release derives the version from Conventional Commit messages, updates `CHANGELOG.md`, tags the commit, and creates a draft release; the build matrix attaches the artifacts; the workflow publishes the draft once every platform has built. Commits that are not `feat`, `fix`, `perf`, or breaking produce no release. The repository is `https://github.com/MONOGRID/KTX-GUI`. The updater signing private key is a GitHub Actions secret (`TAURI_SIGNING_PRIVATE_KEY` and, if set, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`). It is never committed.
+The workflow needs `contents: write`. It checks out the repo, installs Linux webkit and packaging packages, sets up Node and Rust, installs frontend dependencies, downloads and stages the pinned `ktx` binaries, then runs `tauri-action` to build and attach artifacts to a GitHub Release. Releases are automatic: on every push to `main`, semantic-release derives the version from Conventional Commit messages, updates `CHANGELOG.md`, tags the commit, and creates a draft release; the build matrix attaches the artifacts; the workflow publishes the draft once every platform has built. Commits that are not `feat`, `fix`, `perf`, or breaking produce no release. The repository is `https://github.com/MONOGRID/KTXForge`. The updater signing private key is a GitHub Actions secret (`TAURI_SIGNING_PRIVATE_KEY` and, if set, `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`). It is never committed.
 
 Updater configuration, from the Tauri v2 updater plugin:
 
 - `bundle.createUpdaterArtifacts` is `true`.
 - `plugins.updater.pubkey` is the public half of the minisign key pair from `tauri signer generate`. The private key is what signs release artifacts. Losing it means existing installs can never update again.
-- `plugins.updater.endpoints` includes `https://github.com/MONOGRID/KTX-GUI/releases/latest/download/latest.json`, which `tauri-action` generates.
+- `plugins.updater.endpoints` includes `https://github.com/MONOGRID/KTXForge/releases/latest/download/latest.json`, which `tauri-action` generates.
 - Windows `installMode` is `passive` (small progress UI, no extra prompts).
 - On launch, Rust checks for an update. The UI shows version notes and progress, then relaunches after install. Signature checks stay on. They cannot be disabled.
 

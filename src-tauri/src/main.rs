@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-    ktx_gui_lib::run()
+    ktxforge_lib::run()
 }

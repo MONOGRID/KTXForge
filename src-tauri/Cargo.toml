@@ -1,12 +1,12 @@
 [package]
-name = "ktx-gui"
+name = "ktxforge"
 version = "0.0.0"
-description = "KTX encoder and inspector"
+description = "KTXForge — desktop GUI for KTX encode and inspect"
 authors = ["MONOGRID"]
 edition = "2021"
 
 [lib]
-name = "ktx_gui_lib"
+name = "ktxforge_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [package.metadata.cargo-machete]
