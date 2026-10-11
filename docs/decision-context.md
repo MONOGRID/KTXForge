@@ -359,3 +359,15 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 **Decided:** Ship Wave 6 as `.github/workflows/ci.yml` + `release.yml`, `.releaserc.json`, `scripts/set-version.mjs` / `release-outputs.mjs`, and updater config in `tauri.conf.json` (`createUpdaterArtifacts`, pubkey, `releases/latest/download/latest.json`, Windows `passive`, macOS ad-hoc `-`). Generate the minisign keypair with `tauri signer generate` for this repo; commit only the public key; store the private key as GitHub secret `TAURI_SIGNING_PRIVATE_KEY` (no password). Integration branch is `dev` (renamed from `master`); `main` is created locally for the post–Wave 7 ship merge and is not pushed until then so an empty-repo push does not publish `1.0.0` early.
 
 **Why:** Unblocks CI and the automatic release pipeline on `MONOGRID/KTXForge` while keeping the first public release gated on Wave 7 acceptance.
+
+## 2026-10-11 — Windows menu accelerator fallback via keydown
+
+**Decided:** Keep native muda accelerators on the File/View menu items for display and for macOS/Linux. On Windows only, bind a capture-phase `keydown` listener (`bindWindowsMenuShortcuts`) that maps the same Ctrl chords to menu ids and invokes `dispatch_menu_action`. That command checks the live menu-item enabled flag, then runs the shared `handle_menu_id` path used by `on_menu_event`. Matcher coverage is locked by `npm run test:menu-shortcuts`.
+
+**Why:** WebView2 swallows keyboard input before Win32 `TranslateAcceleratorW`, so menu clicks work but the accelerators next to them do nothing (wry#451 / tauri#6365). A JS fallback is the established workaround; routing through Rust keeps enablement and Open/Exit/updater behavior in one place.
+
+## 2026-10-11 — Expand Darwin pkgs with pkgutil; follow soname symlinks
+
+**Decided:** `scripts/fetch-ktx.mjs` expands Darwin `.pkg` assets with `pkgutil --expand-full` only. It does not use `7z` for those packages. Linux and macOS library lookup follows soname symlinks (`libktx.so.4`, `libktx.4.dylib`) and matches the path suffix under the archive prefix (`KTX-Software-…/` or a component `Payload/`). This replaces the “or `7z x` the pkg” option in [ktx-cli/staging.md](ktx-cli/staging.md).
+
+**Why:** CI failed on v4.4.2. `7z x` stops at the xar, so `usr/local/bin/ktx` stays inside a gzip+cpio Payload. The Linux tarball nests files under `KTX-Software-4.4.2-Linux-x86_64/`, and `lib/libktx.so.4` is a symlink to `libktx.so.4.4.2`. A walk that only accepts regular files never sees that name, which is the `NEEDED` entry.

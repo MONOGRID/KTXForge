@@ -16,7 +16,7 @@ import {
   rmSync,
   chmodSync,
 } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { pipeline } from "node:stream/promises";
 import { Readable } from "node:stream";
@@ -86,12 +86,19 @@ function stagedKtxPath(triple, isWindows) {
 }
 
 function extractArchive(extract, assetPath, outDir) {
+  if (extract === "pkg") {
+    // 7z only unwraps the xar. Each component Payload stays gzip+cpio,
+    // so usr/local/bin/ktx never appears as a file.
+    rmSync(outDir, { recursive: true, force: true });
+    run("pkgutil", ["--expand-full", assetPath, outDir]);
+    return;
+  }
   mkdirSync(outDir, { recursive: true });
   if (extract === "tarbz2") {
     run("tar", ["-xjf", assetPath, "-C", outDir]);
     return;
   }
-  if (extract === "nsis7z" || extract === "pkg") {
+  if (extract === "nsis7z") {
     run(find7z(), ["x", assetPath, `-o${outDir}`, "-y"]);
     return;
   }
@@ -112,7 +119,8 @@ function walkFiles(rootDir, onFile) {
       const full = join(dir, ent.name);
       if (ent.isDirectory()) {
         stack.push(full);
-      } else if (ent.isFile()) {
+      } else if (ent.isFile() || ent.isSymbolicLink()) {
+        // soname links (libktx.so.4 → libktx.so.4.4.2) are not regular files
         onFile(full, ent.name);
       }
     }
@@ -120,14 +128,20 @@ function walkFiles(rootDir, onFile) {
 }
 
 function findInTree(rootDir, relativeHint) {
-  const direct = join(rootDir, relativeHint);
+  const parts = relativeHint.split(/[/\\]/).filter(Boolean);
+  const direct = join(rootDir, ...parts);
   if (existsSync(direct)) {
     return direct;
   }
-  const base = relativeHint.split(/[/\\]/).pop();
+  // Tarballs and expanded pkgs add a prefix (KTX-Software-…/ or Payload/).
+  const suffix = parts.join("/");
   let found = null;
-  walkFiles(rootDir, (full, name) => {
-    if (!found && name === base) {
+  walkFiles(rootDir, (full) => {
+    if (found) {
+      return;
+    }
+    const rel = relative(rootDir, full).split(/[/\\]/).join("/");
+    if (rel === suffix || rel.endsWith(`/${suffix}`)) {
       found = full;
     }
   });
