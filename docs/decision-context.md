@@ -213,3 +213,15 @@ ASTC `--format` strings keep the Vulkan `_BLOCK` suffix required by v4.4.2. This
 **Decided:** Inspector uses a horizontal resizable split (`inspector-layout`, same reka-ui pattern as the encoder): left = mip/layer/depth controls + fixed-size image viewport + pinned Export bar; right = path/size header + scrollable report panels. Drop the in-window “KTX-GUI Inspector” title (window title is enough). Mip and layer (and depth) are range sliders with the current selection in the label (e.g. `Mip L0 · 2048×2048`). The viewport does not scroll or resize with the image; the image pans by drag and zooms with Ctrl/Cmd+wheel. Inline View 1:1/Fit buttons move to the native View menu (Zoom In/Out, Actual Size, Fit) via `menu://action` (`zoom-in` / `zoom-out` / `zoom-actual` / `zoom-fit`), handled only in the inspector.
 
 **Why:** The previous two-column grid put metadata on the left and scrolled the whole viewer column, so export and zoom chrome floated away from a usable preview. Matching the encoder’s resizable + pinned-bottom pattern keeps export reachable and lets the report grow without shrinking the canvas.
+
+## 2026-10-11 — Shared ImageViewport; encoder compare wipe
+
+**Decided:** Zoom/pan lives in shared `useZoomPan` + `ImageViewport` (checkerboard, Ctrl/Cmd+wheel, drag pan, View menu via `viewerControls`). Inspector and encoder both use it. Encoder preview is no longer side-by-side: source alone until encode succeeds, then a vertical wipe slider (original left / encoded right) with one shared transform so pan and zoom stay locked. Stats stay under the viewport. `menu://action` zoom is handled in both windows but only when `document.hasFocus()` so the unfocused webview ignores app-wide emits. Replaces the “View zoom handled only in the inspector” part of the inspector-layout entry; encode preview in requirements still means “show encoded vs source,” now as a wipe rather than two columns.
+
+**Why:** Matching inspector navigation in the encoder was requested; a wipe is a clearer quality compare than two independently scaled boxes. Sharing the viewport avoids duplicating transform math.
+
+## 2026-10-11 — Compare wipe is frame-clipped; full-res source preview
+
+**Decided:** The encoder wipe clips the original in *frame* space (overflow strip at `splitPct` of the viewport, inner layer as wide as the frame, same pan/zoom transform as the encoded layer). The divisor and the image cut stay aligned when panning. Preview pane loads `source_preview` (full-resolution PNG / tone-mapped HDR), not `source_thumbnail` (128px list thumb). Both compare layers fill a shared max(natural) canvas via `object-fit: fill`.
+
+**Why:** Clip-path on the transformed image moved the cut with the pan while the handle stayed viewport-centered. Using the list thumbnail made the left side a small inset next to a full encoded preview.

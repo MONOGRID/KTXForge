@@ -1,22 +1,28 @@
 import { on } from "../api/events";
 import type { MenuAction } from "../bindings/MenuAction";
-import { getViewerControls } from "./viewerControls";
+import { getViewerControls } from "../shared/viewerControls";
 
 function handleMenuAction(action: MenuAction): void {
-  const viewer = getViewerControls();
   switch (action) {
     case "zoom-in":
-      viewer?.zoomIn();
-      break;
     case "zoom-out":
-      viewer?.zoomOut();
-      break;
     case "zoom-actual":
-      viewer?.zoomActual();
+    case "zoom-fit": {
+      if (!document.hasFocus()) {
+        break;
+      }
+      const viewer = getViewerControls();
+      if (action === "zoom-in") {
+        viewer?.zoomIn();
+      } else if (action === "zoom-out") {
+        viewer?.zoomOut();
+      } else if (action === "zoom-actual") {
+        viewer?.zoomActual();
+      } else {
+        viewer?.zoomFit();
+      }
       break;
-    case "zoom-fit":
-      viewer?.zoomFit();
-      break;
+    }
     case "encode":
     case "cancel-encode":
     case "save":

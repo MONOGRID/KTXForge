@@ -130,10 +130,46 @@ pub fn thumbnail_png(path: &Path, max: u32) -> Result<Vec<u8>, AppError> {
     let max = max.max(1);
     let img = image::open(path).map_err(|e| AppError::image(e.to_string()))?;
     let thumb = img.resize(max, max, FilterType::Triangle);
+    encode_png(&thumb)
+}
+
+/// Full-resolution PNG suitable for the encoder compare wipe (not the 128px list thumb).
+pub fn source_preview_png(path: &Path) -> Result<Vec<u8>, AppError> {
+    match classify(path) {
+        FileKind::Image {
+            kind: SourceKind::Ldr,
+            needs_conversion: false,
+        } => crate::image::export::png_bytes(path),
+        FileKind::Image {
+            kind: SourceKind::Ldr,
+            needs_conversion: true,
+        } => encode_png(&load_for_png(path)?),
+        FileKind::Image {
+            kind: SourceKind::Hdr,
+            needs_conversion: false,
+        } => crate::image::export::exr_to_preview_png(path),
+        FileKind::Image {
+            kind: SourceKind::Hdr,
+            needs_conversion: true,
+        } => {
+            let dir = tempfile::tempdir().map_err(|e| AppError::io(e.to_string()))?;
+            let prepared = prepare_input(path, dir.path())?;
+            crate::image::export::exr_to_preview_png(&prepared.path)
+        }
+        FileKind::Ktx1 | FileKind::Ktx2 => Err(AppError::invalid_input(
+            "KTX files are inspected, not used as encode sources",
+        )),
+        FileKind::Unsupported => Err(AppError::unsupported_file(format!(
+            "unsupported source: {}",
+            path.display()
+        ))),
+    }
+}
+
+fn encode_png(img: &DynamicImage) -> Result<Vec<u8>, AppError> {
     let mut buf = Vec::new();
     let mut cursor = std::io::Cursor::new(&mut buf);
-    thumb
-        .write_to(&mut cursor, ImageFormat::Png)
+    img.write_to(&mut cursor, ImageFormat::Png)
         .map_err(|e| AppError::image(e.to_string()))?;
     Ok(buf)
 }
@@ -186,5 +222,15 @@ mod tests {
         if sw.max(sh) >= 32 {
             assert_eq!(w.max(h), 32);
         }
+    }
+
+    #[test]
+    fn source_preview_keeps_full_dimensions() {
+        let root = fixtures();
+        let path = root.join("rgba.png");
+        let (sw, sh) = image::image_dimensions(&path).unwrap();
+        let bytes = source_preview_png(&path).unwrap();
+        let img = image::load_from_memory(&bytes).unwrap();
+        assert_eq!(img.dimensions(), (sw, sh));
     }
 }

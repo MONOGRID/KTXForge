@@ -2,6 +2,7 @@ import { watchEffect } from "vue";
 import { call } from "../api/commands";
 import { on } from "../api/events";
 import type { MenuAction } from "../bindings/MenuAction";
+import { getViewerControls } from "../shared/viewerControls";
 import {
   canCancelEncode,
   canClearSources,
@@ -35,11 +36,26 @@ async function handleMenuAction(action: MenuAction): Promise<void> {
     case "clear-sources":
       clearSources();
       break;
-    case "export":
     case "zoom-in":
     case "zoom-out":
     case "zoom-actual":
-    case "zoom-fit":
+    case "zoom-fit": {
+      if (!document.hasFocus()) {
+        break;
+      }
+      const viewer = getViewerControls();
+      if (action === "zoom-in") {
+        viewer?.zoomIn();
+      } else if (action === "zoom-out") {
+        viewer?.zoomOut();
+      } else if (action === "zoom-actual") {
+        viewer?.zoomActual();
+      } else {
+        viewer?.zoomFit();
+      }
+      break;
+    }
+    case "export":
       break;
   }
 }

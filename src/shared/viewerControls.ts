@@ -1,4 +1,4 @@
-/** Imperative zoom API registered by ImageViewer for the View menu. */
+/** Imperative zoom API registered by a viewport for the View menu. */
 export type ViewerControls = {
   zoomIn: () => void;
   zoomOut: () => void;

@@ -23,6 +23,7 @@ export type Commands = {
   };
   pick_sources: { args: EmptyArgs; result: SourceInfo[] };
   source_thumbnail: { args: { path: string }; result: ArrayBuffer };
+  source_preview: { args: { path: string }; result: ArrayBuffer };
   encode: { args: { request: EncodeRequest }; result: EncodeResult };
   cancel_encode: { args: { jobId: string }; result: null };
   encoded_preview: { args: { jobId: string }; result: ArrayBuffer };

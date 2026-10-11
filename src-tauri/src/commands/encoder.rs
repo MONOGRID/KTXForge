@@ -7,7 +7,7 @@ use crate::commands::inspector_window;
 use crate::commands::{OptionReport, SourceInfo};
 use crate::error::AppError;
 use crate::image::classify::{classify, FileKind};
-use crate::image::convert::{read_source_info, thumbnail_png};
+use crate::image::convert::{read_source_info, source_preview_png, thumbnail_png};
 use crate::ktx::options::CreateOptions;
 use crate::ktx::rules;
 use crate::state::AppState;
@@ -81,5 +81,11 @@ pub async fn pick_sources(app: AppHandle) -> Result<Vec<SourceInfo>, AppError> {
 #[tauri::command]
 pub async fn source_thumbnail(path: String) -> Result<tauri::ipc::Response, AppError> {
     let bytes = thumbnail_png(PathBuf::from(path).as_path(), THUMB_MAX)?;
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
+#[tauri::command]
+pub async fn source_preview(path: String) -> Result<tauri::ipc::Response, AppError> {
+    let bytes = source_preview_png(PathBuf::from(path).as_path())?;
     Ok(tauri::ipc::Response::new(bytes))
 }

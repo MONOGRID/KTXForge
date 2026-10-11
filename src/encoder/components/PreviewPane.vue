@@ -4,16 +4,42 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { call } from "../../api/commands";
 import { toAppError } from "../../api/guards";
 import type { EncodeResult } from "../../bindings/EncodeResult";
+import ImageViewport from "../../shared/components/ImageViewport.vue";
 import { toastAppError } from "../../shared/toastAppError";
 import { store } from "../store";
 
 const sourceUrl = ref<string | null>(null);
 const encodedUrl = ref<string | null>(null);
+const sourceLoading = ref(false);
+const encodedLoading = ref(false);
 
 const result = computed((): EncodeResult | null => store.job.result);
 
-const showTonemapLabel = computed(
-  (): boolean => result.value?.preview.kind === "tonemappedFromExr",
+const showTonemapHint = computed((): string | null =>
+  result.value?.preview.kind === "tonemappedFromExr"
+    ? "Preview, not stored data"
+    : null,
+);
+
+const comparing = computed(
+  (): boolean => sourceUrl.value !== null && encodedUrl.value !== null,
+);
+
+const viewportSrc = computed((): string | null => {
+  if (comparing.value) {
+    return sourceUrl.value;
+  }
+  return sourceUrl.value ?? encodedUrl.value;
+});
+
+const compareSrc = computed((): string | null =>
+  comparing.value ? encodedUrl.value : null,
+);
+
+const loading = computed(
+  (): boolean =>
+    viewportSrc.value === null &&
+    (sourceLoading.value || encodedLoading.value),
 );
 
 function sourcePathAt(index: number): string | undefined {
@@ -52,9 +78,11 @@ watch(
     revoke(sourceUrl.value);
     sourceUrl.value = null;
     if (path === undefined) {
+      sourceLoading.value = false;
       return;
     }
-    void call("source_thumbnail", { path })
+    sourceLoading.value = true;
+    void call("source_preview", { path })
       .then((bytes) => {
         if (sourcePathAt(0) !== path) {
           return;
@@ -65,6 +93,11 @@ watch(
       })
       .catch(() => {
         // Leave the source slot empty.
+      })
+      .finally(() => {
+        if (sourcePathAt(0) === path) {
+          sourceLoading.value = false;
+        }
       });
   },
   { immediate: true },
@@ -79,8 +112,10 @@ watch(
     revoke(encodedUrl.value);
     encodedUrl.value = null;
     if (jobId === null) {
+      encodedLoading.value = false;
       return;
     }
+    encodedLoading.value = true;
     void call("encoded_preview", { jobId })
       .then((bytes) => {
         if (store.job.jobId !== jobId || store.job.status !== "done") {
@@ -95,6 +130,11 @@ watch(
           return;
         }
         toastAppError(toAppError(err));
+      })
+      .finally(() => {
+        if (store.job.jobId === jobId && store.job.status === "done") {
+          encodedLoading.value = false;
+        }
       });
   },
   { immediate: true },
@@ -116,109 +156,80 @@ onUnmounted(() => {
       </h2>
     </header>
 
-    <ScrollArea class="min-h-0 flex-1">
-      <div class="flex min-h-0 flex-col gap-3 p-3">
-        <div class="grid min-h-48 flex-1 grid-cols-2 gap-3">
-          <div class="flex min-h-0 flex-col gap-1">
-            <div class="text-xs text-ink-muted">
-              Source
-            </div>
-            <div class="preview-box flex min-h-0 flex-1 w-full items-center justify-center overflow-hidden rounded border border-line bg-surface-sunken">
-              <img
-                v-if="sourceUrl"
-                :src="sourceUrl"
-                alt="Source"
-                class="max-h-full max-w-full object-contain"
-              >
-              <span
-                v-else
-                class="px-2 text-center text-xs text-ink-faint"
-              >No source</span>
-            </div>
-          </div>
+    <div class="flex min-h-0 flex-1 flex-col gap-2 p-3">
+      <ImageViewport
+        class="min-h-0 flex-1"
+        :src="viewportSrc"
+        :compare-src="compareSrc"
+        alt="Source"
+        compare-alt="Encoded preview"
+        :loading="loading"
+        empty-label="Drop or add a source to preview"
+        :hint="showTonemapHint"
+        original-label="Original"
+        result-label="Encoded"
+      />
 
-          <div class="flex min-h-0 flex-col gap-1">
-            <div class="text-xs text-ink-muted">
-              Encoded
-            </div>
-            <div class="preview-box flex min-h-0 flex-1 w-full items-center justify-center overflow-hidden rounded border border-line bg-surface-sunken">
-              <img
-                v-if="encodedUrl"
-                :src="encodedUrl"
-                alt="Encoded preview"
-                class="max-h-full max-w-full object-contain"
-              >
-              <span
-                v-else
-                class="px-2 text-center text-xs text-ink-faint"
-              >Encode to preview</span>
-            </div>
-            <p
-              v-if="showTonemapLabel"
-              class="m-0 shrink-0 text-xs text-ink-muted"
-            >
-              Preview, not stored data
-            </p>
-          </div>
-        </div>
+      <ScrollArea class="max-h-40 shrink-0">
+        <div class="flex flex-col gap-2 pr-2">
+          <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
+            <dt class="text-ink-muted">
+              Size
+            </dt>
+            <dd class="m-0 font-mono">
+              {{ result ? formatBytes(result.outputBytes) : "—" }}
+            </dd>
+            <dt class="text-ink-muted">
+              Dimensions
+            </dt>
+            <dd class="m-0 font-mono">
+              {{ result ? `${String(result.width)}×${String(result.height)}` : "—" }}
+            </dd>
+            <dt class="text-ink-muted">
+              Codec
+            </dt>
+            <dd class="m-0 font-mono">
+              {{ result?.codec ?? "—" }}
+            </dd>
+            <dt class="text-ink-muted">
+              Levels
+            </dt>
+            <dd class="m-0 font-mono">
+              {{ result ? String(result.levels) : "—" }}
+            </dd>
+            <dt class="text-ink-muted">
+              Layers
+            </dt>
+            <dd class="m-0 font-mono">
+              {{ result ? String(result.layers) : "—" }}
+            </dd>
+            <dt class="text-ink-muted">
+              SSIM
+            </dt>
+            <dd class="m-0 font-mono">
+              {{ result ? formatMetric(result.ssim) : "—" }}
+            </dd>
+            <dt class="text-ink-muted">
+              PSNR
+            </dt>
+            <dd class="m-0 font-mono">
+              {{ result ? formatMetric(result.psnr) : "—" }}
+            </dd>
+          </dl>
 
-        <dl class="m-0 shrink-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-          <dt class="text-ink-muted">
-            Size
-          </dt>
-          <dd class="m-0 font-mono">
-            {{ result ? formatBytes(result.outputBytes) : "—" }}
-          </dd>
-          <dt class="text-ink-muted">
-            Dimensions
-          </dt>
-          <dd class="m-0 font-mono">
-            {{ result ? `${String(result.width)}×${String(result.height)}` : "—" }}
-          </dd>
-          <dt class="text-ink-muted">
-            Codec
-          </dt>
-          <dd class="m-0 font-mono">
-            {{ result?.codec ?? "—" }}
-          </dd>
-          <dt class="text-ink-muted">
-            Levels
-          </dt>
-          <dd class="m-0 font-mono">
-            {{ result ? String(result.levels) : "—" }}
-          </dd>
-          <dt class="text-ink-muted">
-            Layers
-          </dt>
-          <dd class="m-0 font-mono">
-            {{ result ? String(result.layers) : "—" }}
-          </dd>
-          <dt class="text-ink-muted">
-            SSIM
-          </dt>
-          <dd class="m-0 font-mono">
-            {{ result ? formatMetric(result.ssim) : "—" }}
-          </dd>
-          <dt class="text-ink-muted">
-            PSNR
-          </dt>
-          <dd class="m-0 font-mono">
-            {{ result ? formatMetric(result.psnr) : "—" }}
-          </dd>
-        </dl>
-
-        <ul
-          v-if="result && result.warnings.length > 0"
-          class="m-0 list-disc pl-4 text-xs text-ink-muted"
-        >
-          <li
-            v-for="(warning, index) in result.warnings"
-            :key="index"
+          <ul
+            v-if="result && result.warnings.length > 0"
+            class="m-0 list-disc pl-4 text-xs text-ink-muted"
           >
-            {{ warning }}
-          </li>
-        </ul>
-      </div>
-    </ScrollArea>
+            <li
+              v-for="(warning, index) in result.warnings"
+              :key="index"
+            >
+              {{ warning }}
+            </li>
+          </ul>
+        </div>
+      </ScrollArea>
+    </div>
   </section>
 </template>

@@ -60,6 +60,7 @@ pub fn run() {
             commands::encoder::describe_options,
             commands::encoder::pick_sources,
             commands::encoder::source_thumbnail,
+            commands::encoder::source_preview,
             commands::encode::encode,
             commands::encode::cancel_encode,
             commands::encode::encoded_preview,
