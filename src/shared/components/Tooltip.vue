@@ -1,7 +1,4 @@
 <script setup lang="ts">
-// fallow-ignore-file unused-file
-// consumed by T5.2
-
 withDefaults(
   defineProps<{
     text: string;
@@ -14,7 +11,7 @@ withDefaults(
 </script>
 
 <template>
-  <span class="tooltip-root relative inline-flex">
+  <span class="tooltip-root relative inline-flex max-w-full">
     <slot />
     <span
       class="tooltip-bubble pointer-events-none absolute z-10 max-w-xs rounded bg-ink px-2 py-1 text-xs text-surface opacity-0 shadow"

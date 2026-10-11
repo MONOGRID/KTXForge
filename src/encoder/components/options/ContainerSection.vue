@@ -1,8 +1,21 @@
 <script setup lang="ts">
+import type { OptionKey } from "../../../bindings/OptionKey";
 import Panel from "../../../shared/components/Panel.vue";
 import { store } from "../../store";
 import OptionControls from "./OptionControls.vue";
-import type { OptionControlField } from "./optionControls";
+import { anyEnabled, type OptionControlField } from "./optionControls";
+
+const KEYS = [
+  "1d",
+  "cubemap",
+  "layers",
+  "depth",
+  "levels",
+  "width",
+  "height",
+  "scale",
+  "raw",
+] as const satisfies readonly OptionKey[];
 
 const fields: OptionControlField[] = [
   {
@@ -54,24 +67,6 @@ const fields: OptionControlField[] = [
     },
   },
   {
-    key: "generate-mipmap",
-    label: "Generate mipmap",
-    kind: "bool",
-    get: () => store.options.container.generateMipmap,
-    set: (value) => {
-      store.options.container.generateMipmap = value;
-    },
-  },
-  {
-    key: "runtime-mipmap",
-    label: "Runtime mipmap",
-    kind: "bool",
-    get: () => store.options.container.runtimeMipmap,
-    set: (value) => {
-      store.options.container.runtimeMipmap = value;
-    },
-  },
-  {
     key: "width",
     label: "Width",
     kind: "number",
@@ -114,7 +109,10 @@ const fields: OptionControlField[] = [
 </script>
 
 <template>
-  <Panel title="Container">
+  <Panel
+    v-if="anyEnabled(KEYS)"
+    title="Container"
+  >
     <OptionControls :fields="fields" />
   </Panel>
 </template>

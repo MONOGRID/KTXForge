@@ -5,6 +5,7 @@ import type { VkFormat } from "../../../bindings/VkFormat";
 import EnumSelect from "../../../shared/components/EnumSelect.vue";
 import OptionField from "../../../shared/components/OptionField.vue";
 import Panel from "../../../shared/components/Panel.vue";
+import Tooltip from "../../../shared/components/Tooltip.vue";
 import { fieldState, store } from "../../store";
 
 type FormatMode = "uncompressed" | "astc" | "codec";
@@ -322,11 +323,16 @@ const astcColorGroups = [
 <template>
   <Panel title="Format">
     <div class="field-row">
-      <label
+      <Tooltip
+        text="Uncompressed Vulkan format, ASTC block format, or uncompressed plus BasisLZ/UASTC encode."
         class="label"
-        :for="groupId"
-        title="Group"
-      >Group</label>
+      >
+        <label
+          class="min-w-0 cursor-pointer truncate"
+          :for="groupId"
+          title="Group"
+        >Group</label>
+      </Tooltip>
       <div class="min-w-0 flex-1">
         <EnumSelect
           :id="groupId"
@@ -372,6 +378,7 @@ const astcColorGroups = [
     </OptionField>
 
     <OptionField
+      v-if="mode !== 'astc'"
       label="Encode"
       option-key="encode"
       :state="fieldState('encode')"
@@ -380,7 +387,6 @@ const astcColorGroups = [
         :model-value="store.options.encode"
         :options="encodeOptions"
         empty-label="None"
-        :disabled="mode === 'astc'"
         @update:model-value="onEncode"
       />
     </OptionField>

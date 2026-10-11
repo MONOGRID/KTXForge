@@ -171,3 +171,21 @@ ASTC `--format` strings keep the Vulkan `_BLOCK` suffix required by v4.4.2. This
 **Decided:** Tauri v2 IPC renames snake_case command parameters to camelCase for the webview, so frontend `call(...)` args use `jobId` (not `job_id`) for `cancel_encode` / `encoded_preview` / `save_encoded`. Transient and command failures surface through shadcn-vue Sonner (`vue-sonner`) toasts in both encoder and inspector windows via a shared `toastAppError` helper; the inline `ErrorBox` and header error banners are removed.
 
 **Why:** Save and encoded preview failed with `missing required key jobId` while the UI kept snake_case keys. Red inline error boxes are a poor fit for multi-window desktop chrome; toasts keep the panels clean and work the same in the inspector.
+
+## 2026-10-11 — Encoder options: hide unavailable, enable-then-reveal, tooltips
+
+**Decided:** Unavailable encoding options are **hidden**, not dimmed with an inline reason. Whole accordion panels hide when every field inside is disabled per `describe_options`. Panels follow enable-then-reveal (master switch, then linked details). Generate/runtime mipmap live in the **Mipmaps / resample** panel with the filter controls. Each option has a short tooltip from the ktx create docs. This replaces the earlier “every option stays visible and disabled with reason” product rule (requirements + development-plan T5.1 `OptionField` note). Rust remains the enablement source of truth; Vue only renders `FieldState.enabled`.
+
+**Why:** A dense options rail full of greyed-out codec and dependency rows is noise. Hiding inactive controls and nesting details under their enable switch matches how users enable features and keeps the rail scannable.
+
+## 2026-10-11 — Declarative option enablement predicates in Rust
+
+**Decided:** `describe_options` enablement is a declarative gate table in `rules.rs`: each `OptionKey` has zero or more `Gate`s (`Pred` + reason). `Pred` is a small closed set (`Raw`, `ScaleSet`, `EncodeBasisLz`, …) composed with `Any` / `Not`. Multiple gates on one key are AND (each keeps its own reason); `Any` expresses OR (e.g. mipmap filters need generate-mipmap **or** scale **or** width **or** height). Vue does not evaluate predicates: it only shows fields when `FieldState.enabled` is true, treats a missing report entry as disabled, and waits for `store.ready` before rendering the options panel. Container `scale` defaults to `1.0` (`Some(1.0)` in Rust / `1` in the store), so filter controls are available on a fresh form because scale is set.
+
+**Why:** The previous `match` buried AND/OR dependencies in ad-hoc branches; a table makes multi-condition visibility explicit and keeps CLI-faithful OR rules (filters) next to AND rules (UASTC RDO sub-options). Shipping the predicate graph to Vue would duplicate the rules engine and break the Rust-owns-enablement decision. The product default for scale is `1`, not unset.
+
+## 2026-10-11 — No placeholders for known option defaults
+
+**Decided:** Known `ktx create` defaults are real values in `CreateOptions::default` (and the matching store interim object), not empty fields with placeholder / “Default (…)” / “tool default” chrome. Applies especially when dependents key off “value is set”. Current defaults from [ktx-cli/create.txt](../ktx-cli/create.txt): `scale` 1; mipmap filter `lanczos4`, filter scale `1.0`, wrap `clamp`; BasisLZ `qlevel` 128, `clevel` 1, RDO thresholds `1.25`; UASTC quality `1`, RDO-L/D/B/S `1` / `4096` / `10` / `18`; ASTC quality `medium`; `threads` = `available_parallelism` (or 1). Leave unset only when the CLI default is “flag omitted” with no numeric/enum default (`width`/`height`/`layers`/`depth`/`levels`, `max-endpoints`/`max-selectors`, encode none, color assign/convert). UASTC RDO sub-flags are stored at their defaults but emitted only when `--uastc-rdo` is on. Documented in [AGENTS.md](../AGENTS.md).
+
+**Why:** Placeholders looked like defaults but left `null`/`None`, so enablement gates and argv disagreed with what the user saw. Real defaults match the tool and keep dependent controls honest.

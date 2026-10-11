@@ -110,7 +110,7 @@ Supercompression:
 
 ### Options that must appear in the UI
 
-Every option below is visible. Options that the current codec, format, or texture shape cannot use stay visible and disabled, with the reason from the tool docs (for example "ignored unless UASTC is selected", "cannot be used with raw"). Defaults match the tool.
+Every option below is available in the UI. Options the current codec, format, or texture shape cannot use are **hidden** (not shown disabled). Whole option panels hide when every control inside is unavailable. Dependent detail controls follow enable-then-reveal: the master switch stays visible when it can be used; linked options appear only while that feature applies (for example mipmap filter controls only after generate-mipmap, scale, width, or height). Each control has a short tooltip from the tool docs. Defaults match the tool.
 
 **Container**
 

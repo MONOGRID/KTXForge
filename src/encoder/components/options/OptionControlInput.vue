@@ -71,6 +71,7 @@ function onBoolUpdate(checked: boolean): void {
     v-if="field.kind === 'enum'"
     :model-value="field.get()"
     :options="enumOptions"
+    :empty-label="field.emptyLabel"
     @update:model-value="onEnumUpdate"
   />
   <Input
@@ -79,6 +80,7 @@ function onBoolUpdate(checked: boolean): void {
     type="number"
     class="h-8 font-mono"
     :step="field.step"
+    :placeholder="field.placeholder"
     :model-value="numberDisplay"
     @update:model-value="onNumberUpdate"
   />
@@ -88,8 +90,8 @@ function onBoolUpdate(checked: boolean): void {
     type="text"
     maxlength="4"
     spellcheck="false"
-    placeholder="rgba"
     class="h-8 font-mono"
+    :placeholder="field.placeholder"
     :model-value="textDisplay"
     @update:model-value="onTextUpdate"
   />

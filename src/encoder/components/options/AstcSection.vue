@@ -1,11 +1,15 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import type { AstcQuality } from "../../../bindings/AstcQuality";
+import type { OptionKey } from "../../../bindings/OptionKey";
 import { Switch } from "@/components/ui/switch";
 import EnumSelect from "../../../shared/components/EnumSelect.vue";
 import OptionField from "../../../shared/components/OptionField.vue";
 import Panel from "../../../shared/components/Panel.vue";
 import { fieldState, store } from "../../store";
+import { anyEnabled } from "./optionControls";
+
+const KEYS = ["astc-quality", "astc-perceptual"] as const satisfies readonly OptionKey[];
 
 const qualityLabels = {
   fastest: "Fastest (0)",
@@ -44,7 +48,10 @@ function pickQuality(value: string | null): void {
 </script>
 
 <template>
-  <Panel title="ASTC">
+  <Panel
+    v-if="anyEnabled(KEYS)"
+    title="ASTC"
+  >
     <OptionField
       label="ASTC quality"
       option-key="astc-quality"
@@ -53,7 +60,7 @@ function pickQuality(value: string | null): void {
       <EnumSelect
         :model-value="store.options.astc.astcQuality"
         :options="qualityChoices"
-        empty-label="Default (medium)"
+        :empty-label="false"
         @update:model-value="pickQuality"
       />
     </OptionField>

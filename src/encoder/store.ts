@@ -36,7 +36,7 @@ function emptyReport(): OptionReport {
 }
 
 /** Matches Rust `CreateOptions::default` until `initStore` replaces it. */
-function placeholderOptions(): CreateOptions {
+function interimOptions(): CreateOptions {
   return {
     format: "R8G8B8A8_SRGB",
     encode: null,
@@ -50,13 +50,13 @@ function placeholderOptions(): CreateOptions {
       runtimeMipmap: false,
       width: null,
       height: null,
-      scale: null,
+      scale: 1,
       raw: false,
     },
     filter: {
-      mipmapFilter: null,
-      mipmapFilterScale: null,
-      mipmapWrap: null,
+      mipmapFilter: "lanczos4",
+      mipmapFilterScale: 1,
+      mipmapWrap: "clamp",
     },
     color: {
       assignTf: null,
@@ -76,31 +76,31 @@ function placeholderOptions(): CreateOptions {
       normalMode: false,
     },
     basisLz: {
-      qlevel: null,
-      clevel: null,
+      qlevel: 128,
+      clevel: 1,
       maxEndpoints: null,
       maxSelectors: null,
-      endpointRdoThreshold: null,
-      selectorRdoThreshold: null,
+      endpointRdoThreshold: 1.25,
+      selectorRdoThreshold: 1.25,
       noEndpointRdo: false,
       noSelectorRdo: false,
     },
     uastcLdr: {
-      uastcQuality: null,
+      uastcQuality: 1,
       uastcRdo: false,
-      uastcRdoL: null,
-      uastcRdoD: null,
-      uastcRdoB: null,
-      uastcRdoS: null,
+      uastcRdoL: 1,
+      uastcRdoD: 4096,
+      uastcRdoB: 10,
+      uastcRdoS: 18,
       uastcRdoF: false,
       uastcRdoM: false,
     },
     astc: {
-      astcQuality: null,
+      astcQuality: "medium",
       astcPerceptual: false,
     },
     encoder: {
-      threads: null,
+      threads: 1,
       noSse: false,
       compareSsim: false,
       comparePsnr: false,
@@ -111,7 +111,7 @@ function placeholderOptions(): CreateOptions {
 
 export const store = reactive({
   sources: [] as SourceInfo[],
-  options: placeholderOptions(),
+  options: interimOptions(),
   report: emptyReport(),
   job: emptyJob(),
   animation: null as AnimationOptions | null,
@@ -141,12 +141,17 @@ watch(
   { deep: true },
 );
 
+/** Rust `describe_options` is the only source of enablement. Missing → hidden. */
 export function fieldState(key: OptionKey): FieldState {
   const found = store.report.fields.find((field) => field.key === key);
-  if (found) {
+  if (found !== undefined) {
     return found;
   }
-  return { key, enabled: true, reason: null };
+  return { key, enabled: false, reason: "waiting for option rules" };
+}
+
+export function isOptionEnabled(key: OptionKey): boolean {
+  return fieldState(key).enabled;
 }
 
 export function addSources(items: readonly SourceInfo[]): void {

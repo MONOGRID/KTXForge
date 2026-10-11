@@ -48,10 +48,7 @@ pub fn exit_meaning(code: i32) -> &'static str {
 /// When cancelled, await so the child kill can finish. Otherwise abort — the
 /// watcher loops until the cancel flag is set, so awaiting it on the success
 /// path hangs forever (inspector stuck on "Loading…").
-async fn finish_cancel_watcher(
-    cancel_task: tauri::async_runtime::JoinHandle<()>,
-    cancelled: bool,
-) {
+async fn finish_cancel_watcher(cancel_task: tauri::async_runtime::JoinHandle<()>, cancelled: bool) {
     if cancelled {
         let _ = cancel_task.await;
     } else {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { toRef } from "vue";
+import { computed, toRef } from "vue";
 import OptionField from "../../../shared/components/OptionField.vue";
-import { fieldState } from "../../store";
+import { fieldState, isOptionEnabled } from "../../store";
 import OptionControlInput from "./OptionControlInput.vue";
 import {
   warningsForFields,
@@ -14,11 +14,15 @@ const props = defineProps<{
 
 const fieldsRef = toRef(props, "fields");
 const warningMap = warningsForFields(() => fieldsRef.value);
+
+const visibleFields = computed(() =>
+  fieldsRef.value.filter((field) => isOptionEnabled(field.key)),
+);
 </script>
 
 <template>
   <OptionField
-    v-for="field in fields"
+    v-for="field in visibleFields"
     :key="field.key"
     :label="field.label"
     :option-key="field.key"

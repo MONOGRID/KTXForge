@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import type { OptionKey } from "../../../bindings/OptionKey";
 import Panel from "../../../shared/components/Panel.vue";
 import { store } from "../../store";
 import OptionControls from "./OptionControls.vue";
@@ -9,7 +10,25 @@ import {
   texcoordOriginLabels,
   transferFunctionLabels,
 } from "./colorLabels";
-import { isLabeled, type OptionControlField } from "./optionControls";
+import { anyEnabled, isLabeled, type OptionControlField } from "./optionControls";
+
+const KEYS = [
+  "assign-tf",
+  "convert-tf",
+  "assign-primaries",
+  "convert-primaries",
+  "assign-texcoord-origin",
+  "convert-texcoord-origin",
+  "fail-on-color-conversions",
+  "warn-on-color-conversions",
+  "no-warn-on-color-conversions",
+  "fail-on-origin-changes",
+  "warn-on-origin-changes",
+  "swizzle",
+  "input-swizzle",
+  "normalize",
+  "normal-mode",
+] as const satisfies readonly OptionKey[];
 
 function setEnum<E extends string>(
   labels: Record<E, string>,
@@ -147,6 +166,7 @@ const fields: OptionControlField[] = [
     key: "swizzle",
     label: "Swizzle",
     kind: "text",
+    placeholder: "rgba",
     get: () => store.options.color.swizzle,
     set: (value) => {
       store.options.color.swizzle = value;
@@ -156,6 +176,7 @@ const fields: OptionControlField[] = [
     key: "input-swizzle",
     label: "Input swizzle",
     kind: "text",
+    placeholder: "rgba",
     get: () => store.options.color.inputSwizzle,
     set: (value) => {
       store.options.color.inputSwizzle = value;
@@ -183,7 +204,10 @@ const fields: OptionControlField[] = [
 </script>
 
 <template>
-  <Panel title="Color, orientation, channels">
+  <Panel
+    v-if="anyEnabled(KEYS)"
+    title="Color, orientation, channels"
+  >
     <OptionControls :fields="fields" />
   </Panel>
 </template>

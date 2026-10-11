@@ -1,7 +1,7 @@
 import { computed, type ComputedRef } from "vue";
 import type { OptionKey } from "../../../bindings/OptionKey";
 import type { OptionWarning } from "../../../bindings/OptionWarning";
-import { store } from "../../store";
+import { isOptionEnabled, store } from "../../store";
 
 type BoolOptionField = {
   key: OptionKey;
@@ -16,6 +16,7 @@ type NumberOptionField = {
   label: string;
   kind: "number";
   step: string;
+  placeholder?: string;
   get: () => number | null;
   set: (value: number | null) => void;
 };
@@ -25,6 +26,8 @@ type EnumOptionField = {
   label: string;
   kind: "enum";
   labels: Record<string, string>;
+  /** Omit / `false` = no empty choice (field has a real default). */
+  emptyLabel?: string | false;
   get: () => string | null;
   set: (value: string | null) => void;
 };
@@ -33,6 +36,8 @@ type TextOptionField = {
   key: OptionKey;
   label: string;
   kind: "text";
+  /** Format hint only (e.g. `rgba`); never a stand-in for a default value. */
+  placeholder?: string;
   get: () => string | null;
   set: (value: string | null) => void;
 };
@@ -73,6 +78,10 @@ export function warningsForFields(
   return computed(() =>
     collectWarnings(new Set(fields().map((field) => field.key))),
   );
+}
+
+export function anyEnabled(keys: readonly OptionKey[]): boolean {
+  return keys.some((key) => isOptionEnabled(key));
 }
 
 export function enumEntries(

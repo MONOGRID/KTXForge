@@ -1,13 +1,18 @@
 <script setup lang="ts">
-import { computed, useId } from "vue";
+import { computed, useId, watch } from "vue";
+import type { OptionKey } from "../../../bindings/OptionKey";
 import type { Supercompression } from "../../../bindings/Supercompression";
 import { Input } from "@/components/ui/input";
 import EnumSelect from "../../../shared/components/EnumSelect.vue";
 import OptionField from "../../../shared/components/OptionField.vue";
 import Panel from "../../../shared/components/Panel.vue";
+import Tooltip from "../../../shared/components/Tooltip.vue";
 import { fieldState, store } from "../../store";
+import { anyEnabled } from "./optionControls";
 
 type Kind = Supercompression["kind"];
+
+const KEYS = ["zstd", "zlib"] as const satisfies readonly OptionKey[];
 
 const schemeLabels = {
   none: "None",
@@ -15,17 +20,31 @@ const schemeLabels = {
   zlib: "Zlib",
 } satisfies Record<Kind, string>;
 
-const schemes = (["none", "zstd", "zlib"] as const).map((value) => ({
-  value,
-  label: schemeLabels[value],
-}));
-
 const FALLBACK_ZSTD = 3;
 const FALLBACK_ZLIB = 6;
 
 const schemeId = useId();
 
 const scheme = computed(() => store.options.supercompression.kind);
+
+const zstdEnabled = computed(() => fieldState("zstd").enabled);
+const zlibEnabled = computed(() => fieldState("zlib").enabled);
+
+const schemes = computed(() => {
+  const all = (["none", "zstd", "zlib"] as const).map((value) => ({
+    value,
+    label: schemeLabels[value],
+  }));
+  return all.filter((entry) => {
+    if (entry.value === "zstd") {
+      return zstdEnabled.value;
+    }
+    if (entry.value === "zlib") {
+      return zlibEnabled.value;
+    }
+    return true;
+  });
+});
 
 const zstdValue = computed(() => {
   const sc = store.options.supercompression;
@@ -40,6 +59,18 @@ const zlibValue = computed(() => {
 const scWarnings = computed(() =>
   store.report.warnings.filter((w) => w.key === "zstd" || w.key === "zlib"),
 );
+
+const panelVisible = computed(
+  () => anyEnabled(KEYS) || store.options.supercompression.kind === "none",
+);
+
+watch([zstdEnabled, zlibEnabled, scheme], ([zstdOk, zlibOk, kind]) => {
+  if (kind === "zstd" && !zstdOk) {
+    store.options.supercompression = { kind: "none" };
+  } else if (kind === "zlib" && !zlibOk) {
+    store.options.supercompression = { kind: "none" };
+  }
+});
 
 function clampInt(raw: string | number, min: number, max: number, fallback: number): number {
   const n = Number(raw);
@@ -78,13 +109,21 @@ function changeZlib(value: string | number): void {
 </script>
 
 <template>
-  <Panel title="Supercompression">
+  <Panel
+    v-if="panelVisible"
+    title="Supercompression"
+  >
     <div class="field-row">
-      <label
+      <Tooltip
+        text="Optional Zstd or Zlib supercompression after encode. Not valid with BasisLZ."
         class="label"
-        :for="schemeId"
-        title="Scheme"
-      >Scheme</label>
+      >
+        <label
+          class="min-w-0 cursor-pointer truncate"
+          :for="schemeId"
+          title="Scheme"
+        >Scheme</label>
+      </Tooltip>
       <div class="min-w-0 flex-1">
         <EnumSelect
           :id="schemeId"
@@ -96,6 +135,7 @@ function changeZlib(value: string | number): void {
       </div>
     </div>
     <OptionField
+      v-if="scheme === 'zstd'"
       v-slot="{ controlId }"
       label="Zstd level"
       option-key="zstd"
@@ -109,11 +149,11 @@ function changeZlib(value: string | number): void {
         max="22"
         step="1"
         :model-value="zstdValue"
-        :disabled="scheme === 'zlib'"
         @update:model-value="changeZstd"
       />
     </OptionField>
     <OptionField
+      v-if="scheme === 'zlib'"
       v-slot="{ controlId }"
       label="Zlib level"
       option-key="zlib"
@@ -127,7 +167,6 @@ function changeZlib(value: string | number): void {
         max="9"
         step="1"
         :model-value="zlibValue"
-        :disabled="scheme === 'zstd'"
         @update:model-value="changeZlib"
       />
     </OptionField>

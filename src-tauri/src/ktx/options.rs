@@ -421,7 +421,7 @@ impl OptionKey {
     }
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "camelCase")]
 pub struct ContainerOptions {
@@ -438,13 +438,41 @@ pub struct ContainerOptions {
     pub raw: bool,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
+impl Default for ContainerOptions {
+    fn default() -> Self {
+        Self {
+            one_d: false,
+            cubemap: false,
+            layers: None,
+            depth: None,
+            levels: None,
+            generate_mipmap: false,
+            runtime_mipmap: false,
+            width: None,
+            height: None,
+            scale: Some(1.0),
+            raw: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "camelCase")]
 pub struct FilterOptions {
     pub mipmap_filter: Option<MipmapFilter>,
     pub mipmap_filter_scale: Option<f32>,
     pub mipmap_wrap: Option<MipmapWrap>,
+}
+
+impl Default for FilterOptions {
+    fn default() -> Self {
+        Self {
+            mipmap_filter: Some(MipmapFilter::Lanczos4),
+            mipmap_filter_scale: Some(1.0),
+            mipmap_wrap: Some(MipmapWrap::Clamp),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
@@ -468,7 +496,7 @@ pub struct ColorOptions {
     pub normal_mode: bool,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "camelCase")]
 pub struct BasisLzOptions {
@@ -482,7 +510,22 @@ pub struct BasisLzOptions {
     pub no_selector_rdo: bool,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
+impl Default for BasisLzOptions {
+    fn default() -> Self {
+        Self {
+            qlevel: Some(128),
+            clevel: Some(1),
+            max_endpoints: None,
+            max_selectors: None,
+            endpoint_rdo_threshold: Some(1.25),
+            selector_rdo_threshold: Some(1.25),
+            no_endpoint_rdo: false,
+            no_selector_rdo: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "camelCase")]
 pub struct UastcLdrOptions {
@@ -496,7 +539,22 @@ pub struct UastcLdrOptions {
     pub uastc_rdo_m: bool,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
+impl Default for UastcLdrOptions {
+    fn default() -> Self {
+        Self {
+            uastc_quality: Some(1),
+            uastc_rdo: false,
+            uastc_rdo_l: Some(1.0),
+            uastc_rdo_d: Some(4096),
+            uastc_rdo_b: Some(10.0),
+            uastc_rdo_s: Some(18.0),
+            uastc_rdo_f: false,
+            uastc_rdo_m: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "camelCase")]
 pub struct AstcOptions {
@@ -504,7 +562,16 @@ pub struct AstcOptions {
     pub astc_perceptual: bool,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize, TS)]
+impl Default for AstcOptions {
+    fn default() -> Self {
+        Self {
+            astc_quality: Some(AstcQuality::Medium),
+            astc_perceptual: false,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "camelCase")]
 pub struct EncoderOptions {
@@ -512,6 +579,23 @@ pub struct EncoderOptions {
     pub no_sse: bool,
     pub compare_ssim: bool,
     pub compare_psnr: bool,
+}
+
+fn default_thread_count() -> u32 {
+    std::thread::available_parallelism()
+        .map(|n| u32::try_from(n.get()).unwrap_or(1))
+        .unwrap_or(1)
+}
+
+impl Default for EncoderOptions {
+    fn default() -> Self {
+        Self {
+            threads: Some(default_thread_count()),
+            no_sse: false,
+            compare_ssim: false,
+            compare_psnr: false,
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, TS)]

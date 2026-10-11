@@ -1,15 +1,24 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import type { OptionKey } from "../../../bindings/OptionKey";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import OptionField from "../../../shared/components/OptionField.vue";
 import Panel from "../../../shared/components/Panel.vue";
 import { fieldState, store } from "../../store";
+import { anyEnabled } from "./optionControls";
+
+const KEYS = [
+  "threads",
+  "no-sse",
+  "compare-ssim",
+  "compare-psnr",
+] as const satisfies readonly OptionKey[];
 
 const encoder = computed(() => store.options.encoder);
 
 const flagWarnings = computed(() => {
-  const keys = new Set(["threads", "no-sse", "compare-ssim", "compare-psnr"]);
+  const keys = new Set<string>(KEYS);
   return store.report.warnings.filter(
     (w) => w.key !== null && keys.has(w.key),
   );
@@ -27,7 +36,10 @@ function writeThreads(value: string | number): void {
 </script>
 
 <template>
-  <Panel title="Encoder flags">
+  <Panel
+    v-if="anyEnabled(KEYS)"
+    title="Encoder flags"
+  >
     <OptionField
       v-slot="{ controlId }"
       label="Threads"
@@ -41,7 +53,6 @@ function writeThreads(value: string | number): void {
         min="1"
         step="1"
         :model-value="encoder.threads === null ? '' : String(encoder.threads)"
-        placeholder="tool default"
         @update:model-value="writeThreads"
       />
     </OptionField>

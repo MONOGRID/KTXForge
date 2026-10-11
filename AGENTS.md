@@ -9,6 +9,12 @@ Before choosing or changing an approach for this app, read these:
 
 Rust owns the heavy work: file conversion, process control, parsing, image preparation, and anything that encodes, decodes, or shells out. Vue, TypeScript, and HTML only render controls, previews, progress, and inspector data. The frontend calls Tauri commands and listens for events. It does not encode, decode, parse KTX, or build a command line.
 
+## Encoder option defaults (no placeholders)
+
+When `ktx create` (or this app) has a known default for an option, put that value in `CreateOptions::default` / the store as a real value. Do **not** leave the field unset and show the default as an input `placeholder`, `empty-label` like “Default (medium)”, or “tool default”.
+
+This matters especially when other options’ enablement depends on the value being set (for example `scale: 1` unlocks mipmap filter controls). Placeholders are only for format hints on fields that truly have no default (for example swizzle pattern `rgba` when the flag is omitted). Unset (`null` / `None`) means “omit the flag”, not “pretend the default is visible”.
+
 ## TypeScript
 
 `strict` stays on. Write types the checker can prove.

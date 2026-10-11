@@ -6,6 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import OptionField from "../../../shared/components/OptionField.vue";
 import Panel from "../../../shared/components/Panel.vue";
 import { fieldState, store } from "../../store";
+import { anyEnabled } from "./optionControls";
 
 const KEYS = [
   "qlevel",
@@ -44,7 +45,10 @@ function shown(value: number | null): string {
 </script>
 
 <template>
-  <Panel title="BasisLZ">
+  <Panel
+    v-if="anyEnabled(KEYS)"
+    title="BasisLZ"
+  >
     <OptionField
       v-slot="{ controlId }"
       label="Quality level"
@@ -59,7 +63,6 @@ function shown(value: number | null): string {
         max="255"
         step="1"
         :model-value="shown(basis.qlevel)"
-        placeholder="tool default"
         @update:model-value="store.options.basisLz.qlevel = readOptional($event, true)"
       />
     </OptionField>
@@ -77,7 +80,6 @@ function shown(value: number | null): string {
         max="6"
         step="1"
         :model-value="shown(basis.clevel)"
-        placeholder="tool default"
         @update:model-value="store.options.basisLz.clevel = readOptional($event, true)"
       />
     </OptionField>
@@ -95,7 +97,6 @@ function shown(value: number | null): string {
         max="16128"
         step="1"
         :model-value="shown(basis.maxEndpoints)"
-        placeholder="tool default"
         @update:model-value="store.options.basisLz.maxEndpoints = readOptional($event, true)"
       />
     </OptionField>
@@ -113,7 +114,6 @@ function shown(value: number | null): string {
         max="16128"
         step="1"
         :model-value="shown(basis.maxSelectors)"
-        placeholder="tool default"
         @update:model-value="store.options.basisLz.maxSelectors = readOptional($event, true)"
       />
     </OptionField>
@@ -131,7 +131,6 @@ function shown(value: number | null): string {
         max="3"
         step="0.05"
         :model-value="shown(basis.endpointRdoThreshold)"
-        placeholder="tool default"
         @update:model-value="store.options.basisLz.endpointRdoThreshold = readOptional($event, false)"
       />
     </OptionField>
@@ -149,7 +148,6 @@ function shown(value: number | null): string {
         max="3"
         step="0.05"
         :model-value="shown(basis.selectorRdoThreshold)"
-        placeholder="tool default"
         @update:model-value="store.options.basisLz.selectorRdoThreshold = readOptional($event, false)"
       />
     </OptionField>

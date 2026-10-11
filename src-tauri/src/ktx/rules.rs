@@ -34,7 +34,6 @@ pub fn validate(opts: &CreateOptions) -> Result<(), Vec<String>> {
     reject_zlib_with_basis_lz(opts, &mut errors);
     reject_generate_mipmap_constraints(opts, &mut errors);
     reject_runtime_vs_generate(opts, &mut errors);
-    reject_scale_with_raw(opts, &mut errors);
     reject_raw_missing_size(opts, &mut errors);
     reject_convert_tf_with_raw(opts, &mut errors);
     reject_convert_primaries_with_raw(opts, &mut errors);
@@ -50,82 +49,126 @@ pub fn validate(opts: &CreateOptions) -> Result<(), Vec<String>> {
     }
 }
 
-fn field_enabled(opts: &CreateOptions, key: OptionKey) -> (bool, Option<String>) {
+/// Atomic facts about [`CreateOptions`], composed with [`Pred::Any`] / [`Pred::Not`].
+/// AND across conditions is multiple [`Gate`]s on one key (each with its own reason).
+#[derive(Clone, Copy)]
+enum Pred {
+    Raw,
+    OneD,
+    Cubemap,
+    DepthSet,
+    GenerateMipmap,
+    RuntimeMipmap,
+    ScaleSet,
+    WidthSet,
+    HeightSet,
+    UastcRdo,
+    EncodeBasisLz,
+    EncodeUastc,
+    EncodeSet,
+    AstcFormat,
+    SintOrUintFormat,
+    AssignPrimariesNone,
+    Not(&'static Pred),
+    Any(&'static [Pred]),
+}
+
+/// One must-hold condition. All gates for a key must pass; first failure supplies `reason`.
+#[derive(Clone, Copy)]
+struct Gate {
+    pred: Pred,
+    reason: &'static str,
+}
+
+const NOT_RAW: Pred = Pred::Not(&Pred::Raw);
+const NOT_ENCODE_BASIS_LZ: Pred = Pred::Not(&Pred::EncodeBasisLz);
+const NOT_GENERATE_MIPMAP: Pred = Pred::Not(&Pred::GenerateMipmap);
+const NOT_RUNTIME_MIPMAP: Pred = Pred::Not(&Pred::RuntimeMipmap);
+const NOT_ONE_D: Pred = Pred::Not(&Pred::OneD);
+const NOT_CUBEMAP: Pred = Pred::Not(&Pred::Cubemap);
+const NOT_DEPTH_SET: Pred = Pred::Not(&Pred::DepthSet);
+const NOT_SINT_OR_UINT: Pred = Pred::Not(&Pred::SintOrUintFormat);
+const NOT_ASSIGN_PRIMARIES_NONE: Pred = Pred::Not(&Pred::AssignPrimariesNone);
+
+const CUBEMAP_OR_DEPTH: &[Pred] = &[Pred::Cubemap, Pred::DepthSet];
+const ONE_D_OR_DEPTH: &[Pred] = &[Pred::OneD, Pred::DepthSet];
+const ONE_D_OR_CUBEMAP: &[Pred] = &[Pred::OneD, Pred::Cubemap];
+const NOT_CUBEMAP_OR_DEPTH: Pred = Pred::Not(&Pred::Any(CUBEMAP_OR_DEPTH));
+const NOT_ONE_D_OR_DEPTH: Pred = Pred::Not(&Pred::Any(ONE_D_OR_DEPTH));
+const NOT_ONE_D_OR_CUBEMAP: Pred = Pred::Not(&Pred::Any(ONE_D_OR_CUBEMAP));
+
+const RESAMPLE: &[Pred] = &[
+    Pred::GenerateMipmap,
+    Pred::ScaleSet,
+    Pred::WidthSet,
+    Pred::HeightSet,
+];
+const RESAMPLE_ANY: Pred = Pred::Any(RESAMPLE);
+
+const BASIS_OR_UASTC: &[Pred] = &[Pred::EncodeBasisLz, Pred::EncodeUastc];
+const BASIS_OR_UASTC_ANY: Pred = Pred::Any(BASIS_OR_UASTC);
+
+const ENCODE_OR_ASTC: &[Pred] = &[Pred::EncodeSet, Pred::AstcFormat];
+const ENCODE_OR_ASTC_ANY: Pred = Pred::Any(ENCODE_OR_ASTC);
+
+fn gates(key: OptionKey) -> &'static [Gate] {
     match key {
-        // "--zstd <1-22> — not valid with BasisLZ."
-        OptionKey::Zstd => disable_if(
-            opts.encode == Some(EncodeCodec::BasisLz),
-            "not valid with BasisLZ",
-        ),
-        // "--zlib <1-9> — not valid with BasisLZ."
-        OptionKey::Zlib => disable_if(
-            opts.encode == Some(EncodeCodec::BasisLz),
-            "not valid with BasisLZ",
-        ),
-        // "--generate-mipmap … cannot be used with SINT, UINT or 3D textures or --raw."
-        OptionKey::GenerateMipmap => {
-            if opts.container.raw {
-                return (false, Some("cannot be used with raw".to_owned()));
-            }
-            if opts.container.depth.is_some() {
-                return (false, Some("not valid for 3D textures".to_owned()));
-            }
-            if is_sint_or_uint(opts.format) {
-                return (false, Some("not valid for SINT or UINT formats".to_owned()));
-            }
-            if opts.container.runtime_mipmap {
-                return (
-                    false,
-                    Some("mutually exclusive with --runtime-mipmap".to_owned()),
-                );
-            }
-            (true, None)
+        OptionKey::Zstd | OptionKey::Zlib => &[Gate {
+            pred: NOT_ENCODE_BASIS_LZ,
+            reason: "not valid with BasisLZ",
+        }],
+        OptionKey::GenerateMipmap => &[
+            Gate {
+                pred: NOT_RAW,
+                reason: "cannot be used with raw",
+            },
+            Gate {
+                pred: NOT_DEPTH_SET,
+                reason: "not valid for 3D textures",
+            },
+            Gate {
+                pred: NOT_SINT_OR_UINT,
+                reason: "not valid for SINT or UINT formats",
+            },
+            Gate {
+                pred: NOT_RUNTIME_MIPMAP,
+                reason: "mutually exclusive with --runtime-mipmap",
+            },
+        ],
+        OptionKey::RuntimeMipmap => &[Gate {
+            pred: NOT_GENERATE_MIPMAP,
+            reason: "mutually exclusive with --generate-mipmap",
+        }],
+        OptionKey::Scale => &[Gate {
+            pred: NOT_RAW,
+            reason: "cannot be used with raw",
+        }],
+        OptionKey::MipmapFilter | OptionKey::MipmapFilterScale | OptionKey::MipmapWrap => &[
+            Gate {
+                pred: NOT_RAW,
+                reason: "ignored for raw input",
+            },
+            Gate {
+                pred: RESAMPLE_ANY,
+                reason: "ignored unless --generate-mipmap, --scale, --width or --height are specified",
+            },
+        ],
+        OptionKey::ConvertTf | OptionKey::ConvertTexcoordOrigin | OptionKey::Normalize => {
+            &[Gate {
+                pred: NOT_RAW,
+                reason: "not valid with raw",
+            }]
         }
-        // "--runtime-mipmap … Mutually exclusive with --generate-mipmap"
-        OptionKey::RuntimeMipmap => disable_if(
-            opts.container.generate_mipmap,
-            "mutually exclusive with --generate-mipmap",
-        ),
-        // "--scale … Not valid with raw"
-        OptionKey::Scale => disable_if(opts.container.raw, "cannot be used with raw"),
-        // "--width, --height … Required for raw"
-        OptionKey::Width | OptionKey::Height => (true, None),
-        // "--raw"
-        OptionKey::Raw => (true, None),
-        // Mipmap filters: "Ignored unless --generate-mipmap, --scale, --width or --height"
-        OptionKey::MipmapFilter | OptionKey::MipmapFilterScale | OptionKey::MipmapWrap => {
-            if opts.container.raw {
-                return (false, Some("ignored for raw input".to_owned()));
-            }
-            let resampling = opts.container.generate_mipmap
-                || opts.container.scale.is_some()
-                || opts.container.width.is_some()
-                || opts.container.height.is_some();
-            disable_if(
-                !resampling,
-                "ignored unless --generate-mipmap, --scale, --width or --height are specified",
-            )
-        }
-        // "--convert-tf … Not valid with raw"
-        OptionKey::ConvertTf => disable_if(opts.container.raw, "not valid with raw"),
-        // "--convert-primaries … Not valid with raw, and not valid when assigned primaries are none"
-        OptionKey::ConvertPrimaries => {
-            if opts.container.raw {
-                return (false, Some("not valid with raw".to_owned()));
-            }
-            if opts.color.assign_primaries == Some(ColorPrimaries::None) {
-                return (
-                    false,
-                    Some("not valid when assigned primaries are none".to_owned()),
-                );
-            }
-            (true, None)
-        }
-        // "--convert-texcoord-origin … Not valid with raw"
-        OptionKey::ConvertTexcoordOrigin => disable_if(opts.container.raw, "not valid with raw"),
-        // "--normalize … Not valid with raw or premultiply"
-        OptionKey::Normalize => disable_if(opts.container.raw, "not valid with raw"),
-        // BasisLZ options only with basis-lz
+        OptionKey::ConvertPrimaries => &[
+            Gate {
+                pred: NOT_RAW,
+                reason: "not valid with raw",
+            },
+            Gate {
+                pred: NOT_ASSIGN_PRIMARIES_NONE,
+                reason: "not valid when assigned primaries are none",
+            },
+        ],
         OptionKey::Qlevel
         | OptionKey::Clevel
         | OptionKey::MaxEndpoints
@@ -133,60 +176,57 @@ fn field_enabled(opts: &CreateOptions, key: OptionKey) -> (bool, Option<String>)
         | OptionKey::EndpointRdoThreshold
         | OptionKey::SelectorRdoThreshold
         | OptionKey::NoEndpointRdo
-        | OptionKey::NoSelectorRdo => disable_if(
-            opts.encode != Some(EncodeCodec::BasisLz),
-            "ignored unless BasisLZ is selected",
-        ),
-        // "--max-endpoints … Takes effect only together with --max-selectors"
-        // (still enabled when BasisLZ; informational in reason when only one set — kept enabled)
-        // UASTC LDR options
-        OptionKey::UastcQuality | OptionKey::UastcRdo => disable_if(
-            opts.encode != Some(EncodeCodec::Uastc),
-            "ignored unless UASTC is selected",
-        ),
+        | OptionKey::NoSelectorRdo => &[Gate {
+            pred: Pred::EncodeBasisLz,
+            reason: "ignored unless BasisLZ is selected",
+        }],
+        OptionKey::UastcQuality | OptionKey::UastcRdo => &[Gate {
+            pred: Pred::EncodeUastc,
+            reason: "ignored unless UASTC is selected",
+        }],
         OptionKey::UastcRdoL
         | OptionKey::UastcRdoD
         | OptionKey::UastcRdoB
         | OptionKey::UastcRdoS
         | OptionKey::UastcRdoF
-        | OptionKey::UastcRdoM => {
-            if opts.encode != Some(EncodeCodec::Uastc) {
-                return (false, Some("ignored unless UASTC is selected".to_owned()));
-            }
-            disable_if(
-                !opts.uastc_ldr.uastc_rdo,
-                "ignored unless --uastc-rdo is enabled",
-            )
-        }
-        // ASTC options when format is ASTC
-        OptionKey::AstcQuality | OptionKey::AstcPerceptual => disable_if(
-            !is_astc_format(opts.format),
-            "ignored unless an ASTC format is selected",
-        ),
-        // "--no-sse — BasisLZ and UASTC only"
-        OptionKey::NoSse => disable_if(
-            !matches!(opts.encode, Some(EncodeCodec::BasisLz | EncodeCodec::Uastc)),
-            "BasisLZ and UASTC only",
-        ),
-        // "--compare-ssim / --compare-psnr — Requires Basis-LZ, UASTC or ASTC encoding"
-        OptionKey::CompareSsim | OptionKey::ComparePsnr => {
-            let ok = opts.encode.is_some() || is_astc_format(opts.format);
-            disable_if(!ok, "requires BasisLZ, UASTC, or ASTC encoding")
-        }
-        // Cubemap vs 1d vs depth — soft disable for conflicting shapes
-        OptionKey::OneD => disable_if(
-            opts.container.cubemap || opts.container.depth.is_some(),
-            "not valid with cubemap or 3D",
-        ),
-        OptionKey::Cubemap => disable_if(
-            opts.container.one_d || opts.container.depth.is_some(),
-            "not valid with 1D or 3D",
-        ),
-        OptionKey::Depth => disable_if(
-            opts.container.one_d || opts.container.cubemap,
-            "not valid with 1D or cubemap",
-        ),
-        OptionKey::Layers
+        | OptionKey::UastcRdoM => &[
+            Gate {
+                pred: Pred::EncodeUastc,
+                reason: "ignored unless UASTC is selected",
+            },
+            Gate {
+                pred: Pred::UastcRdo,
+                reason: "ignored unless --uastc-rdo is enabled",
+            },
+        ],
+        OptionKey::AstcQuality | OptionKey::AstcPerceptual => &[Gate {
+            pred: Pred::AstcFormat,
+            reason: "ignored unless an ASTC format is selected",
+        }],
+        OptionKey::NoSse => &[Gate {
+            pred: BASIS_OR_UASTC_ANY,
+            reason: "BasisLZ and UASTC only",
+        }],
+        OptionKey::CompareSsim | OptionKey::ComparePsnr => &[Gate {
+            pred: ENCODE_OR_ASTC_ANY,
+            reason: "requires BasisLZ, UASTC, or ASTC encoding",
+        }],
+        OptionKey::OneD => &[Gate {
+            pred: NOT_CUBEMAP_OR_DEPTH,
+            reason: "not valid with cubemap or 3D",
+        }],
+        OptionKey::Cubemap => &[Gate {
+            pred: NOT_ONE_D_OR_DEPTH,
+            reason: "not valid with 1D or 3D",
+        }],
+        OptionKey::Depth => &[Gate {
+            pred: NOT_ONE_D_OR_CUBEMAP,
+            reason: "not valid with 1D or cubemap",
+        }],
+        OptionKey::Width
+        | OptionKey::Height
+        | OptionKey::Raw
+        | OptionKey::Layers
         | OptionKey::Levels
         | OptionKey::AssignTf
         | OptionKey::AssignPrimaries
@@ -201,15 +241,39 @@ fn field_enabled(opts: &CreateOptions, key: OptionKey) -> (bool, Option<String>)
         | OptionKey::NormalMode
         | OptionKey::Format
         | OptionKey::Encode
-        | OptionKey::Threads => (true, None),
+        | OptionKey::Threads => &[],
     }
 }
 
-fn disable_if(cond: bool, reason: &str) -> (bool, Option<String>) {
-    if cond {
-        (false, Some(reason.to_owned()))
-    } else {
-        (true, None)
+fn field_enabled(opts: &CreateOptions, key: OptionKey) -> (bool, Option<String>) {
+    for gate in gates(key) {
+        if !eval_pred(gate.pred, opts) {
+            return (false, Some(gate.reason.to_owned()));
+        }
+    }
+    (true, None)
+}
+
+fn eval_pred(pred: Pred, opts: &CreateOptions) -> bool {
+    match pred {
+        Pred::Raw => opts.container.raw,
+        Pred::OneD => opts.container.one_d,
+        Pred::Cubemap => opts.container.cubemap,
+        Pred::DepthSet => opts.container.depth.is_some(),
+        Pred::GenerateMipmap => opts.container.generate_mipmap,
+        Pred::RuntimeMipmap => opts.container.runtime_mipmap,
+        Pred::ScaleSet => opts.container.scale.is_some(),
+        Pred::WidthSet => opts.container.width.is_some(),
+        Pred::HeightSet => opts.container.height.is_some(),
+        Pred::UastcRdo => opts.uastc_ldr.uastc_rdo,
+        Pred::EncodeBasisLz => opts.encode == Some(EncodeCodec::BasisLz),
+        Pred::EncodeUastc => opts.encode == Some(EncodeCodec::Uastc),
+        Pred::EncodeSet => opts.encode.is_some(),
+        Pred::AstcFormat => is_astc_format(opts.format),
+        Pred::SintOrUintFormat => is_sint_or_uint(opts.format),
+        Pred::AssignPrimariesNone => opts.color.assign_primaries == Some(ColorPrimaries::None),
+        Pred::Not(inner) => !eval_pred(*inner, opts),
+        Pred::Any(parts) => parts.iter().any(|p| eval_pred(*p, opts)),
     }
 }
 
@@ -407,13 +471,6 @@ fn reject_runtime_vs_generate(opts: &CreateOptions, errors: &mut Vec<String>) {
     }
 }
 
-fn reject_scale_with_raw(opts: &CreateOptions, errors: &mut Vec<String>) {
-    // "Not valid with raw"
-    if opts.container.raw && opts.container.scale.is_some() {
-        errors.push("--scale cannot be used with --raw".to_owned());
-    }
-}
-
 fn reject_raw_missing_size(opts: &CreateOptions, errors: &mut Vec<String>) {
     // "Width and height required" for raw
     if opts.container.raw && (opts.container.width.is_none() || opts.container.height.is_none()) {
@@ -588,14 +645,13 @@ mod tests {
 
     #[test]
     fn scale_not_with_raw() {
-        // "Not valid with raw"
+        // "Not valid with raw" — soft-disabled; default scale may remain but is not emitted.
         let mut o = opts();
         o.container.raw = true;
         o.container.width = Some(8);
         o.container.height = Some(8);
         assert!(!field(&report(&o), OptionKey::Scale).enabled);
-        o.container.scale = Some(2.0);
-        assert!(validate(&o).is_err());
+        assert!(validate(&o).is_ok());
     }
 
     #[test]
@@ -683,10 +739,14 @@ mod tests {
     #[test]
     fn mipmap_filters_ignored_unless_resampling() {
         // "Ignored unless --generate-mipmap, --scale, --width or --height"
-        let o = opts();
-        assert!(!field(&report(&o), OptionKey::MipmapFilter).enabled);
+        // Default scale is 1.0, so filters start enabled; clear scale to test the gate.
         let mut o = opts();
+        o.container.scale = None;
+        assert!(!field(&report(&o), OptionKey::MipmapFilter).enabled);
         o.container.generate_mipmap = true;
+        assert!(field(&report(&o), OptionKey::MipmapFilter).enabled);
+        let o = opts();
+        assert_eq!(o.container.scale, Some(1.0));
         assert!(field(&report(&o), OptionKey::MipmapFilter).enabled);
     }
 

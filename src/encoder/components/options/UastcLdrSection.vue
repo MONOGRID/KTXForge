@@ -6,6 +6,7 @@ import { Switch } from "@/components/ui/switch";
 import OptionField from "../../../shared/components/OptionField.vue";
 import Panel from "../../../shared/components/Panel.vue";
 import { fieldState, store } from "../../store";
+import { anyEnabled } from "./optionControls";
 
 const UASTC_KEYS = [
   "uastc-quality",
@@ -47,7 +48,10 @@ function textOrEmpty(value: number | null): string {
 </script>
 
 <template>
-  <Panel title="UASTC LDR">
+  <Panel
+    v-if="anyEnabled(UASTC_KEYS)"
+    title="UASTC LDR"
+  >
     <OptionField
       v-slot="{ controlId }"
       label="UASTC quality"
@@ -62,7 +66,6 @@ function textOrEmpty(value: number | null): string {
         max="4"
         step="1"
         :model-value="textOrEmpty(ldr.uastcQuality)"
-        placeholder="tool default"
         @update:model-value="store.options.uastcLdr.uastcQuality = optionalIntFromValue($event)"
       />
     </OptionField>
@@ -93,7 +96,6 @@ function textOrEmpty(value: number | null): string {
         max="10"
         step="0.001"
         :model-value="textOrEmpty(ldr.uastcRdoL)"
-        placeholder="tool default"
         @update:model-value="store.options.uastcLdr.uastcRdoL = optionalFromValue($event)"
       />
     </OptionField>
@@ -111,7 +113,6 @@ function textOrEmpty(value: number | null): string {
         max="65536"
         step="1"
         :model-value="textOrEmpty(ldr.uastcRdoD)"
-        placeholder="tool default"
         @update:model-value="store.options.uastcLdr.uastcRdoD = optionalIntFromValue($event)"
       />
     </OptionField>
@@ -129,7 +130,6 @@ function textOrEmpty(value: number | null): string {
         max="300"
         step="1"
         :model-value="textOrEmpty(ldr.uastcRdoB)"
-        placeholder="tool default"
         @update:model-value="store.options.uastcLdr.uastcRdoB = optionalFromValue($event)"
       />
     </OptionField>
@@ -147,7 +147,6 @@ function textOrEmpty(value: number | null): string {
         max="65536"
         step="0.01"
         :model-value="textOrEmpty(ldr.uastcRdoS)"
-        placeholder="tool default"
         @update:model-value="store.options.uastcLdr.uastcRdoS = optionalFromValue($event)"
       />
     </OptionField>

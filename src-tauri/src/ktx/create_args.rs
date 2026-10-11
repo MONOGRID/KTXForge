@@ -112,21 +112,27 @@ pub fn build_create_args(
         push_flag_value(&mut args, "--height", &height.to_string());
     }
     if let Some(scale) = c.scale {
-        push_flag_value(&mut args, "--scale", &fmt_f32(scale));
+        // Scale is disabled for raw; keep the UI default without emitting a conflict.
+        if !c.raw {
+            push_flag_value(&mut args, "--scale", &fmt_f32(scale));
+        }
     }
     if c.raw {
         args.push("--raw".to_owned());
     }
 
     let f = &opts.filter;
-    if let Some(filter) = f.mipmap_filter {
-        push_flag_value(&mut args, "--mipmap-filter", filter.cli());
-    }
-    if let Some(scale) = f.mipmap_filter_scale {
-        push_flag_value(&mut args, "--mipmap-filter-scale", &fmt_f32(scale));
-    }
-    if let Some(wrap) = f.mipmap_wrap {
-        push_flag_value(&mut args, "--mipmap-wrap", wrap.cli());
+    // Filter flags are ignored for raw; keep UI defaults without emitting them.
+    if !c.raw {
+        if let Some(filter) = f.mipmap_filter {
+            push_flag_value(&mut args, "--mipmap-filter", filter.cli());
+        }
+        if let Some(scale) = f.mipmap_filter_scale {
+            push_flag_value(&mut args, "--mipmap-filter-scale", &fmt_f32(scale));
+        }
+        if let Some(wrap) = f.mipmap_wrap {
+            push_flag_value(&mut args, "--mipmap-wrap", wrap.cli());
+        }
     }
 
     let color = &opts.color;
@@ -215,24 +221,24 @@ pub fn build_create_args(
         }
         if u.uastc_rdo {
             args.push("--uastc-rdo".to_owned());
-        }
-        if let Some(v) = u.uastc_rdo_l {
-            push_flag_value(&mut args, "--uastc-rdo-l", &fmt_f32(v));
-        }
-        if let Some(v) = u.uastc_rdo_d {
-            push_flag_value(&mut args, "--uastc-rdo-d", &v.to_string());
-        }
-        if let Some(v) = u.uastc_rdo_b {
-            push_flag_value(&mut args, "--uastc-rdo-b", &fmt_f32(v));
-        }
-        if let Some(v) = u.uastc_rdo_s {
-            push_flag_value(&mut args, "--uastc-rdo-s", &fmt_f32(v));
-        }
-        if u.uastc_rdo_f {
-            args.push("--uastc-rdo-f".to_owned());
-        }
-        if u.uastc_rdo_m {
-            args.push("--uastc-rdo-m".to_owned());
+            if let Some(v) = u.uastc_rdo_l {
+                push_flag_value(&mut args, "--uastc-rdo-l", &fmt_f32(v));
+            }
+            if let Some(v) = u.uastc_rdo_d {
+                push_flag_value(&mut args, "--uastc-rdo-d", &v.to_string());
+            }
+            if let Some(v) = u.uastc_rdo_b {
+                push_flag_value(&mut args, "--uastc-rdo-b", &fmt_f32(v));
+            }
+            if let Some(v) = u.uastc_rdo_s {
+                push_flag_value(&mut args, "--uastc-rdo-s", &fmt_f32(v));
+            }
+            if u.uastc_rdo_f {
+                args.push("--uastc-rdo-f".to_owned());
+            }
+            if u.uastc_rdo_m {
+                args.push("--uastc-rdo-m".to_owned());
+            }
         }
     }
 
@@ -299,12 +305,23 @@ mod tests {
     #[test]
     fn defaults_emit_format_and_paths() {
         let opts = CreateOptions::default();
+        let threads = opts.encoder.threads.expect("default threads");
         let args = build_create_args(&opts, &[path("in.png")], Path::new("out.ktx2")).unwrap();
         assert_eq!(
             args,
             vec![
                 "--format".to_owned(),
                 "R8G8B8A8_SRGB".to_owned(),
+                "--scale".to_owned(),
+                "1".to_owned(),
+                "--mipmap-filter".to_owned(),
+                "lanczos4".to_owned(),
+                "--mipmap-filter-scale".to_owned(),
+                "1".to_owned(),
+                "--mipmap-wrap".to_owned(),
+                "clamp".to_owned(),
+                "--threads".to_owned(),
+                threads.to_string(),
                 "in.png".to_owned(),
                 "out.ktx2".to_owned(),
             ]

@@ -1,10 +1,19 @@
 <script setup lang="ts">
 import type { MipmapFilter } from "../../../bindings/MipmapFilter";
 import type { MipmapWrap } from "../../../bindings/MipmapWrap";
+import type { OptionKey } from "../../../bindings/OptionKey";
 import Panel from "../../../shared/components/Panel.vue";
 import { store } from "../../store";
 import OptionControls from "./OptionControls.vue";
-import { isLabeled, type OptionControlField } from "./optionControls";
+import { anyEnabled, isLabeled, type OptionControlField } from "./optionControls";
+
+const KEYS = [
+  "generate-mipmap",
+  "runtime-mipmap",
+  "mipmap-filter",
+  "mipmap-filter-scale",
+  "mipmap-wrap",
+] as const satisfies readonly OptionKey[];
 
 const mipmapFilterLabels = {
   box: "box",
@@ -53,10 +62,29 @@ function assignMipmapWrap(value: string | null): void {
 
 const fields: OptionControlField[] = [
   {
+    key: "generate-mipmap",
+    label: "Generate mipmaps",
+    kind: "bool",
+    get: () => store.options.container.generateMipmap,
+    set: (value) => {
+      store.options.container.generateMipmap = value;
+    },
+  },
+  {
+    key: "runtime-mipmap",
+    label: "Runtime mipmap",
+    kind: "bool",
+    get: () => store.options.container.runtimeMipmap,
+    set: (value) => {
+      store.options.container.runtimeMipmap = value;
+    },
+  },
+  {
     key: "mipmap-filter",
     label: "Mipmap filter",
     kind: "enum",
     labels: mipmapFilterLabels,
+    emptyLabel: false,
     get: () => store.options.filter.mipmapFilter,
     set: assignMipmapFilter,
   },
@@ -75,6 +103,7 @@ const fields: OptionControlField[] = [
     label: "Mipmap wrap",
     kind: "enum",
     labels: mipmapWrapLabels,
+    emptyLabel: false,
     get: () => store.options.filter.mipmapWrap,
     set: assignMipmapWrap,
   },
@@ -82,7 +111,10 @@ const fields: OptionControlField[] = [
 </script>
 
 <template>
-  <Panel title="Mipmap / resample filters">
+  <Panel
+    v-if="anyEnabled(KEYS)"
+    title="Mipmaps / resample"
+  >
     <OptionControls :fields="fields" />
   </Panel>
 </template>
