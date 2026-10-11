@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import DepthVolumeView from "../../shared/components/DepthVolumeView.vue";
 import ImageViewport from "../../shared/components/ImageViewport.vue";
 import { setDropZone } from "../dropTarget";
 import { usePreviewPane } from "../usePreviewPane";
@@ -12,6 +13,8 @@ const {
   contentHeight,
   packAxis,
   isCubemap,
+  isDepthVolume,
+  depthSourceUrls,
   result,
   packMax,
   showPackSlider,
@@ -21,6 +24,7 @@ const {
   viewportSrc,
   compareSrc,
   loading,
+  volumeLoading,
   packSliderLabel,
   generatedMipLabel,
   onPackInput,
@@ -55,7 +59,33 @@ const {
         @generated-mip-input="onGeneratedMipInput"
       />
 
+      <template v-if="isDepthVolume">
+        <div class="flex min-h-0 flex-1 flex-col gap-2">
+          <DepthVolumeView
+            :slice-urls="depthSourceUrls"
+            :active-index="previewIndex"
+            :loading="volumeLoading"
+            empty-label="Drop depth-slice images to preview the volume"
+          />
+          <ImageViewport
+            class="min-h-0 flex-1"
+            :src="viewportSrc"
+            :compare-src="compareSrc"
+            :content-width="contentWidth"
+            :content-height="contentHeight"
+            alt="Depth slice source"
+            compare-alt="Depth slice encoded"
+            :loading="loading"
+            empty-label="Select a depth slice to compare"
+            :hint="showTonemapHint"
+            original-label="Original"
+            result-label="Encoded"
+          />
+        </div>
+      </template>
+
       <ImageViewport
+        v-else
         class="min-h-0 flex-1"
         :src="viewportSrc"
         :compare-src="compareSrc"

@@ -1,7 +1,7 @@
 <script setup lang="ts">
-import { computed } from "vue";
-import { report, selection } from "../../store";
+import { computed, watch } from "vue";
 import RangeTickLabels from "../../../shared/components/RangeTickLabels.vue";
+import { report, selection } from "../../store";
 
 const FACE_LABELS = [
   "+X",
@@ -15,6 +15,9 @@ const FACE_LABELS = [
 type Dims = {
   faceCount: number;
   layerCount: number;
+  /** Base-level depth (texture is 3D when > 1). */
+  baseDepthCount: number;
+  /** Depth at the selected mip (halves each level). */
   depthCount: number;
   hasAnim: boolean;
 };
@@ -25,22 +28,28 @@ const dims = computed((): Dims | null => {
     return null;
   }
 
+  const level = selection.value.level;
+
   if (current.kind.kind === "ktx2") {
     const header = current.kind.info.header;
     const anim = current.kind.info.keyValueData.KTXanimData;
+    const baseDepthCount = Math.max(1, header.pixelDepth);
     return {
       faceCount: Math.max(1, header.faceCount),
       layerCount: Math.max(1, header.layerCount),
-      depthCount: Math.max(1, header.pixelDepth),
+      baseDepthCount,
+      depthCount: Math.max(1, baseDepthCount >> level),
       hasAnim: anim !== null,
     };
   }
 
   const header = current.kind.header;
+  const baseDepthCount = Math.max(1, header.pixelDepth);
   return {
     faceCount: Math.max(1, header.numberOfFaces),
     layerCount: Math.max(1, header.numberOfArrayElements),
-    depthCount: Math.max(1, header.pixelDepth),
+    baseDepthCount,
+    depthCount: Math.max(1, baseDepthCount >> level),
     hasAnim: false,
   };
 });
@@ -53,7 +62,7 @@ const showLayers = computed(
     dims.value !== null && dims.value.layerCount > 1 && !dims.value.hasAnim,
 );
 const showDepth = computed(
-  (): boolean => dims.value !== null && dims.value.depthCount > 1,
+  (): boolean => dims.value !== null && dims.value.baseDepthCount > 1,
 );
 const visible = computed(
   (): boolean => showFaces.value || showLayers.value || showDepth.value,
@@ -86,6 +95,18 @@ function onDepthInput(event: Event): void {
   }
   selection.value.depthSlice = Number(el.value);
 }
+
+watch(
+  () => dims.value?.depthCount,
+  (count) => {
+    if (count === undefined) {
+      return;
+    }
+    if (selection.value.depthSlice >= count) {
+      selection.value.depthSlice = Math.max(0, count - 1);
+    }
+  },
+);
 </script>
 
 <template>

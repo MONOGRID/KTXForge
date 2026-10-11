@@ -10,11 +10,24 @@ const ZOOM_STEP = 1.25;
 const MIN_SCALE = 0.05;
 const MAX_SCALE = 64;
 
+/** Sticky View sizing rule until the user picks another or zooms freely. */
+export type ZoomMode = "fit" | "actual" | "manual";
+
+/**
+ * Window-scoped sticky zoom. Survives ImageViewport remounts (e.g. depth
+ * volume vs flat) and stays put across outputs / layers / mips.
+ */
+const sharedZoomMode = ref<ZoomMode>("fit");
+const sharedManualScale = ref(1);
+const sharedPanX = ref(0);
+const sharedPanY = ref(0);
+
 export type ZoomPanApi = {
   frameRef: Ref<HTMLElement | null>;
   /** Frame content width in CSS pixels (for frame-space compare wipe). */
   frameW: Ref<number>;
   scale: ComputedRef<number>;
+  zoomMode: Ref<ZoomMode>;
   panX: Ref<number>;
   panY: Ref<number>;
   dragging: Ref<boolean>;
@@ -32,6 +45,9 @@ export type ZoomPanApi = {
 /**
  * Fit / 1:1 / stepped zoom with cursor-anchored Ctrl/Cmd+wheel and drag pan.
  * `canInteract` gates pan (and should be false while a compare handle is dragged).
+ *
+ * Fit and Actual are sticky modes: content size changes (mip/layer/output) keep
+ * the mode. Wheel / Zoom In/Out switch to manual and keep that scale.
  */
 export function useZoomPan(
   naturalWidth: Ref<number>,
@@ -41,10 +57,10 @@ export function useZoomPan(
   const frameRef = ref<HTMLElement | null>(null);
   const { width: frameW, height: frameH } = useElementSize(frameRef);
 
-  /** User-controlled scale; `null` means fit-to-frame. */
-  const userScale = ref<number | null>(null);
-  const panX = ref(0);
-  const panY = ref(0);
+  const zoomMode = sharedZoomMode;
+  const manualScale = sharedManualScale;
+  const panX = sharedPanX;
+  const panY = sharedPanY;
   const dragging = ref(false);
   const dragOrigin = ref<{
     x: number;
@@ -68,7 +84,15 @@ export function useZoomPan(
     return Math.min(availW / naturalWidth.value, availH / naturalHeight.value);
   });
 
-  const scale = computed((): number => userScale.value ?? fitScale.value);
+  const scale = computed((): number => {
+    if (zoomMode.value === "fit") {
+      return fitScale.value;
+    }
+    if (zoomMode.value === "actual") {
+      return 1;
+    }
+    return clampScale(manualScale.value);
+  });
 
   const sizeLabel = computed((): string | null => {
     if (naturalWidth.value <= 0) {
@@ -92,19 +116,20 @@ export function useZoomPan(
   }
 
   function zoomFit(): void {
-    userScale.value = null;
+    zoomMode.value = "fit";
     resetPan();
   }
 
   function zoomActual(): void {
-    userScale.value = 1;
+    zoomMode.value = "actual";
     resetPan();
   }
 
   function zoomAt(nextScale: number, originX: number, originY: number): void {
     const frame = frameRef.value;
     if (frame === null) {
-      userScale.value = clampScale(nextScale);
+      zoomMode.value = "manual";
+      manualScale.value = clampScale(nextScale);
       return;
     }
 
@@ -114,19 +139,22 @@ export function useZoomPan(
     const prev = scale.value;
     const clamped = clampScale(nextScale);
     if (prev <= 0) {
-      userScale.value = clamped;
+      zoomMode.value = "manual";
+      manualScale.value = clamped;
       return;
     }
     const ratio = clamped / prev;
     panX.value = cx - (cx - panX.value) * ratio;
     panY.value = cy - (cy - panY.value) * ratio;
-    userScale.value = clamped;
+    zoomMode.value = "manual";
+    manualScale.value = clamped;
   }
 
   function zoomBy(factor: number): void {
     const frame = frameRef.value;
     if (frame === null) {
-      userScale.value = clampScale(scale.value * factor);
+      zoomMode.value = "manual";
+      manualScale.value = clampScale(scale.value * factor);
       return;
     }
     const rect = frame.getBoundingClientRect();
@@ -197,6 +225,7 @@ export function useZoomPan(
     frameRef,
     frameW,
     scale,
+    zoomMode,
     panX,
     panY,
     dragging,

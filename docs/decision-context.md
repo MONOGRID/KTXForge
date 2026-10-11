@@ -300,3 +300,27 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 **Decided:** Encoder Preview browses **inputs** by `InputRole` immediately (layer / mip-chain / depth sliders; cubemap as a classic cross with no face slider). After encode, the same frame wipes input vs extract. When the KTX has generated mips (`levels > 1` and role is not `MipChain`), add a **Mip** slider: left stays full-res input(s), right is the extracted mip for resolution-loss compare. Cubemap uses one canvas-composited cross per side under a **single** wipe. `encoded_preview` takes `ImageSelection` and reuses the job preview-cache / `extract_preview_png`. CSS3D depth volume deferred to a follow-up plan.
 
 **Why:** Preview only showed `inputs[0]` vs L0/F0; packing roles were invisible until the inspector. Artists need to verify layers/mips/faces before and after encode without leaving the encoder, and to judge mip filter quality with the same wipe.
+
+## 2026-10-11 — DepthSlices CSS3D volume preview
+
+**Decided:** For `InputRole::DepthSlices`, Preview shows an oblique CSS 3D stack (`perspective` + `transform-style: preserve-3d`) of every source slice plane. The existing **Depth** slider highlights the active plane and drives a separate 2D wipe of that slice vs `encoded_preview` (highlighted-slice wipe, not a duplicated/clipped volume). No WebGL. Slice bitmaps still come from `source_preview` / `encoded_preview`. Generated-mip slider stays off for this role (3D + generate-mipmap is invalid). Cube arrays and raymarched volumes stay out of scope.
+
+**Why:** A single 2D depth slider hid the volume shape. A CSS stack is enough for spatial overview without a second rendering stack; keeping wipe on one slice matches the existing ImageViewport compare and avoids flattening issues from clipping a preserve-3d scene.
+
+## 2026-10-11 — Sticky View zoom mode (Fit / Actual / manual)
+
+**Decided:** `useZoomPan` keeps an explicit sticky mode: **Fit**, **Actual** (1:1), or **manual** (wheel / Zoom In/Out). View menu Fit and Actual set the mode and reset pan; they stay in force across output selection, layer/mip/depth scrubbing, and `ImageViewport` remounts (window-scoped shared state). Content size / `src` changes update pixel dimensions only — they never force Fit. In Actual mode, mip changes shrink the on-screen image (header/mip `contentWidth`/`contentHeight` own the canvas; decode sizes must not `max()` expand it). Manual mode keeps its scale factor. A later Fit/Actual choice or a free zoom replaces the previous rule.
+
+**Why:** Scrubbing layers/mips called `zoomFit()` on every size change, wiping the user's zoom. Fit/Actual from the View menu need to behave like persistent sizing rules, and Actual size is only useful for mip review if smaller levels actually appear smaller.
+
+## 2026-10-11 — Inspector CSS3D depth volume
+
+**Decided:** When an inspected KTX has `pixelDepth > 1` at the selected mip, the inspector viewer shows the shared `DepthVolumeView` stack (same CSS3D oblique planes as encoder DepthSlices Preview) above the existing 2D `ImageViewport` for the highlighted slice. All depth planes for the current level/face/layer load through `inspector_image` via a non-coalescing `ensureInspectorImageUrl` path so scrub coalescing does not drop sibling slices. `DepthVolumeView` lives under `src/shared/components`.
+
+**Why:** Encoder Preview already spatialized 3D packs; opening the same (or any) 3D KTX in the inspector still showed only one 2D slice. Reusing the shared volume view keeps both windows consistent without a second rendering stack.
+
+## 2026-10-11 — Volume orbit + shared cubemap cross
+
+**Decided:** `DepthVolumeView` supports click-drag orbit (`useOrbitDrag`: rotateX / rotateZ with clamped pitch; double-click resets). Cubemap cross compositing (`composeCubemapCross`) lives in `src/shared` and is used by both encoder Preview and inspector when `faceCount > 1`. Inspector face buttons still drive export / selection; the viewport shows the full cross, not a single face.
+
+**Why:** Artists need to tumble the depth stack to read shape, and cubemap layout should match across windows so packing and inspection use one mental model.

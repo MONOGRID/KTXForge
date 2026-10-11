@@ -237,9 +237,9 @@ The center Preview is role-aware and always starts from the selected output’s 
 | Array layers | **Layer** slider over inputs | Wipe that layer vs the matching extract; **Mip** slider when levels > 1 |
 | Mip chain | **Mip** slider over inputs | Wipe that input vs encoded level (generate-mipmap is off for this role) |
 | Cubemap faces | Classic face **cross** (empty cells if fewer than six) | Same cross on both sides of **one** wipe; **Mip** slider when levels > 1 |
-| Depth slices | **Depth** slider over inputs (2D slice) | Wipe that slice vs extract |
+| Depth slices | Oblique **CSS 3D volume** of all input slices; **Depth** slider highlights one slice | Same volume (source stack); wipe panel compares the highlighted slice vs extract |
 
-Wipe compare always shows input vs output in the same frame. When scrubbing a **generated** mip, the left side stays the full-resolution input(s) and the right side is the extracted mip so resolution loss is visible. Cubemap uses one composite cross per side under a single wipe handle (not per-face wipes).
+Wipe compare always shows input vs output in the same frame. When scrubbing a **generated** mip, the left side stays the full-resolution input(s) and the right side is the extracted mip so resolution loss is visible. Cubemap uses one composite cross per side under a single wipe handle (not per-face wipes). Depth slices use a `perspective` / `preserve-3d` stack for spatial overview (drag to orbit; double-click resets); the wipe stays a 2D compare of the highlighted slice (not a clipped duplicate volume).
 
 After a successful encode, Rust extracts viewable PNG slices (`encoded_preview` with an `ImageSelection`):
 
@@ -281,6 +281,14 @@ Extract selection uses `--level`, `--layer`, `--face`, `--depth`, or `--all`.
 ### Mipmap preview
 
 The inspector lists every mip level from the header (`levelCount` and the level index). Selecting a level extracts that level and shows it at its real pixel size and scaled up so it stays readable. Dimensions for level `i` are the base size shifted by `i`, with a minimum of 1. Cubemap faces, array layers, and 3D slices stay selectable while browsing mips.
+
+### 3D depth volume preview
+
+When `pixelDepth` at the selected mip is greater than 1, the inspector shows the same oblique **CSS 3D volume** stack as the encoder Preview (`perspective` / `preserve-3d` slice planes). The **Depth** slider highlights the active plane and the 2D viewport below shows that slice. Slice bitmaps come from `inspector_image` for each depth index at the current level / face / layer. Drag on the volume to orbit; double-click resets the angle.
+
+### Cubemap cross preview
+
+When `faceCount` is greater than 1, the inspector shows the same classic face **cross** composite as the encoder Preview (shared `composeCubemapCross`). Face buttons still set the export / subresource selection; the viewport stays on the full cross.
 
 ### Multi-frame
 

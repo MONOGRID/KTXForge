@@ -2,6 +2,7 @@
 import { computed, onUnmounted, ref, watch } from "vue";
 import { toAppError } from "../../../api/guards";
 import type { ImageSelection } from "../../../bindings/ImageSelection";
+import DepthVolumeView from "../../../shared/components/DepthVolumeView.vue";
 import ImageViewport from "../../../shared/components/ImageViewport.vue";
 import { toastAppError } from "../../../shared/toastAppError";
 import {
@@ -13,6 +14,8 @@ import {
   type SubresourceDims,
 } from "../../imageCache";
 import { path, report, selection } from "../../store";
+import { useCubemapCross } from "../../useCubemapCross";
+import { useDepthVolume } from "../../useDepthVolume";
 
 const MISS_DEBOUNCE_MS = 120;
 const PREFETCH_IDLE_MS = 200;
@@ -51,6 +54,44 @@ const errorLabel = computed((): string | null =>
   loadFailed.value ? "Failed to load image" : null,
 );
 
+function preparePath(filePath: string): void {
+  if (cachedPath.value !== null && cachedPath.value !== filePath) {
+    clearInspectorImageCache();
+  }
+  cachedPath.value = filePath;
+}
+
+const {
+  depthSliceUrls,
+  volumeLoading,
+  showDepthVolume,
+  activeDepthIndex,
+  resetVolume,
+  invalidateVolume,
+} = useDepthVolume({
+  path,
+  report,
+  selection,
+  previewUnavailable,
+  preparePath,
+});
+
+const {
+  showCubemapCross,
+  crossUrl,
+  crossWidth,
+  crossHeight,
+  crossLoading,
+  invalidateCross,
+} = useCubemapCross({
+  path,
+  report,
+  selection,
+  previewUnavailable,
+  showDepthVolume,
+  preparePath,
+});
+
 const subresourceDims = computed((): SubresourceDims | null => {
   const current = report.value;
   if (current === null) {
@@ -79,7 +120,7 @@ function mipSize(base: number, level: number): number {
 }
 
 /** Header dims for the current mip — drives fit before the PNG decode finishes. */
-const contentWidth = computed((): number | null => {
+const faceContentWidth = computed((): number | null => {
   const current = report.value;
   if (current === null) {
     return null;
@@ -91,7 +132,7 @@ const contentWidth = computed((): number | null => {
   return mipSize(current.kind.header.pixelWidth, level);
 });
 
-const contentHeight = computed((): number | null => {
+const faceContentHeight = computed((): number | null => {
   const current = report.value;
   if (current === null) {
     return null;
@@ -101,6 +142,33 @@ const contentHeight = computed((): number | null => {
     return mipSize(current.kind.info.header.pixelHeight, level);
   }
   return mipSize(current.kind.header.pixelHeight, level);
+});
+
+const viewportSrc = computed((): string | null =>
+  showCubemapCross.value ? crossUrl.value : objectUrl.value,
+);
+
+const viewportLoading = computed((): boolean =>
+  showCubemapCross.value ? crossLoading.value : loading.value,
+);
+
+const viewportWidth = computed((): number | null =>
+  showCubemapCross.value ? crossWidth.value : faceContentWidth.value,
+);
+
+const viewportHeight = computed((): number | null =>
+  showCubemapCross.value ? crossHeight.value : faceContentHeight.value,
+);
+
+const viewportAlt = computed((): string =>
+  showCubemapCross.value ? "Cubemap cross" : "KTX subresource preview",
+);
+
+const viewportHint = computed((): string | null => {
+  if (showCubemapCross.value) {
+    return tonemapHint.value ?? "Cubemap cross";
+  }
+  return tonemapHint.value;
 });
 
 function isAbortError(err: unknown): boolean {
@@ -119,13 +187,6 @@ function clearPrefetchTimer(): void {
     clearTimeout(prefetchTimer);
     prefetchTimer = null;
   }
-}
-
-function preparePath(filePath: string): void {
-  if (cachedPath.value !== null && cachedPath.value !== filePath) {
-    clearInspectorImageCache();
-  }
-  cachedPath.value = filePath;
 }
 
 function scheduleIdlePrefetch(filePath: string, sel: ImageSelection): void {
@@ -174,6 +235,8 @@ function clearViewerState(): void {
   }
   objectUrl.value = null;
   loading.value = false;
+  resetVolume();
+  invalidateCross();
 }
 
 function showCachedHit(filePath: string, sel: ImageSelection, hit: string): void {
@@ -200,8 +263,20 @@ function scheduleMissFetch(
   }, MISS_DEBOUNCE_MS);
 }
 
-function onSelectionChange(): void {
+function clearFlatPreview(): void {
+  objectUrl.value = null;
+  loading.value = false;
+}
+
+function selectionFilePath(): string | null {
   const filePath = path.value;
+  if (filePath === null || filePath === "" || report.value === null) {
+    return null;
+  }
+  return filePath;
+}
+
+function onSelectionChange(): void {
   const gen = ++fetchGen.value;
   const sel = { ...selection.value };
 
@@ -209,16 +284,17 @@ function onSelectionChange(): void {
   clearMissTimer();
   clearPrefetchTimer();
 
-  if (filePath === null || filePath === "" || report.value === null) {
+  const filePath = selectionFilePath();
+  if (filePath === null) {
     clearViewerState();
     return;
   }
 
   preparePath(filePath);
 
-  if (previewUnavailable.value !== null) {
-    objectUrl.value = null;
-    loading.value = false;
+  if (previewUnavailable.value !== null || showCubemapCross.value) {
+    // Cubemap preview is the shared cross; face buttons only affect export selection.
+    clearFlatPreview();
     return;
   }
 
@@ -240,6 +316,7 @@ watch(
       selection.value.face,
       selection.value.layer,
       selection.value.depthSlice,
+      showCubemapCross.value,
     ] as const,
   () => {
     onSelectionChange();
@@ -249,6 +326,8 @@ watch(
 
 onUnmounted(() => {
   fetchGen.value += 1;
+  invalidateVolume();
+  invalidateCross();
   clearMissTimer();
   clearPrefetchTimer();
   clearInspectorImageCache();
@@ -258,15 +337,39 @@ onUnmounted(() => {
 </script>
 
 <template>
+  <div
+    v-if="showDepthVolume"
+    class="flex h-full min-h-0 flex-col gap-2"
+  >
+    <DepthVolumeView
+      :slice-urls="depthSliceUrls"
+      :active-index="activeDepthIndex"
+      :loading="volumeLoading"
+      empty-label="No depth slices"
+    />
+    <ImageViewport
+      class="min-h-0 flex-1"
+      :src="objectUrl"
+      alt="KTX depth slice preview"
+      :loading="loading"
+      :content-width="faceContentWidth"
+      :content-height="faceContentHeight"
+      empty-label="Select a depth slice"
+      :error-label="errorLabel"
+      :unavailable-label="unavailableLabel"
+      :hint="tonemapHint"
+    />
+  </div>
   <ImageViewport
-    :src="objectUrl"
-    alt="KTX subresource preview"
-    :loading="loading"
-    :content-width="contentWidth"
-    :content-height="contentHeight"
+    v-else
+    :src="viewportSrc"
+    :alt="viewportAlt"
+    :loading="viewportLoading"
+    :content-width="viewportWidth"
+    :content-height="viewportHeight"
     empty-label="No image selected"
     :error-label="errorLabel"
     :unavailable-label="unavailableLabel"
-    :hint="tonemapHint"
+    :hint="viewportHint"
   />
 </template>

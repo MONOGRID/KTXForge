@@ -119,14 +119,14 @@ function noteNaturalSize(width: number, height: number): void {
   if (width <= 0 || height <= 0) {
     return;
   }
+  if (hasContentSize.value) {
+    // Header / mip dims own the canvas (Actual size must shrink with mips).
+    return;
+  }
   if (comparing.value) {
     // Shared canvas = max of both sides so neither is letterboxed away when sizes differ.
     naturalWidth.value = Math.max(naturalWidth.value, width);
     naturalHeight.value = Math.max(naturalHeight.value, height);
-    return;
-  }
-  if (hasContentSize.value) {
-    // Header dims already drive fit; avoid a one-frame 1:1 flash from decode.
     return;
   }
   naturalWidth.value = width;
@@ -158,13 +158,6 @@ function dimPair(
   return { w: pair[0] ?? 0, h: pair[1] ?? 0 };
 }
 
-function applyKnownContentSize(nextW: number, nextH: number, prevW: number, prevH: number): void {
-  applyContentSize();
-  if (prevW !== nextW || prevH !== nextH) {
-    zoomFit();
-  }
-}
-
 function clearNaturalSizeIfHadPrev(prevW: number, prevH: number): void {
   if (prevW > 0 || prevH > 0) {
     naturalWidth.value = 0;
@@ -179,7 +172,8 @@ function syncContentSizeProps(
   const { w: nextW, h: nextH } = dimPair(next);
   const { w: prevW, h: prevH } = dimPair(prev);
   if (nextW > 0 && nextH > 0) {
-    applyKnownContentSize(nextW, nextH, prevW, prevH);
+    // Update pixel size only — sticky zoom mode (fit / actual / manual) stays.
+    applyContentSize();
     return;
   }
   clearNaturalSizeIfHadPrev(prevW, prevH);
@@ -198,10 +192,9 @@ watch(
       applyContentSize();
       return;
     }
-    // Unknown size: hide until `@load` (fitScale is 1 while natural is 0).
+    // Unknown size: hide until `@load`. Keep zoom mode (do not force Fit).
     naturalWidth.value = 0;
     naturalHeight.value = 0;
-    zoomFit();
   },
 );
 
@@ -391,21 +384,6 @@ onUnmounted(() => {
 </template>
 
 <style lang="scss" scoped>
-.checkerboard {
-  background-color: #c0c0c0;
-  background-image:
-    linear-gradient(45deg, #808080 25%, transparent 25%),
-    linear-gradient(-45deg, #808080 25%, transparent 25%),
-    linear-gradient(45deg, transparent 75%, #808080 75%),
-    linear-gradient(-45deg, transparent 75%, #808080 75%);
-  background-size: 16px 16px;
-  background-position:
-    0 0,
-    0 8px,
-    8px -8px,
-    -8px 0;
-}
-
 .viewer-img {
   image-rendering: pixelated;
   image-rendering: crisp-edges;

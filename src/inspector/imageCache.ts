@@ -12,15 +12,17 @@ const inflight = new Map<string, Promise<string>>();
 /** At most one `ktx extract` / IPC at a time (scrubbing must not stampede). */
 type PrefetchItem = ImageSelection & { filePath: string };
 
+type QueuedLoad = {
+  filePath: string;
+  sel: ImageSelection;
+  resolve: (url: string) => void;
+  reject: (err: unknown) => void;
+};
+
 let fetchBusy = false;
-let interactiveQueued:
-  | {
-      filePath: string;
-      sel: ImageSelection;
-      resolve: (url: string) => void;
-      reject: (err: unknown) => void;
-    }
-  | null = null;
+let interactiveQueued: QueuedLoad | null = null;
+/** Non-coalescing loads (depth volume stacks); yield to interactive, outrank prefetch. */
+const ensureQueue: QueuedLoad[] = [];
 const prefetchQueue: PrefetchItem[] = [];
 
 export function peekInspectorImageUrl(
@@ -36,7 +38,14 @@ export function clearInspectorImageCache(): void {
   }
   urls.clear();
   inflight.clear();
-  interactiveQueued = null;
+  if (interactiveQueued !== null) {
+    interactiveQueued.reject(new DOMException("Cleared", "AbortError"));
+    interactiveQueued = null;
+  }
+  for (const item of ensureQueue) {
+    item.reject(new DOMException("Cleared", "AbortError"));
+  }
+  ensureQueue.length = 0;
   prefetchQueue.length = 0;
 }
 
@@ -103,23 +112,19 @@ function takeNextPrefetch(): PrefetchItem | null {
   return null;
 }
 
-function pumpFetches(): void {
-  if (fetchBusy) {
-    return;
-  }
+function startQueuedLoad(item: QueuedLoad): void {
+  beginFetch(
+    runFetch(item.filePath, item.sel).then(item.resolve, item.reject),
+  );
+}
 
-  const interactive = interactiveQueued;
-  if (interactive !== null) {
-    interactiveQueued = null;
-    beginFetch(
-      runFetch(interactive.filePath, interactive.sel).then(
-        interactive.resolve,
-        interactive.reject,
-      ),
-    );
-    return;
-  }
+function takeInteractive(): QueuedLoad | null {
+  const item = interactiveQueued;
+  interactiveQueued = null;
+  return item;
+}
 
+function startPrefetchIfAny(): void {
   const next = takeNextPrefetch();
   if (next === null) {
     return;
@@ -129,6 +134,26 @@ function pumpFetches(): void {
       // Prefetch failures are ignored; the viewer surfaces real load errors.
     }),
   );
+}
+
+function pumpFetches(): void {
+  if (fetchBusy) {
+    return;
+  }
+
+  const interactive = takeInteractive();
+  if (interactive !== null) {
+    startQueuedLoad(interactive);
+    return;
+  }
+
+  const ensure = ensureQueue.shift();
+  if (ensure !== undefined) {
+    startQueuedLoad(ensure);
+    return;
+  }
+
+  startPrefetchIfAny();
 }
 
 /**
@@ -157,6 +182,31 @@ export function loadInspectorImageUrl(
     interactiveQueued = { filePath, sel, resolve, reject };
     // Prefetch work yields to the interactive slider target.
     prefetchQueue.length = 0;
+    pumpFetches();
+  });
+}
+
+/**
+ * Resolve an object URL without scrub coalescing — for loading every depth
+ * slice of a 3D volume. Yields to interactive loads; shares the cache/inflight map.
+ */
+export function ensureInspectorImageUrl(
+  filePath: string,
+  sel: ImageSelection,
+): Promise<string> {
+  const cached = peekInspectorImageUrl(filePath, sel);
+  if (cached !== null) {
+    return Promise.resolve(cached);
+  }
+
+  const pending = inflight.get(selectionKey(filePath, sel));
+  if (pending !== undefined) {
+    return pending;
+  }
+
+  // Duplicate queue entries for the same key are fine: later pumps hit cache/inflight.
+  return new Promise<string>((resolve, reject) => {
+    ensureQueue.push({ filePath, sel, resolve, reject });
     pumpFetches();
   });
 }
