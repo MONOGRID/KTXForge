@@ -262,3 +262,9 @@ ASTC `--format` strings keep the Vulkan `_BLOCK` suffix required by v4.4.2. This
 **Decided:** Adding, removing, reordering, or clearing sources resets encoder `job` state to idle (unless a job is currently running). The center preview and Save affordance follow that state, so a stale encoded preview cannot outlive the source list that produced it.
 
 **Why:** After a successful encode, deleting a source cleared the source layer but left `job.status === "done"` and the encoded object URL, so the viewport kept showing the old result until the next encode.
+
+## 2026-10-11 — Hard-block convert-tf / assign-tf vs sRGB format
+
+**Decided:** `*_SRGB` vs transfer-function pairing is a hard rules-engine constraint, not a soft warning. For `*_SRGB` formats, `--convert-tf` choices omit `linear` and `--assign-tf` only lists sRGB aliases; for UNORM/ASTC UNORM formats that have an sRGB twin, `--convert-tf` only offers `linear`. Invalid current values are cleared via `OptionSuggestion` (`convertTf` / `assignTf`); `validate` refuses encode. Soft warnings remain for lossy sRGB→linear and encode color-space advice.
+
+**Why:** The GUI let users pick `--convert-tf linear` with `R8G8B8A8_SRGB`, which `ktx create` fatals on. Same “never offer known-fail combos” rule as source/format pairing.

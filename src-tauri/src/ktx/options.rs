@@ -716,13 +716,17 @@ pub enum SourcesClass {
     Mixed,
 }
 
-/// Patches Vue must apply when current options would fail `ktx create` for the sources.
+/// Patches Vue must apply when current options would fail `ktx create`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "camelCase")]
 pub struct OptionSuggestion {
     pub format: VkFormat,
     pub encode: Option<EncodeCodec>,
+    /// Cleared when incompatible with `format` (e.g. `linear` on `*_SRGB`).
+    pub convert_tf: Option<ConvertTransferFunction>,
+    /// Cleared when incompatible with `format` (non-sRGB assign on `*_SRGB`).
+    pub assign_tf: Option<TransferFunction>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]

@@ -160,7 +160,7 @@ Mip generation is avoided when the output transfer function is non-linear and is
 | `--premultiply-alpha` | Premultiply and set the metadata flag. Not valid with normalize or raw |
 | `--normal-mode` | Linear, 2+ components. RGB(A) XYZ becomes X+Y in RGB+A. For BasisLZ this disables endpoint and selector RDO |
 
-`*_SRGB` formats require an sRGB output transfer function. Non-sRGB formats that have an sRGB twin reject an sRGB output transfer function. Implicit conversion: sRGB formats convert non-sRGB input to sRGB; other formats convert non-linear input to linear. Supported implicit or explicit conversion inputs are linear, sRGB, ITU (BT.601, BT.709, BT.2020, SMPTE 170M), and PQ. Supported conversion outputs are linear and sRGB. sRGB to linear is treated as visually lossy. Encoding to ASTC, BasisLZ, or UASTC is discouraged unless the data is linear or sRGB. The UI shows these warnings next to the controls.
+`*_SRGB` formats require an sRGB output transfer function — the UI hides `linear` (and other non-sRGB assign values) and auto-clears an invalid choice; encode refuses as a backstop. Non-sRGB formats that have an sRGB twin reject an sRGB `--convert-tf` the same way (only `linear` is offered). Implicit conversion: sRGB formats convert non-sRGB input to sRGB; other formats convert non-linear input to linear. Supported implicit or explicit conversion inputs are linear, sRGB, ITU (BT.601, BT.709, BT.2020, SMPTE 170M), and PQ. Supported conversion outputs are linear and sRGB. sRGB to linear is treated as visually lossy. Encoding to ASTC, BasisLZ, or UASTC is discouraged unless the data is linear or sRGB. Soft color-space notes still appear as warnings next to the controls.
 
 **BasisLZ** (`--encode basis-lz`)
 

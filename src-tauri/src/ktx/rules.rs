@@ -5,9 +5,9 @@ use strum::IntoEnumIterator;
 use crate::commands::{SourceInfo, SourceKind};
 use crate::ktx::option_help;
 use crate::ktx::options::{
-    ColorPrimaries, CreateOptions, EncodeCodec, FieldState, OptionKey, OptionReport,
-    OptionSuggestion, OptionWarning, SourcesClass, Supercompression, TransferFunction, VkFormat,
-    WarningLevel,
+    ColorPrimaries, ConvertTransferFunction, CreateOptions, EncodeCodec, FieldState, OptionKey,
+    OptionReport, OptionSuggestion, OptionWarning, SourcesClass, Supercompression,
+    TransferFunction, VkFormat, WarningLevel,
 };
 
 /// Return a [`FieldState`] for every [`OptionKey`], plus color / encode warnings.
@@ -21,7 +21,7 @@ pub fn describe(opts: &CreateOptions, sources: &[SourceInfo]) -> OptionReport {
     for key in OptionKey::iter() {
         let (mut enabled, mut reason) = field_enabled(opts, key);
         apply_source_enablement(key, sources_class, &mut enabled, &mut reason);
-        let choices = filter_choices(key, sources_class, option_help::choices_for(key));
+        let choices = filter_choices(key, opts, sources_class, option_help::choices_for(key));
         fields.push(FieldState {
             key,
             enabled,
@@ -32,7 +32,6 @@ pub fn describe(opts: &CreateOptions, sources: &[SourceInfo]) -> OptionReport {
     }
     let mut warnings = Vec::new();
     warn_nonlinear_mipmap(opts, &mut warnings);
-    warn_srgb_format_tf(opts, &mut warnings);
     warn_encode_color_space(opts, &mut warnings);
     warn_srgb_to_linear_lossy(opts, &mut warnings);
     warn_mixed_sources(sources_class, &mut warnings);
@@ -78,6 +77,7 @@ fn reject_option_constraints(opts: &CreateOptions, errors: &mut Vec<String>) {
     reject_runtime_vs_generate(opts, errors);
     reject_raw_missing_size(opts, errors);
     reject_convert_tf_with_raw(opts, errors);
+    reject_tf_format_mismatch(opts, errors);
     reject_convert_primaries_with_raw(opts, errors);
     reject_convert_primaries_when_none(opts, errors);
     reject_convert_origin_with_raw(opts, errors);
@@ -134,20 +134,30 @@ fn options_compatible(opts: &CreateOptions, class: SourcesClass) -> bool {
 }
 
 fn suggestion_for(opts: &CreateOptions, class: SourcesClass) -> Option<OptionSuggestion> {
-    if options_compatible(opts, class) {
+    let (format, encode) = if options_compatible(opts, class) {
+        (opts.format, opts.encode)
+    } else {
+        match class {
+            SourcesClass::Hdr => (VkFormat::R16G16B16A16Sfloat, None),
+            SourcesClass::Ldr => (VkFormat::R8G8B8A8Srgb, opts.encode),
+            SourcesClass::Empty | SourcesClass::Mixed => return None,
+        }
+    };
+    let convert_tf = sanitize_convert_tf(format, opts.color.convert_tf);
+    let assign_tf = sanitize_assign_tf(format, opts.color.assign_tf);
+    if format == opts.format
+        && encode == opts.encode
+        && convert_tf == opts.color.convert_tf
+        && assign_tf == opts.color.assign_tf
+    {
         return None;
     }
-    match class {
-        SourcesClass::Hdr => Some(OptionSuggestion {
-            format: VkFormat::R16G16B16A16Sfloat,
-            encode: None,
-        }),
-        SourcesClass::Ldr => Some(OptionSuggestion {
-            format: VkFormat::R8G8B8A8Srgb,
-            encode: opts.encode,
-        }),
-        SourcesClass::Empty | SourcesClass::Mixed => None,
-    }
+    Some(OptionSuggestion {
+        format,
+        encode,
+        convert_tf,
+        assign_tf,
+    })
 }
 
 fn apply_source_enablement(
@@ -193,6 +203,7 @@ fn apply_source_enablement(
 
 fn filter_choices(
     key: OptionKey,
+    opts: &CreateOptions,
     class: SourcesClass,
     choices: Vec<crate::ktx::options::OptionChoice>,
 ) -> Vec<crate::ktx::options::OptionChoice> {
@@ -205,6 +216,20 @@ fn filter_choices(
             })
             .collect(),
         OptionKey::Encode if matches!(class, SourcesClass::Hdr | SourcesClass::Mixed) => Vec::new(),
+        OptionKey::ConvertTf => choices
+            .into_iter()
+            .filter(|c| {
+                ConvertTransferFunction::iter()
+                    .any(|tf| tf.cli() == c.value.as_str() && convert_tf_allowed(opts.format, tf))
+            })
+            .collect(),
+        OptionKey::AssignTf => choices
+            .into_iter()
+            .filter(|c| {
+                TransferFunction::iter()
+                    .any(|tf| tf.cli() == c.value.as_str() && assign_tf_allowed(opts.format, tf))
+            })
+            .collect(),
         _ => choices,
     }
 }
@@ -509,26 +534,49 @@ fn has_srgb_twin(format: VkFormat) -> bool {
     ) || (s.starts_with("ASTC_") && s.contains("_UNORM_"))
 }
 
-fn output_tf_is_srgb(opts: &CreateOptions) -> bool {
-    if let Some(tf) = opts.color.convert_tf {
-        return matches!(
-            tf,
-            crate::ktx::options::ConvertTransferFunction::Srgb
-                | crate::ktx::options::ConvertTransferFunction::SrgbEotf
-                | crate::ktx::options::ConvertTransferFunction::Scrgb
-                | crate::ktx::options::ConvertTransferFunction::ScrgbEotf
-        );
-    }
-    match opts.color.assign_tf {
-        Some(
-            TransferFunction::Srgb
+fn is_srgb_convert_tf(tf: ConvertTransferFunction) -> bool {
+    !matches!(tf, ConvertTransferFunction::Linear)
+}
+
+fn is_srgb_assign_tf(tf: TransferFunction) -> bool {
+    matches!(
+        tf,
+        TransferFunction::Srgb
             | TransferFunction::SrgbEotf
             | TransferFunction::Scrgb
-            | TransferFunction::ScrgbEotf,
-        ) => true,
-        Some(_) => false,
-        None => is_srgb_format(opts.format),
+            | TransferFunction::ScrgbEotf
+    )
+}
+
+/// `*_SRGB` formats require an sRGB convert-tf; formats with an sRGB twin reject sRGB convert-tf.
+fn convert_tf_allowed(format: VkFormat, tf: ConvertTransferFunction) -> bool {
+    if is_srgb_format(format) {
+        is_srgb_convert_tf(tf)
+    } else if has_srgb_twin(format) {
+        matches!(tf, ConvertTransferFunction::Linear)
+    } else {
+        true
     }
+}
+
+/// `*_SRGB` formats require an sRGB assign-tf when the flag is set.
+fn assign_tf_allowed(format: VkFormat, tf: TransferFunction) -> bool {
+    if is_srgb_format(format) {
+        is_srgb_assign_tf(tf)
+    } else {
+        true
+    }
+}
+
+fn sanitize_convert_tf(
+    format: VkFormat,
+    tf: Option<ConvertTransferFunction>,
+) -> Option<ConvertTransferFunction> {
+    tf.filter(|value| convert_tf_allowed(format, *value))
+}
+
+fn sanitize_assign_tf(format: VkFormat, tf: Option<TransferFunction>) -> Option<TransferFunction> {
+    tf.filter(|value| assign_tf_allowed(format, *value))
 }
 
 fn is_nonlinear_non_srgb(tf: TransferFunction) -> bool {
@@ -545,11 +593,11 @@ fn is_nonlinear_non_srgb(tf: TransferFunction) -> bool {
 fn effective_output_tf(opts: &CreateOptions) -> Option<TransferFunction> {
     if let Some(tf) = opts.color.convert_tf {
         return Some(match tf {
-            crate::ktx::options::ConvertTransferFunction::Linear => TransferFunction::Linear,
-            crate::ktx::options::ConvertTransferFunction::Srgb
-            | crate::ktx::options::ConvertTransferFunction::SrgbEotf
-            | crate::ktx::options::ConvertTransferFunction::Scrgb
-            | crate::ktx::options::ConvertTransferFunction::ScrgbEotf => TransferFunction::Srgb,
+            ConvertTransferFunction::Linear => TransferFunction::Linear,
+            ConvertTransferFunction::Srgb
+            | ConvertTransferFunction::SrgbEotf
+            | ConvertTransferFunction::Scrgb
+            | ConvertTransferFunction::ScrgbEotf => TransferFunction::Srgb,
         });
     }
     opts.color.assign_tf
@@ -568,30 +616,6 @@ fn warn_nonlinear_mipmap(opts: &CreateOptions, warnings: &mut Vec<OptionWarning>
                 message: "mip generation is avoided when the output transfer function is non-linear and is not sRGB; the resampler only decodes sRGB".to_owned(),
             });
         }
-    }
-}
-
-// "*_SRGB formats require an sRGB output transfer function. Non-sRGB formats that have an sRGB twin reject an sRGB output transfer function."
-fn warn_srgb_format_tf(opts: &CreateOptions, warnings: &mut Vec<OptionWarning>) {
-    let srgb_out = output_tf_is_srgb(opts);
-    if is_srgb_format(opts.format)
-        && !srgb_out
-        && (opts.color.convert_tf.is_some() || opts.color.assign_tf.is_some())
-    {
-        warnings.push(OptionWarning {
-            key: Some(OptionKey::Format),
-            level: WarningLevel::Warn,
-            message: "*_SRGB formats require an sRGB output transfer function".to_owned(),
-        });
-    }
-    if has_srgb_twin(opts.format) && srgb_out && opts.color.convert_tf.is_some() {
-        warnings.push(OptionWarning {
-            key: Some(OptionKey::ConvertTf),
-            level: WarningLevel::Warn,
-            message:
-                "non-sRGB formats that have an sRGB twin reject an sRGB output transfer function"
-                    .to_owned(),
-        });
     }
 }
 
@@ -625,7 +649,7 @@ fn warn_srgb_to_linear_lossy(opts: &CreateOptions, warnings: &mut Vec<OptionWarn
     );
     let to_linear = matches!(
         opts.color.convert_tf,
-        Some(crate::ktx::options::ConvertTransferFunction::Linear)
+        Some(ConvertTransferFunction::Linear)
     );
     if from_srgb && to_linear {
         warnings.push(OptionWarning {
@@ -690,6 +714,30 @@ fn reject_convert_tf_with_raw(opts: &CreateOptions, errors: &mut Vec<String>) {
     // "Not valid with raw"
     if opts.container.raw && opts.color.convert_tf.is_some() {
         errors.push("--convert-tf is not valid with --raw".to_owned());
+    }
+}
+
+fn reject_tf_format_mismatch(opts: &CreateOptions, errors: &mut Vec<String>) {
+    // "*_SRGB formats require an sRGB output transfer function.
+    //  Non-sRGB formats that have an sRGB twin reject an sRGB output transfer function."
+    if let Some(tf) = opts.color.convert_tf {
+        if !convert_tf_allowed(opts.format, tf) {
+            if is_srgb_format(opts.format) {
+                errors.push(
+                    "--convert-tf must be sRGB for *_SRGB formats (linear is invalid)".to_owned(),
+                );
+            } else {
+                errors.push(
+                    "--convert-tf sRGB is invalid for non-sRGB formats that have an sRGB twin"
+                        .to_owned(),
+                );
+            }
+        }
+    }
+    if let Some(tf) = opts.color.assign_tf {
+        if !assign_tf_allowed(opts.format, tf) {
+            errors.push("--assign-tf must be sRGB for *_SRGB formats".to_owned());
+        }
     }
 }
 
@@ -1038,22 +1086,71 @@ mod tests {
     }
 
     #[test]
-    fn warn_srgb_format_needs_srgb_tf() {
+    fn srgb_format_hides_linear_convert_tf_and_rejects() {
         // "*_SRGB formats require an sRGB output transfer function"
         let mut o = opts();
         o.format = VkFormat::R8G8B8A8Srgb;
         o.color.convert_tf = Some(ConvertTransferFunction::Linear);
         let r = report(&o);
-        assert!(r.warnings.iter().any(|w| w.message.contains("*_SRGB")));
+        let convert_choices: Vec<_> = field(&r, OptionKey::ConvertTf)
+            .choices
+            .iter()
+            .map(|c| c.value.as_str())
+            .collect();
+        assert!(!convert_choices.contains(&"linear"));
+        assert!(convert_choices.contains(&"srgb"));
+        assert_eq!(
+            r.suggestion,
+            Some(OptionSuggestion {
+                format: VkFormat::R8G8B8A8Srgb,
+                encode: None,
+                convert_tf: None,
+                assign_tf: None,
+            })
+        );
+        assert!(validate(&o).is_err());
     }
 
     #[test]
-    fn warn_non_srgb_rejects_srgb_tf() {
+    fn unorm_twin_hides_srgb_convert_tf_and_rejects() {
+        // "Non-sRGB formats that have an sRGB twin reject an sRGB output transfer function"
         let mut o = opts();
         o.format = VkFormat::R8G8B8A8Unorm;
         o.color.convert_tf = Some(ConvertTransferFunction::Srgb);
         let r = report(&o);
-        assert!(r.warnings.iter().any(|w| w.message.contains("sRGB twin")));
+        let convert_choices: Vec<_> = field(&r, OptionKey::ConvertTf)
+            .choices
+            .iter()
+            .map(|c| c.value.as_str())
+            .collect();
+        assert!(convert_choices.contains(&"linear"));
+        assert!(!convert_choices.contains(&"srgb"));
+        assert_eq!(
+            r.suggestion,
+            Some(OptionSuggestion {
+                format: VkFormat::R8G8B8A8Unorm,
+                encode: None,
+                convert_tf: None,
+                assign_tf: None,
+            })
+        );
+        assert!(validate(&o).is_err());
+    }
+
+    #[test]
+    fn srgb_format_hides_non_srgb_assign_tf() {
+        let mut o = opts();
+        o.format = VkFormat::R8G8B8A8Srgb;
+        o.color.assign_tf = Some(TransferFunction::Linear);
+        let r = report(&o);
+        let assign_choices: Vec<_> = field(&r, OptionKey::AssignTf)
+            .choices
+            .iter()
+            .map(|c| c.value.as_str())
+            .collect();
+        assert!(!assign_choices.contains(&"linear"));
+        assert!(assign_choices.contains(&"srgb"));
+        assert!(validate(&o).is_err());
     }
 
     #[test]
@@ -1069,7 +1166,9 @@ mod tests {
     #[test]
     fn warn_srgb_to_linear_lossy() {
         // "sRGB to linear is treated as visually lossy"
+        // Use UNORM (sRGB twin): convert-tf linear is allowed; assign srgb + convert linear warns.
         let mut o = opts();
+        o.format = VkFormat::R8G8B8A8Unorm;
         o.color.assign_tf = Some(TransferFunction::Srgb);
         o.color.convert_tf = Some(ConvertTransferFunction::Linear);
         let r = report(&o);
@@ -1077,6 +1176,8 @@ mod tests {
             .warnings
             .iter()
             .any(|w| w.message.contains("visually lossy")));
+        assert!(r.suggestion.is_none());
+        assert!(validate(&o).is_ok());
     }
 
     #[test]
@@ -1120,6 +1221,8 @@ mod tests {
             Some(OptionSuggestion {
                 format: VkFormat::R16G16B16A16Sfloat,
                 encode: None,
+                convert_tf: None,
+                assign_tf: None,
             })
         );
         let format_choices: Vec<_> = field(&r, OptionKey::Format)
@@ -1156,6 +1259,8 @@ mod tests {
             Some(OptionSuggestion {
                 format: VkFormat::R8G8B8A8Srgb,
                 encode: None,
+                convert_tf: None,
+                assign_tf: None,
             })
         );
         let format_choices: Vec<_> = field(&r, OptionKey::Format)

@@ -47,11 +47,20 @@ function applySuggestion(report: OptionReport): boolean {
   }
   const formatChanged = store.options.format !== suggestion.format;
   const encodeChanged = store.options.encode !== suggestion.encode;
-  if (!formatChanged && !encodeChanged) {
+  const convertTfChanged = store.options.color.convertTf !== suggestion.convertTf;
+  const assignTfChanged = store.options.color.assignTf !== suggestion.assignTf;
+  if (
+    !formatChanged &&
+    !encodeChanged &&
+    !convertTfChanged &&
+    !assignTfChanged
+  ) {
     return false;
   }
   store.options.format = suggestion.format;
   store.options.encode = suggestion.encode;
+  store.options.color.convertTf = suggestion.convertTf;
+  store.options.color.assignTf = suggestion.assignTf;
   return true;
 }
 
