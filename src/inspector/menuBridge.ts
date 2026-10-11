@@ -1,35 +1,9 @@
 import { on } from "../api/events";
 import type { MenuAction } from "../bindings/MenuAction";
-import { getViewerControls } from "../shared/viewerControls";
+import { applyZoomMenuAction } from "../shared/menuZoom";
 
 function handleMenuAction(action: MenuAction): void {
-  switch (action) {
-    case "zoom-in":
-    case "zoom-out":
-    case "zoom-actual":
-    case "zoom-fit": {
-      if (!document.hasFocus()) {
-        break;
-      }
-      const viewer = getViewerControls();
-      if (action === "zoom-in") {
-        viewer?.zoomIn();
-      } else if (action === "zoom-out") {
-        viewer?.zoomOut();
-      } else if (action === "zoom-actual") {
-        viewer?.zoomActual();
-      } else {
-        viewer?.zoomFit();
-      }
-      break;
-    }
-    case "encode":
-    case "cancel-encode":
-    case "save":
-    case "clear-sources":
-    case "export":
-      break;
-  }
+  applyZoomMenuAction(action);
 }
 
 /** Wire native View menu zoom actions for the inspector window. */

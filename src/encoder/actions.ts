@@ -1,7 +1,8 @@
 import { call } from "../api/commands";
 import { toAppError } from "../api/guards";
-import { toastAppError } from "../shared/toastAppError";
+import type { EncodeResult } from "../bindings/EncodeResult";
 import type { SourceInfo } from "../bindings/SourceInfo";
+import { toastAppError } from "../shared/toastAppError";
 import type { DropZone } from "./dropTarget";
 import type { PackInputRole } from "./inputRole";
 import {
@@ -22,25 +23,23 @@ import {
 /** Concurrent `ktx create` processes during Encode all. */
 const ENCODE_PARALLELISM = 2;
 
+function animationBlocksEncode(): boolean {
+  if (store.animation === null) {
+    return false;
+  }
+  return (
+    store.inputRole !== "arrayLayers" ||
+    store.outputs.some((slot) => slot.inputs.length < 2)
+  );
+}
+
 export function canEncode(): boolean {
-  if (store.queue !== null) {
-    return false;
-  }
-  if (!allOutputsValid()) {
-    return false;
-  }
-  if (store.report.suggestion !== null) {
-    return false;
-  }
-  if (store.animation !== null) {
-    if (store.inputRole !== "arrayLayers") {
-      return false;
-    }
-    if (store.outputs.some((slot) => slot.inputs.length < 2)) {
-      return false;
-    }
-  }
-  return true;
+  return (
+    store.queue === null &&
+    allOutputsValid() &&
+    store.report.suggestion === null &&
+    !animationBlocksEncode()
+  );
 }
 
 export function canCancelEncode(): boolean {
@@ -122,6 +121,51 @@ export async function addInputsForOutput(outputId: string): Promise<void> {
   await openSourcesAsInputs();
 }
 
+function trackRunningJob(jobId: string): void {
+  store.queue?.runningJobIds.push(jobId);
+}
+
+function untrackRunningJob(jobId: string): void {
+  const queue = store.queue;
+  if (queue === null) {
+    return;
+  }
+  const at = queue.runningJobIds.indexOf(jobId);
+  if (at >= 0) {
+    queue.runningJobIds.splice(at, 1);
+  }
+}
+
+function applyEncodeSuccess(
+  slot: OutputSlot,
+  jobId: string,
+  result: EncodeResult,
+): void {
+  if (slot.job.jobId !== jobId) {
+    return;
+  }
+  slot.job.status = "done";
+  slot.job.stage = "done";
+  slot.job.result = result;
+}
+
+function applyEncodeFailure(slot: OutputSlot, jobId: string, err: unknown): void {
+  if (slot.job.jobId !== jobId) {
+    return;
+  }
+  const appError = toAppError(err);
+  if (appError.kind === "cancelled") {
+    slot.job.status = "idle";
+    slot.job.stage = null;
+    slot.job.jobId = null;
+    slot.job.errorMessage = null;
+    return;
+  }
+  slot.job.status = "error";
+  slot.job.result = null;
+  slot.job.errorMessage = appError.message;
+}
+
 async function encodeOne(slot: OutputSlot): Promise<void> {
   const jobId = crypto.randomUUID();
   slot.job = {
@@ -132,9 +176,7 @@ async function encodeOne(slot: OutputSlot): Promise<void> {
     result: null,
     errorMessage: null,
   };
-  if (store.queue !== null) {
-    store.queue.runningJobIds.push(jobId);
-  }
+  trackRunningJob(jobId);
 
   try {
     const result = await call("encode", {
@@ -146,36 +188,64 @@ async function encodeOne(slot: OutputSlot): Promise<void> {
         inputRole: store.inputRole,
       },
     });
-    if (slot.job.jobId !== jobId) {
-      return;
-    }
-    slot.job.status = "done";
-    slot.job.stage = "done";
-    slot.job.result = result;
+    applyEncodeSuccess(slot, jobId, result);
   } catch (err: unknown) {
-    if (slot.job.jobId !== jobId) {
-      return;
-    }
-    const appError = toAppError(err);
-    if (appError.kind === "cancelled") {
-      slot.job.status = "idle";
-      slot.job.stage = null;
-      slot.job.jobId = null;
-      slot.job.errorMessage = null;
-      return;
-    }
-    slot.job.status = "error";
-    slot.job.result = null;
-    slot.job.errorMessage = appError.message;
+    applyEncodeFailure(slot, jobId, err);
   } finally {
-    const queue = store.queue;
-    if (queue !== null) {
-      const at = queue.runningJobIds.indexOf(jobId);
-      if (at >= 0) {
-        queue.runningJobIds.splice(at, 1);
-      }
+    untrackRunningJob(jobId);
+  }
+}
+
+function markSlotsQueued(slots: readonly OutputSlot[]): void {
+  for (const slot of slots) {
+    slot.job = {
+      status: "queued",
+      jobId: null,
+      stage: null,
+      stderrLines: [],
+      result: null,
+      errorMessage: null,
+    };
+  }
+}
+
+function resetStillQueued(slots: readonly OutputSlot[]): void {
+  for (const slot of slots) {
+    if (slot.job.status === "queued") {
+      slot.job = {
+        status: "idle",
+        jobId: null,
+        stage: null,
+        stderrLines: [],
+        result: null,
+        errorMessage: null,
+      };
     }
   }
+}
+
+async function runEncodeWorkers(
+  slots: readonly OutputSlot[],
+  queueState: BatchQueueState,
+): Promise<void> {
+  let nextIndex = 0;
+  const runWorker = async (): Promise<void> => {
+    while (!queueState.cancelRequested) {
+      const index = nextIndex;
+      nextIndex += 1;
+      if (index >= slots.length) {
+        return;
+      }
+      await encodeOne(slots[index]);
+      queueState.done += 1;
+    }
+  };
+  await Promise.all(
+    Array.from(
+      { length: Math.min(ENCODE_PARALLELISM, slots.length) },
+      () => runWorker(),
+    ),
+  );
 }
 
 export async function encode(): Promise<void> {
@@ -195,54 +265,12 @@ export async function encode(): Promise<void> {
     runningJobIds: [],
   };
   store.queue = queueState;
-
-  for (const slot of slots) {
-    slot.job = {
-      status: "queued",
-      jobId: null,
-      stage: null,
-      stderrLines: [],
-      result: null,
-      errorMessage: null,
-    };
-  }
-
-  let nextIndex = 0;
-
-  const runWorker = async (): Promise<void> => {
-    while (!queueState.cancelRequested) {
-      const index = nextIndex;
-      nextIndex += 1;
-      if (index >= slots.length) {
-        return;
-      }
-      const slot = slots[index];
-      await encodeOne(slot);
-      queueState.done += 1;
-    }
-  };
-
-  const workers = Array.from(
-    { length: Math.min(ENCODE_PARALLELISM, slots.length) },
-    () => runWorker(),
-  );
-  await Promise.all(workers);
-
+  markSlotsQueued(slots);
+  await runEncodeWorkers(slots, queueState);
   store.queue = null;
 
   if (queueState.cancelRequested) {
-    for (const slot of slots) {
-      if (slot.job.status === "queued") {
-        slot.job = {
-          status: "idle",
-          jobId: null,
-          stage: null,
-          stderrLines: [],
-          result: null,
-          errorMessage: null,
-        };
-      }
-    }
+    resetStillQueued(slots);
     return;
   }
 
@@ -328,6 +356,30 @@ export function clearSources(): void {
   clearOutputs();
 }
 
+function dropOntoInputs(sources: readonly SourceInfo[]): void {
+  if (selectedOutput.value === null) {
+    toastAppError({
+      kind: "invalidInput",
+      message: "Select a KTX output (or use +) before dropping inputs",
+    });
+    return;
+  }
+  const notice = addInputsToSelected(sources);
+  if (notice !== null) {
+    toastAppError({ kind: "invalidInput", message: notice });
+  }
+}
+
+async function dropOntoOutputs(sources: readonly SourceInfo[]): Promise<void> {
+  const rejected = await addOutputsFromSources(sources);
+  if (rejected.length > 0) {
+    toastAppError({
+      kind: "invalidInput",
+      message: rejected.join("; "),
+    });
+  }
+}
+
 /** Route dropped images by active drop zone. */
 export async function handleDroppedSources(
   sources: readonly SourceInfo[],
@@ -336,37 +388,16 @@ export async function handleDroppedSources(
   if (sources.length === 0) {
     return;
   }
-  if (zone === null) {
-    // Dropped on chrome / options — ask via the same preview dialog.
-    setPendingCenterDrop(sources);
-    return;
-  }
-  if (zone === "center") {
+  // null / center: ask via the preview dialog (chrome drops count as center).
+  if (zone === null || zone === "center") {
     setPendingCenterDrop(sources);
     return;
   }
   if (zone === "inputs") {
-    if (selectedOutput.value === null) {
-      toastAppError({
-        kind: "invalidInput",
-        message: "Select a KTX output (or use +) before dropping inputs",
-      });
-      return;
-    }
-    const notice = addInputsToSelected(sources);
-    if (notice !== null) {
-      toastAppError({ kind: "invalidInput", message: notice });
-    }
+    dropOntoInputs(sources);
     return;
   }
-  // outputs
-  const rejected = await addOutputsFromSources(sources);
-  if (rejected.length > 0) {
-    toastAppError({
-      kind: "invalidInput",
-      message: rejected.join("; "),
-    });
-  }
+  await dropOntoOutputs(sources);
 }
 
 export async function applyCenterDropAsOutputs(): Promise<void> {

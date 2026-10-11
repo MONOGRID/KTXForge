@@ -167,6 +167,39 @@ async function fetchMiss(
   }
 }
 
+function clearViewerState(): void {
+  if (cachedPath.value !== null) {
+    clearInspectorImageCache();
+    cachedPath.value = null;
+  }
+  objectUrl.value = null;
+  loading.value = false;
+}
+
+function showCachedHit(filePath: string, sel: ImageSelection, hit: string): void {
+  objectUrl.value = hit;
+  loading.value = false;
+  scheduleIdlePrefetch(filePath, sel);
+}
+
+function scheduleMissFetch(
+  filePath: string,
+  sel: ImageSelection,
+  gen: number,
+): void {
+  // Keep showing the previous layer while scrubbing; only extract after settle.
+  // First paint (nothing on screen yet) skips the debounce.
+  if (objectUrl.value === null) {
+    void fetchMiss(filePath, sel, gen);
+    return;
+  }
+  loading.value = false;
+  missTimer = setTimeout(() => {
+    missTimer = null;
+    void fetchMiss(filePath, sel, gen);
+  }, MISS_DEBOUNCE_MS);
+}
+
 function onSelectionChange(): void {
   const filePath = path.value;
   const gen = ++fetchGen.value;
@@ -177,12 +210,7 @@ function onSelectionChange(): void {
   clearPrefetchTimer();
 
   if (filePath === null || filePath === "" || report.value === null) {
-    if (cachedPath.value !== null) {
-      clearInspectorImageCache();
-      cachedPath.value = null;
-    }
-    objectUrl.value = null;
-    loading.value = false;
+    clearViewerState();
     return;
   }
 
@@ -196,23 +224,11 @@ function onSelectionChange(): void {
 
   const hit = peekInspectorImageUrl(filePath, sel);
   if (hit !== null) {
-    objectUrl.value = hit;
-    loading.value = false;
-    scheduleIdlePrefetch(filePath, sel);
+    showCachedHit(filePath, sel, hit);
     return;
   }
 
-  // Keep showing the previous layer while scrubbing; only extract after settle.
-  // First paint (nothing on screen yet) skips the debounce.
-  if (objectUrl.value === null) {
-    void fetchMiss(filePath, sel, gen);
-    return;
-  }
-  loading.value = false;
-  missTimer = setTimeout(() => {
-    missTimer = null;
-    void fetchMiss(filePath, sel, gen);
-  }, MISS_DEBOUNCE_MS);
+  scheduleMissFetch(filePath, sel, gen);
 }
 
 watch(

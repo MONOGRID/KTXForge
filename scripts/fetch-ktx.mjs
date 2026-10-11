@@ -204,9 +204,26 @@ function verifyStaged(outKtx) {
   console.log((ver.stdout || ver.stderr || "").trim());
 }
 
-async function main() {
-  const { target: targetArg } = parseArgs(process.argv.slice(2));
-  const triple = targetArg || hostTriple();
+function logAlreadyStaged(outKtx) {
+  const ver = spawnSync(outKtx, ["--version"], { encoding: "utf8" });
+  console.log(
+    `already staged: ${outKtx} (${`${ver.stdout || ""}${ver.stderr || ""}`.trim()})`,
+  );
+}
+
+async function extractAndStage(triple, cfg, version, outKtx, isWindows) {
+  const assetPath = await ensureAssetCached(cfg, version);
+  const extractDir = join(cacheDir, `extract-${triple}`);
+  rmSync(extractDir, { recursive: true, force: true });
+  extractArchive(cfg.extract, assetPath, extractDir);
+
+  copyExecutable(findInTree(extractDir, cfg.ktxPath), outKtx, isWindows);
+  stageLibs(extractDir, cfg.libs || [], isWindows);
+  maybePatchelf(outKtx, Boolean(cfg.patchelf));
+  verifyStaged(outKtx);
+}
+
+async function stageTarget(triple) {
   const manifest = JSON.parse(readFileSync(versionPath, "utf8"));
   const cfg = manifest.targets[triple];
   if (!cfg) {
@@ -219,22 +236,16 @@ async function main() {
   mkdirSync(cacheDir, { recursive: true });
 
   if (alreadyStaged(outKtx, manifest.version)) {
-    const ver = spawnSync(outKtx, ["--version"], { encoding: "utf8" });
-    console.log(
-      `already staged: ${outKtx} (${`${ver.stdout || ""}${ver.stderr || ""}`.trim()})`,
-    );
+    logAlreadyStaged(outKtx);
     return;
   }
 
-  const assetPath = await ensureAssetCached(cfg, manifest.version);
-  const extractDir = join(cacheDir, `extract-${triple}`);
-  rmSync(extractDir, { recursive: true, force: true });
-  extractArchive(cfg.extract, assetPath, extractDir);
+  await extractAndStage(triple, cfg, manifest.version, outKtx, isWindows);
+}
 
-  copyExecutable(findInTree(extractDir, cfg.ktxPath), outKtx, isWindows);
-  stageLibs(extractDir, cfg.libs || [], isWindows);
-  maybePatchelf(outKtx, Boolean(cfg.patchelf));
-  verifyStaged(outKtx);
+async function main() {
+  const { target: targetArg } = parseArgs(process.argv.slice(2));
+  await stageTarget(targetArg || hostTriple());
 }
 
 main().catch((err) => {

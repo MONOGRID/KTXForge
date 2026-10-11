@@ -78,6 +78,31 @@ async function runFetch(
   }
 }
 
+function beginFetch(work: Promise<unknown>): void {
+  fetchBusy = true;
+  void work.finally(() => {
+    fetchBusy = false;
+    pumpFetches();
+  });
+}
+
+function takeNextPrefetch(): PrefetchItem | null {
+  while (prefetchQueue.length > 0) {
+    const next = prefetchQueue.shift();
+    if (next === undefined) {
+      return null;
+    }
+    if (peekInspectorImageUrl(next.filePath, next) !== null) {
+      continue;
+    }
+    if (inflight.has(selectionKey(next.filePath, next))) {
+      continue;
+    }
+    return next;
+  }
+  return null;
+}
+
 function pumpFetches(): void {
   if (fetchBusy) {
     return;
@@ -86,38 +111,24 @@ function pumpFetches(): void {
   const interactive = interactiveQueued;
   if (interactive !== null) {
     interactiveQueued = null;
-    fetchBusy = true;
-    void runFetch(interactive.filePath, interactive.sel)
-      .then(interactive.resolve, interactive.reject)
-      .finally(() => {
-        fetchBusy = false;
-        pumpFetches();
-      });
+    beginFetch(
+      runFetch(interactive.filePath, interactive.sel).then(
+        interactive.resolve,
+        interactive.reject,
+      ),
+    );
     return;
   }
 
-  while (prefetchQueue.length > 0) {
-    const next = prefetchQueue.shift();
-    if (next === undefined) {
-      break;
-    }
-    if (peekInspectorImageUrl(next.filePath, next) !== null) {
-      continue;
-    }
-    if (inflight.has(selectionKey(next.filePath, next))) {
-      continue;
-    }
-    fetchBusy = true;
-    void runFetch(next.filePath, next)
-      .catch(() => {
-        // Prefetch failures are ignored; the viewer surfaces real load errors.
-      })
-      .finally(() => {
-        fetchBusy = false;
-        pumpFetches();
-      });
+  const next = takeNextPrefetch();
+  if (next === null) {
     return;
   }
+  beginFetch(
+    runFetch(next.filePath, next).catch(() => {
+      // Prefetch failures are ignored; the viewer surfaces real load errors.
+    }),
+  );
 }
 
 /**

@@ -37,47 +37,60 @@ export function isPackRole(role: InputRole): role is PackInputRole {
   return role !== "base2D";
 }
 
+function clearPackDims(options: CreateOptions): void {
+  options.container.layers = null;
+  options.container.cubemap = false;
+  options.container.depth = null;
+}
+
+function applyBase2D(options: CreateOptions): void {
+  clearPackDims(options);
+}
+
+function applyArrayLayers(options: CreateOptions, n: number): void {
+  clearPackDims(options);
+  options.container.layers = n > 0 ? n : null;
+}
+
+function applyCubemapFaces(options: CreateOptions): void {
+  clearPackDims(options);
+  options.container.cubemap = true;
+  options.container.oneD = false;
+  ensureTopLeftOrigin(options);
+}
+
+function applyMipChain(options: CreateOptions, n: number): void {
+  clearPackDims(options);
+  options.container.levels = n > 0 ? n : null;
+  options.container.generateMipmap = false;
+  options.container.runtimeMipmap = false;
+}
+
+function applyDepthSlices(options: CreateOptions, n: number): void {
+  clearPackDims(options);
+  options.container.depth = n > 0 ? n : null;
+  options.container.oneD = false;
+  ensureFrontBackOrigin(options);
+}
+
+const ROLE_APPLIERS = {
+  base2D: applyBase2D,
+  arrayLayers: applyArrayLayers,
+  cubemapFaces: applyCubemapFaces,
+  mipChain: applyMipChain,
+  depthSlices: applyDepthSlices,
+} as const satisfies Record<
+  InputRole,
+  (options: CreateOptions, n: number) => void
+>;
+
 /** Mirror of Rust `input_role::apply_role` — keeps Container options honest in the UI. */
 export function applyRoleToOptions(
   options: CreateOptions,
   role: InputRole,
   inputCount: number,
 ): void {
-  const n = inputCount;
-  switch (role) {
-    case "base2D":
-      options.container.layers = null;
-      options.container.cubemap = false;
-      options.container.depth = null;
-      break;
-    case "arrayLayers":
-      options.container.layers = n > 0 ? n : null;
-      options.container.cubemap = false;
-      options.container.depth = null;
-      break;
-    case "cubemapFaces":
-      options.container.cubemap = true;
-      options.container.layers = null;
-      options.container.depth = null;
-      options.container.oneD = false;
-      ensureTopLeftOrigin(options);
-      break;
-    case "mipChain":
-      options.container.levels = n > 0 ? n : null;
-      options.container.generateMipmap = false;
-      options.container.runtimeMipmap = false;
-      options.container.layers = null;
-      options.container.cubemap = false;
-      options.container.depth = null;
-      break;
-    case "depthSlices":
-      options.container.depth = n > 0 ? n : null;
-      options.container.layers = null;
-      options.container.cubemap = false;
-      options.container.oneD = false;
-      ensureFrontBackOrigin(options);
-      break;
-  }
+  ROLE_APPLIERS[role](options, inputCount);
 }
 
 function ensureTopLeftOrigin(options: CreateOptions): void {

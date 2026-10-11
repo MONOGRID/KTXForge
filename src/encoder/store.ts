@@ -379,6 +379,73 @@ export async function addOutputsFromSources(
   return rejected;
 }
 
+function kindMismatchNotice(items: readonly SourceInfo[]): string | null {
+  const anchor = sessionAnchor();
+  if (anchor === null) {
+    return null;
+  }
+  const mismatch = items.find((item) => item.kind !== anchor.kind);
+  if (mismatch === undefined) {
+    return null;
+  }
+  return `${mismatch.name}: kind must match the first KTX output (${anchor.kind})`;
+}
+
+function roomForRole(slot: OutputSlot, want: number): {
+  room: number;
+  fullMessage: string | null;
+} {
+  const max = maxInputsForRole(store.inputRole);
+  if (max === null) {
+    return { room: want, fullMessage: null };
+  }
+  const room = Math.max(0, max - slot.inputs.length);
+  return {
+    room,
+    fullMessage:
+      room === 0 ? `this role allows at most ${String(max)} inputs` : null,
+  };
+}
+
+function appendPackInputs(
+  slot: OutputSlot,
+  items: readonly SourceInfo[],
+): string | null {
+  const { room, fullMessage } = roomForRole(slot, items.length);
+  if (room === 0) {
+    return fullMessage ?? "cannot add more inputs";
+  }
+  const toAdd = items.slice(0, room);
+  const kindError = kindMismatchNotice(toAdd);
+  if (kindError !== null) {
+    return kindError;
+  }
+  slot.inputs.push(...toAdd);
+  if (items.length > room) {
+    return `only ${String(room)} more input(s) fit this role`;
+  }
+  return null;
+}
+
+function promoteToPackIfMulti(slot: OutputSlot, items: readonly SourceInfo[]): void {
+  const willBeMulti = slot.inputs.length + items.length > 1 || slot.inputs.length > 1;
+  if (!willBeMulti) {
+    return;
+  }
+  ensurePackRole("arrayLayers");
+  store.inputsExpandedId = slot.id;
+}
+
+function replaceBase2DInput(
+  slot: OutputSlot,
+  items: readonly SourceInfo[],
+): string | null {
+  slot.inputs.splice(0, slot.inputs.length, items[0]);
+  return items.length > 1
+    ? "Only one input kept; choose a pack role to add more"
+    : null;
+}
+
 /**
  * Append inputs on the selected output. Entering multi-input switches the
  * session to a pack role (default array layers) and keeps the Inputs panel open.
@@ -393,41 +460,13 @@ export function addInputsToSelected(items: readonly SourceInfo[]): string | null
   }
 
   clearJobOnSlot(slot);
-
-  const willBeMulti = slot.inputs.length + items.length > 1 || slot.inputs.length > 1;
-  if (willBeMulti) {
-    ensurePackRole("arrayLayers");
-    store.inputsExpandedId = slot.id;
-  }
+  promoteToPackIfMulti(slot, items);
 
   if (store.inputRole === "base2D") {
-    // Single-input replace (still on Base 2D).
-    slot.inputs.splice(0, slot.inputs.length, items[0]);
-    return items.length > 1
-      ? "Only one input kept; choose a pack role to add more"
-      : null;
+    return replaceBase2DInput(slot, items);
   }
 
-  const max = maxInputsForRole(store.inputRole);
-  const room =
-    max === null ? items.length : Math.max(0, max - slot.inputs.length);
-  if (room === 0) {
-    return max === null
-      ? "cannot add more inputs"
-      : `this role allows at most ${String(max)} inputs`;
-  }
-  const toAdd = items.slice(0, room);
-  for (const item of toAdd) {
-    const anchor = sessionAnchor();
-    if (anchor !== null && item.kind !== anchor.kind) {
-      return `${item.name}: kind must match the first KTX output (${anchor.kind})`;
-    }
-  }
-  slot.inputs.push(...toAdd);
-  if (items.length > room) {
-    return `only ${String(room)} more input(s) fit this role`;
-  }
-  return null;
+  return appendPackInputs(slot, items);
 }
 
 /** Create one KTX output packed with all sources under a pack role. */
@@ -479,22 +518,29 @@ export function clearPendingCenterDrop(): void {
   store.pendingCenterDrop = null;
 }
 
-export function removeOutput(id: string): void {
-  const index = store.outputs.findIndex((o) => o.id === id);
-  if (index < 0) {
-    return;
-  }
-  const slot = store.outputs[index];
-  if (slot.job.status === "running" || slot.job.status === "queued") {
-    return;
-  }
-  store.outputs.splice(index, 1);
+function canRemoveSlot(slot: OutputSlot): boolean {
+  return slot.job.status !== "running" && slot.job.status !== "queued";
+}
+
+function forgetOutputIds(id: string): void {
   if (store.inputsExpandedId === id) {
     store.inputsExpandedId = null;
   }
   if (store.selectedId === id) {
     store.selectedId = store.outputs[0]?.id ?? null;
   }
+}
+
+export function removeOutput(id: string): void {
+  const index = store.outputs.findIndex((o) => o.id === id);
+  if (index < 0) {
+    return;
+  }
+  if (!canRemoveSlot(store.outputs[index])) {
+    return;
+  }
+  store.outputs.splice(index, 1);
+  forgetOutputIds(id);
   maybeResetToBase2D();
 }
 

@@ -2,7 +2,7 @@ import { watchEffect } from "vue";
 import { call } from "../api/commands";
 import { on } from "../api/events";
 import type { MenuAction } from "../bindings/MenuAction";
-import { getViewerControls } from "../shared/viewerControls";
+import { applyZoomMenuAction } from "../shared/menuZoom";
 import {
   canCancelEncode,
   canClearSources,
@@ -22,41 +22,30 @@ async function setEnabled(id: string, enabled: boolean): Promise<void> {
   }
 }
 
+function runEncoderMenuAction(action: MenuAction): Promise<void> | null {
+  if (action === "encode") {
+    return encode();
+  }
+  if (action === "cancel-encode") {
+    return cancelEncode();
+  }
+  if (action === "save") {
+    return saveEncoded();
+  }
+  if (action === "clear-sources") {
+    clearSources();
+    return Promise.resolve();
+  }
+  return null;
+}
+
 async function handleMenuAction(action: MenuAction): Promise<void> {
-  switch (action) {
-    case "encode":
-      await encode();
-      break;
-    case "cancel-encode":
-      await cancelEncode();
-      break;
-    case "save":
-      await saveEncoded();
-      break;
-    case "clear-sources":
-      clearSources();
-      break;
-    case "zoom-in":
-    case "zoom-out":
-    case "zoom-actual":
-    case "zoom-fit": {
-      if (!document.hasFocus()) {
-        break;
-      }
-      const viewer = getViewerControls();
-      if (action === "zoom-in") {
-        viewer?.zoomIn();
-      } else if (action === "zoom-out") {
-        viewer?.zoomOut();
-      } else if (action === "zoom-actual") {
-        viewer?.zoomActual();
-      } else {
-        viewer?.zoomFit();
-      }
-      break;
-    }
-    case "export":
-      break;
+  if (applyZoomMenuAction(action)) {
+    return;
+  }
+  const pending = runEncoderMenuAction(action);
+  if (pending !== null) {
+    await pending;
   }
 }
 

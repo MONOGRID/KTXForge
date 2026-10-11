@@ -50,14 +50,8 @@ export const ktx1Header = computed((): Ktx1Header | null => {
 export function displayValue(
   value: string | number | bigint | boolean | null | undefined,
 ): string {
-  if (value === null || value === undefined) {
+  if (value === null || value === undefined || value === "") {
     return MISSING;
-  }
-  if (typeof value === "string" && value.length === 0) {
-    return MISSING;
-  }
-  if (typeof value === "boolean") {
-    return value ? "true" : "false";
   }
   return String(value);
 }

@@ -2,6 +2,7 @@
 import { computed, onMounted, onUnmounted, ref, watch } from "vue";
 import { useZoomPan } from "../useZoomPan";
 import { registerViewerControls } from "../viewerControls";
+import ImageCompareLayers from "./ImageCompareLayers.vue";
 
 const props = withDefaults(
   defineProps<{
@@ -148,25 +149,45 @@ function onCompareLoad(event: Event): void {
   noteNaturalSize(img.naturalWidth, img.naturalHeight);
 }
 
+function dimPair(
+  pair: readonly [number | null | undefined, number | null | undefined] | undefined,
+): { w: number; h: number } {
+  if (pair === undefined) {
+    return { w: 0, h: 0 };
+  }
+  return { w: pair[0] ?? 0, h: pair[1] ?? 0 };
+}
+
+function applyKnownContentSize(nextW: number, nextH: number, prevW: number, prevH: number): void {
+  applyContentSize();
+  if (prevW !== nextW || prevH !== nextH) {
+    zoomFit();
+  }
+}
+
+function clearNaturalSizeIfHadPrev(prevW: number, prevH: number): void {
+  if (prevW > 0 || prevH > 0) {
+    naturalWidth.value = 0;
+    naturalHeight.value = 0;
+  }
+}
+
+function syncContentSizeProps(
+  next: readonly [number | null | undefined, number | null | undefined],
+  prev: readonly [number | null | undefined, number | null | undefined] | undefined,
+): void {
+  const { w: nextW, h: nextH } = dimPair(next);
+  const { w: prevW, h: prevH } = dimPair(prev);
+  if (nextW > 0 && nextH > 0) {
+    applyKnownContentSize(nextW, nextH, prevW, prevH);
+    return;
+  }
+  clearNaturalSizeIfHadPrev(prevW, prevH);
+}
+
 watch(
   () => [props.contentWidth, props.contentHeight] as const,
-  (next, prev) => {
-    const nextW = next[0] ?? 0;
-    const nextH = next[1] ?? 0;
-    const prevW = prev?.[0] ?? 0;
-    const prevH = prev?.[1] ?? 0;
-    if (nextW > 0 && nextH > 0) {
-      applyContentSize();
-      if (prevW !== nextW || prevH !== nextH) {
-        zoomFit();
-      }
-      return;
-    }
-    if (prevW > 0 || prevH > 0) {
-      naturalWidth.value = 0;
-      naturalHeight.value = 0;
-    }
-  },
+  syncContentSizeProps,
   { immediate: true },
 );
 
@@ -346,90 +367,25 @@ onUnmounted(() => {
         </div>
       </div>
 
-      <!--
-        Compare wipe in *frame* space: both layers share the same transform, but the
-        original is revealed through a left strip whose width is splitPct of the frame.
-        Pan/zoom move the images; the cut stays under the divisor.
-      -->
-      <template v-else>
-        <div class="absolute inset-0 flex items-center justify-center overflow-hidden">
-          <div
-            class="will-change-transform"
-            :style="transformStyle"
-          >
-            <div
-              class="checkerboard relative"
-              :style="canvasStyle"
-            >
-              <img
-                :src="compareSrc"
-                :alt="compareAlt"
-                class="compare-img"
-                draggable="false"
-                @load="onCompareLoad"
-                @dragstart.prevent
-              >
-            </div>
-          </div>
-        </div>
-        <div
-          class="absolute inset-y-0 left-0 overflow-hidden"
-          :style="{ width: `${String(splitPct)}%` }"
-        >
-          <div
-            class="absolute top-0 left-0 flex h-full items-center justify-center"
-            :style="revealInnerStyle"
-          >
-            <div
-              class="will-change-transform"
-              :style="transformStyle"
-            >
-              <div
-                class="checkerboard relative"
-                :style="canvasStyle"
-              >
-                <img
-                  :src="src"
-                  :alt="alt"
-                  class="compare-img"
-                  draggable="false"
-                  @load="onPrimaryLoad"
-                  @dragstart.prevent
-                >
-              </div>
-            </div>
-          </div>
-        </div>
-      </template>
-
-      <template v-if="comparing && src !== null && !loading && errorLabel === null">
-        <div
-          class="pointer-events-none absolute inset-y-0 z-10 w-px bg-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.35)]"
-          :style="{ left: `${String(splitPct)}%` }"
-        />
-        <button
-          type="button"
-          class="absolute top-1/2 z-20 flex h-10 w-4 -translate-x-1/2 -translate-y-1/2 cursor-col-resize items-center justify-center rounded border border-line bg-surface-raised shadow-sm"
-          :style="{ left: `${String(splitPct)}%` }"
-          :aria-label="`Compare slider, ${String(Math.round(splitPct))} percent original`"
-          @pointerdown="onSplitPointerDown"
-          @pointermove="onSplitPointerMove"
-          @pointerup="onSplitPointerUp"
-          @pointercancel="onSplitPointerUp"
-        >
-          <span class="h-5 w-0.5 rounded bg-ink-muted" />
-        </button>
-        <span
-          class="pointer-events-none absolute bottom-2 left-2 z-10 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-white"
-        >
-          {{ originalLabel }}
-        </span>
-        <span
-          class="pointer-events-none absolute bottom-2 right-2 z-10 rounded bg-black/55 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-white"
-        >
-          {{ resultLabel }}
-        </span>
-      </template>
+      <ImageCompareLayers
+        v-else-if="compareSrc !== null && compareSrc !== ''"
+        :src="src"
+        :compare-src="compareSrc"
+        :alt="alt"
+        :compare-alt="compareAlt"
+        :split-pct="splitPct"
+        :transform-style="transformStyle"
+        :canvas-style="canvasStyle"
+        :reveal-inner-style="revealInnerStyle"
+        :original-label="originalLabel"
+        :result-label="resultLabel"
+        :show-chrome="!loading && errorLabel === null"
+        @primary-load="onPrimaryLoad"
+        @compare-load="onCompareLoad"
+        @split-pointer-down="onSplitPointerDown"
+        @split-pointer-move="onSplitPointerMove"
+        @split-pointer-up="onSplitPointerUp"
+      />
     </div>
   </div>
 </template>
@@ -455,17 +411,5 @@ onUnmounted(() => {
   image-rendering: crisp-edges;
   width: auto;
   height: auto;
-}
-
-.compare-img {
-  position: absolute;
-  inset: 0;
-  display: block;
-  width: 100%;
-  height: 100%;
-  max-width: none;
-  object-fit: fill;
-  image-rendering: pixelated;
-  image-rendering: crisp-edges;
 }
 </style>
