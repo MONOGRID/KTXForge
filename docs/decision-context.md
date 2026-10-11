@@ -347,3 +347,9 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 **Decided:** The product is **KTXForge** (not `KTX-GUI`). Package / crate names are `ktxforge` / `ktxforge_lib`; Tauri `productName` is `KTXForge`; identifier is `com.monogrid.ktxforge`; planned repository is `https://github.com/MONOGRID/KTXForge`. Window titles and in-app header use KTXForge / KTXForge Inspector. README describes the app as a KTX GUI that exposes the full encode and inspect surface, with described screenshot placeholders under `docs/screenshots/`. This supersedes the product naming in the 2026-10-04 GitHub / identity entry.
 
 **Why:** A distinct product name for the desktop GUI, separate from the generic “KTX GUI” label used during scaffolding.
+
+## 2026-10-11 — Dual brand masters for app icons
+
+**Decided:** Brand masters live at `assets/icon-simple.png` (anvil + flame + KTX) and `assets/icon-full.png` (adds FORGE wordmark and pixel sparks). `npm run icons` (`scripts/generate-icons.mjs`) resizes them into `src-tauri/icons` and `public/`: sizes **&lt; 128px** from simple, **≥ 128px** from full (ICO layers 16–64 simple / 256 full; ICNS PNG types likewise). Webviews link `public/favicon.ico` + `favicon-32.png`. Regenerating needs `npm install --no-save sharp to-ico @fiahfy/icns` (not permanent deps).
+
+**Why:** `tauri icon` takes one source; the full mark illegibly crushes at taskbar/tray sizes, while the simple mark underuses large dock/installer surfaces.

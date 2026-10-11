@@ -82,9 +82,18 @@ onUnmounted(() => {
       <QueueModal />
 
       <header class="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-surface-raised px-4 py-2">
-        <h1 class="m-0 text-lg font-semibold tracking-tight">
-          KTXForge
-        </h1>
+        <div class="flex min-w-0 items-center gap-2">
+          <img
+            src="/favicon-32.png"
+            alt=""
+            width="28"
+            height="28"
+            class="size-7 shrink-0"
+          >
+          <h1 class="m-0 text-lg font-semibold tracking-tight">
+            KTXForge
+          </h1>
+        </div>
         <div class="flex items-center gap-2">
           <span class="badge font-mono">
             ktx {{ versionLabel }}

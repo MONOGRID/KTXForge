@@ -17,6 +17,7 @@
     "check": "npm run check:rust && npm run check:web && npm run check:fallow",
     "prepare": "husky",
     "fetch-ktx": "node scripts/fetch-ktx.mjs",
+    "icons": "node scripts/generate-icons.mjs",
     "tauri": "tauri"
   },
   "dependencies": {
