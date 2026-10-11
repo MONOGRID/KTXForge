@@ -76,6 +76,7 @@ pub fn run() {
             commands::update::check_update,
             commands::update::install_update,
             menu::set_menu_item_enabled,
+            menu::dispatch_menu_action,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

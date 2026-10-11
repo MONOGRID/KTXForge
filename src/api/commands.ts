@@ -58,6 +58,10 @@ export type Commands = {
     args: { id: string; enabled: boolean };
     result: null;
   };
+  dispatch_menu_action: {
+    args: { id: string };
+    result: null;
+  };
 };
 
 export async function call<K extends keyof Commands>(

@@ -13,6 +13,7 @@ import FramePlayer from "./components/viewer/FramePlayer.vue";
 import ImageViewer from "./components/viewer/ImageViewer.vue";
 import MipStrip from "./components/viewer/MipStrip.vue";
 import SubresourceSelectors from "./components/viewer/SubresourceSelectors.vue";
+import { bindWindowsMenuShortcuts } from "../shared/menuShortcuts";
 import { bindInspectorMenu } from "./menuBridge";
 import {
   displayValue,
@@ -46,14 +47,17 @@ const previewLabel = computed((): string => {
 });
 
 let unbindMenu: (() => void) | undefined;
+let unbindShortcuts: (() => void) | undefined;
 
 onMounted(() => {
   unbindMenu = bindInspectorMenu();
+  unbindShortcuts = bindWindowsMenuShortcuts();
   void initInspectorStore();
 });
 
 onUnmounted(() => {
   unbindMenu?.();
+  unbindShortcuts?.();
 });
 </script>
 

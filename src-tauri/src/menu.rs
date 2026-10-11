@@ -108,7 +108,12 @@ pub fn app_menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>>
 
 #[cfg(desktop)]
 pub fn on_menu_event(app: &AppHandle, event: &tauri::menu::MenuEvent) {
-    let item = event.id();
+    handle_menu_id(app, event.id().as_ref());
+}
+
+/// Run the same path as a native menu click / accelerator for `id`.
+#[cfg(desktop)]
+pub fn handle_menu_id(app: &AppHandle, item: &str) {
     if item == id::EXIT {
         app.exit(0);
         return;
@@ -183,25 +188,49 @@ fn emit_action(app: &AppHandle, action: MenuAction) {
     let _ = app.emit(MENU_ACTION, action);
 }
 
-/// Enable or disable a File / Help menu item by id.
-#[tauri::command]
-pub fn set_menu_item_enabled(app: AppHandle, id: String, enabled: bool) -> Result<(), AppError> {
-    let Some(menu) = app.menu() else {
-        return Ok(());
-    };
+fn find_menu_item(app: &AppHandle, id: &str) -> Option<tauri::menu::MenuItem<tauri::Wry>> {
+    let menu = app.menu()?;
     for top in menu.items().unwrap_or_default() {
         let Some(sub) = top.as_submenu() else {
             continue;
         };
-        let Some(item) = sub.get(id.as_str()) else {
+        let Some(item) = sub.get(id) else {
             continue;
         };
         if let Some(mi) = item.as_menuitem() {
-            mi.set_enabled(enabled)
-                .map_err(|e| AppError::io(format!("set menu enabled: {e}")))?;
-            return Ok(());
+            return Some(mi.clone());
         }
     }
+    None
+}
+
+/// Enable or disable a File / Help menu item by id.
+#[tauri::command]
+pub fn set_menu_item_enabled(app: AppHandle, id: String, enabled: bool) -> Result<(), AppError> {
+    let Some(mi) = find_menu_item(&app, id.as_str()) else {
+        return Ok(());
+    };
+    mi.set_enabled(enabled)
+        .map_err(|e| AppError::io(format!("set menu enabled: {e}")))?;
+    Ok(())
+}
+
+/// Windows WebView2 does not deliver native menu accelerators to the app
+/// (wry#451). The frontend keydown fallback calls this so enablement and
+/// handlers stay identical to a real menu activation.
+#[tauri::command]
+pub fn dispatch_menu_action(app: AppHandle, id: String) -> Result<(), AppError> {
+    let Some(mi) = find_menu_item(&app, id.as_str()) else {
+        return Ok(());
+    };
+    let enabled = mi
+        .is_enabled()
+        .map_err(|e| AppError::io(format!("menu enabled: {e}")))?;
+    if !enabled {
+        return Ok(());
+    }
+    #[cfg(desktop)]
+    handle_menu_id(&app, id.as_str());
     Ok(())
 }
 

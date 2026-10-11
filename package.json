@@ -22,6 +22,7 @@
     "release-outputs": "node scripts/release-outputs.mjs",
     "test:image-cache-lru": "node scripts/image-cache-lru-selftest.mjs",
     "test:scrub-gate": "node scripts/scrub-gate-selftest.mjs",
+    "test:menu-shortcuts": "node scripts/menu-shortcuts-selftest.mjs",
     "tauri": "tauri",
     "release": "semantic-release"
   },

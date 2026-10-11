@@ -24,6 +24,7 @@ import PreviewPane from "./components/PreviewPane.vue";
 import QueueModal from "./components/QueueModal.vue";
 import OptionsPanel from "./components/options/OptionsPanel.vue";
 import { consumeCommittedDropZone } from "./dropTarget";
+import { bindWindowsMenuShortcuts } from "../shared/menuShortcuts";
 import { bindEncoderMenu } from "./menuBridge";
 import { initStore, showInputsPanel, store } from "./store";
 
@@ -38,10 +39,12 @@ const versionLabel = computed((): string => {
 });
 
 let unbindMenu: (() => void) | undefined;
+let unbindShortcuts: (() => void) | undefined;
 const dropUnlisteners: Array<() => void> = [];
 
 onMounted(() => {
   unbindMenu = bindEncoderMenu();
+  unbindShortcuts = bindWindowsMenuShortcuts();
   void initStore().catch((err: unknown) => {
     toastAppError(toAppError(err));
   });
@@ -64,6 +67,7 @@ onMounted(() => {
 
 onUnmounted(() => {
   unbindMenu?.();
+  unbindShortcuts?.();
   for (const unlisten of dropUnlisteners) {
     unlisten();
   }
