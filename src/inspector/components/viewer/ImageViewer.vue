@@ -1,15 +1,30 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from "vue";
-import { call } from "../../../api/commands";
 import { toAppError } from "../../../api/guards";
+import type { ImageSelection } from "../../../bindings/ImageSelection";
 import ImageViewport from "../../../shared/components/ImageViewport.vue";
 import { toastAppError } from "../../../shared/toastAppError";
+import {
+  clearInspectorImageCache,
+  loadInspectorImageUrl,
+  peekInspectorImageUrl,
+  prefetchInspectorNeighbors,
+  warmInspectorMipChain,
+  type SubresourceDims,
+} from "../../imageCache";
 import { path, report, selection } from "../../store";
+
+const MISS_DEBOUNCE_MS = 120;
+const PREFETCH_IDLE_MS = 200;
 
 const objectUrl = ref<string | null>(null);
 const loading = ref(false);
 const loadFailed = ref(false);
 const fetchGen = ref(0);
+const cachedPath = ref<string | null>(null);
+
+let missTimer: ReturnType<typeof setTimeout> | null = null;
+let prefetchTimer: ReturnType<typeof setTimeout> | null = null;
 
 const previewUnavailable = computed((): string | null => {
   const preview = report.value?.preview;
@@ -36,49 +51,111 @@ const errorLabel = computed((): string | null =>
   loadFailed.value ? "Failed to load image" : null,
 );
 
-function revokeUrl(): void {
-  if (objectUrl.value !== null) {
-    URL.revokeObjectURL(objectUrl.value);
-    objectUrl.value = null;
+const subresourceDims = computed((): SubresourceDims | null => {
+  const current = report.value;
+  if (current === null) {
+    return null;
+  }
+  if (current.kind.kind === "ktx2") {
+    const header = current.kind.info.header;
+    return {
+      levelCount: Math.max(1, header.levelCount),
+      faceCount: Math.max(1, header.faceCount),
+      layerCount: Math.max(1, header.layerCount),
+      depthCount: Math.max(1, header.pixelDepth),
+    };
+  }
+  const header = current.kind.header;
+  return {
+    levelCount: Math.max(1, header.numberOfMipmapLevels),
+    faceCount: Math.max(1, header.numberOfFaces),
+    layerCount: Math.max(1, header.numberOfArrayElements),
+    depthCount: Math.max(1, header.pixelDepth),
+  };
+});
+
+function mipSize(base: number, level: number): number {
+  return Math.max(1, base >> level);
+}
+
+/** Header dims for the current mip — drives fit before the PNG decode finishes. */
+const contentWidth = computed((): number | null => {
+  const current = report.value;
+  if (current === null) {
+    return null;
+  }
+  const level = selection.value.level;
+  if (current.kind.kind === "ktx2") {
+    return mipSize(current.kind.info.header.pixelWidth, level);
+  }
+  return mipSize(current.kind.header.pixelWidth, level);
+});
+
+const contentHeight = computed((): number | null => {
+  const current = report.value;
+  if (current === null) {
+    return null;
+  }
+  const level = selection.value.level;
+  if (current.kind.kind === "ktx2") {
+    return mipSize(current.kind.info.header.pixelHeight, level);
+  }
+  return mipSize(current.kind.header.pixelHeight, level);
+});
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === "AbortError";
+}
+
+function clearMissTimer(): void {
+  if (missTimer !== null) {
+    clearTimeout(missTimer);
+    missTimer = null;
   }
 }
 
-async function loadImage(): Promise<void> {
-  const filePath = path.value;
-  const gen = ++fetchGen.value;
-
-  revokeUrl();
-  loadFailed.value = false;
-
-  if (filePath === null || filePath === "" || report.value === null) {
-    loading.value = false;
-    return;
+function clearPrefetchTimer(): void {
+  if (prefetchTimer !== null) {
+    clearTimeout(prefetchTimer);
+    prefetchTimer = null;
   }
+}
 
-  if (previewUnavailable.value !== null) {
-    loading.value = false;
-    return;
+function preparePath(filePath: string): void {
+  if (cachedPath.value !== null && cachedPath.value !== filePath) {
+    clearInspectorImageCache();
   }
+  cachedPath.value = filePath;
+}
 
-  loading.value = true;
+function scheduleIdlePrefetch(filePath: string, sel: ImageSelection): void {
+  clearPrefetchTimer();
+  prefetchTimer = setTimeout(() => {
+    prefetchTimer = null;
+    const dims = subresourceDims.value;
+    if (dims === null) {
+      return;
+    }
+    prefetchInspectorNeighbors(filePath, sel, dims);
+    warmInspectorMipChain(filePath, sel, dims.levelCount);
+  }, PREFETCH_IDLE_MS);
+}
+
+async function fetchMiss(
+  filePath: string,
+  sel: ImageSelection,
+  gen: number,
+): Promise<void> {
+  loading.value = objectUrl.value === null;
   try {
-    const bytes = await call("inspector_image", {
-      path: filePath,
-      selection: {
-        level: selection.value.level,
-        face: selection.value.face,
-        layer: selection.value.layer,
-        depthSlice: selection.value.depthSlice,
-      },
-    });
+    const url = await loadInspectorImageUrl(filePath, sel);
     if (gen !== fetchGen.value) {
       return;
     }
-    objectUrl.value = URL.createObjectURL(
-      new Blob([bytes], { type: "image/png" }),
-    );
+    objectUrl.value = url;
+    scheduleIdlePrefetch(filePath, sel);
   } catch (err: unknown) {
-    if (gen !== fetchGen.value) {
+    if (gen !== fetchGen.value || isAbortError(err)) {
       return;
     }
     loadFailed.value = true;
@@ -88,6 +165,54 @@ async function loadImage(): Promise<void> {
       loading.value = false;
     }
   }
+}
+
+function onSelectionChange(): void {
+  const filePath = path.value;
+  const gen = ++fetchGen.value;
+  const sel = { ...selection.value };
+
+  loadFailed.value = false;
+  clearMissTimer();
+  clearPrefetchTimer();
+
+  if (filePath === null || filePath === "" || report.value === null) {
+    if (cachedPath.value !== null) {
+      clearInspectorImageCache();
+      cachedPath.value = null;
+    }
+    objectUrl.value = null;
+    loading.value = false;
+    return;
+  }
+
+  preparePath(filePath);
+
+  if (previewUnavailable.value !== null) {
+    objectUrl.value = null;
+    loading.value = false;
+    return;
+  }
+
+  const hit = peekInspectorImageUrl(filePath, sel);
+  if (hit !== null) {
+    objectUrl.value = hit;
+    loading.value = false;
+    scheduleIdlePrefetch(filePath, sel);
+    return;
+  }
+
+  // Keep showing the previous layer while scrubbing; only extract after settle.
+  // First paint (nothing on screen yet) skips the debounce.
+  if (objectUrl.value === null) {
+    void fetchMiss(filePath, sel, gen);
+    return;
+  }
+  loading.value = false;
+  missTimer = setTimeout(() => {
+    missTimer = null;
+    void fetchMiss(filePath, sel, gen);
+  }, MISS_DEBOUNCE_MS);
 }
 
 watch(
@@ -101,14 +226,18 @@ watch(
       selection.value.depthSlice,
     ] as const,
   () => {
-    void loadImage();
+    onSelectionChange();
   },
   { immediate: true },
 );
 
 onUnmounted(() => {
   fetchGen.value += 1;
-  revokeUrl();
+  clearMissTimer();
+  clearPrefetchTimer();
+  clearInspectorImageCache();
+  cachedPath.value = null;
+  objectUrl.value = null;
 });
 </script>
 
@@ -117,6 +246,8 @@ onUnmounted(() => {
     :src="objectUrl"
     alt="KTX subresource preview"
     :loading="loading"
+    :content-width="contentWidth"
+    :content-height="contentHeight"
     empty-label="No image selected"
     :error-label="errorLabel"
     :unavailable-label="unavailableLabel"

@@ -6,13 +6,14 @@ use tauri_plugin_dialog::DialogExt;
 use crate::commands::{EncodeRequest, EncodeResult};
 use crate::error::AppError;
 use crate::events::{EncodeProgressPayload, EncodeStage, ENCODE_PROGRESS};
-use crate::image::convert::prepare_input;
+use crate::image::convert::{prepare_input, read_source_info};
 use crate::ktx::anim::write_anim_data;
 use crate::ktx::create_args::build_create_args;
 use crate::ktx::extract_ops::{extract_preview_png, read_texture_meta};
 use crate::ktx::info_types::{ImageSelection, PreviewKind};
 use crate::ktx::metrics::parse_metrics;
 use crate::ktx::options::{CreateOptions, EncodeCodec};
+use crate::ktx::rules;
 use crate::ktx::sidecar::{self, CancellationHandle};
 use crate::state::{AppState, Job};
 
@@ -61,18 +62,25 @@ pub async fn run_encode(
 
     emit_stage(app, &request.job_id, EncodeStage::Converting, None);
 
+    let mut source_infos = Vec::new();
     let mut prepared_paths = Vec::new();
     for src in &request.sources {
         if cancel.is_cancelled() {
             return Err(AppError::cancelled());
         }
-        let prepared = prepare_input(Path::new(src), &convert_dir)?;
+        let path = Path::new(src);
+        source_infos.push(read_source_info(path)?);
+        let prepared = prepare_input(path, &convert_dir)?;
         prepared_paths.push(prepared.path);
     }
 
     let mut options = request.options.clone();
     if request.animation.is_some() {
         options.container.layers = Some(prepared_paths.len() as u32);
+    }
+
+    if let Err(errors) = rules::validate_for_sources(&options, &source_infos) {
+        return Err(AppError::invalid_input(errors.join("; ")));
     }
 
     let output_path = job_dir.join("output.ktx2");

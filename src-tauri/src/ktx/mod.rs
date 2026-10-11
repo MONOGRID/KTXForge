@@ -19,5 +19,5 @@ pub use info_types::{
 #[allow(unused_imports)]
 pub use options::{
     AnimationOptions, CreateOptions, EncodeCodec, FieldState, OptionKey, OptionReport,
-    OptionWarning, VkFormat, WarningLevel,
+    OptionSuggestion, OptionWarning, SourcesClass, VkFormat, WarningLevel,
 };

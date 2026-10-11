@@ -32,7 +32,27 @@ function emptyJob(): JobState {
 }
 
 function emptyReport(): OptionReport {
-  return { fields: [], warnings: [] };
+  return {
+    fields: [],
+    warnings: [],
+    sourcesClass: "empty",
+    suggestion: null,
+  };
+}
+
+function applySuggestion(report: OptionReport): boolean {
+  const suggestion = report.suggestion;
+  if (suggestion === null) {
+    return false;
+  }
+  const formatChanged = store.options.format !== suggestion.format;
+  const encodeChanged = store.options.encode !== suggestion.encode;
+  if (!formatChanged && !encodeChanged) {
+    return false;
+  }
+  store.options.format = suggestion.format;
+  store.options.encode = suggestion.encode;
+  return true;
 }
 
 /** Matches Rust `CreateOptions::default` until `initStore` replaces it. */
@@ -124,10 +144,13 @@ const refreshReport = useDebounceFn(async () => {
     return;
   }
   try {
-    store.report = await call("describe_options", {
+    const report = await call("describe_options", {
       options: store.options,
       sources: store.sources,
     });
+    store.report = report;
+    // Rust suggestion corrects known-invalid combos; applying options re-triggers this watch.
+    applySuggestion(report);
   } catch {
     // Keep the last successful report; option sections still render.
   }
@@ -160,11 +183,24 @@ export function isOptionEnabled(key: OptionKey): boolean {
   return fieldState(key).enabled;
 }
 
+/** Encode result belongs to the source list that produced it. */
+function clearJobUnlessRunning(): void {
+  if (store.job.status === "running") {
+    return;
+  }
+  store.job = emptyJob();
+}
+
 export function addSources(items: readonly SourceInfo[]): void {
+  if (items.length === 0) {
+    return;
+  }
+  clearJobUnlessRunning();
   store.sources.push(...items);
 }
 
 export function resetSources(): void {
+  clearJobUnlessRunning();
   store.sources.splice(0, store.sources.length);
 }
 
@@ -172,6 +208,7 @@ export function removeSource(index: number): void {
   if (index < 0 || index >= store.sources.length) {
     return;
   }
+  clearJobUnlessRunning();
   store.sources.splice(index, 1);
 }
 
@@ -185,6 +222,7 @@ export function moveSource(index: number, delta: -1 | 1): void {
   ) {
     return;
   }
+  clearJobUnlessRunning();
   const sources = store.sources;
   const current = sources[index];
   sources[index] = sources[next];

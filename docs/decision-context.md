@@ -225,3 +225,40 @@ ASTC `--format` strings keep the Vulkan `_BLOCK` suffix required by v4.4.2. This
 **Decided:** The encoder wipe clips the original in *frame* space (overflow strip at `splitPct` of the viewport, inner layer as wide as the frame, same pan/zoom transform as the encoded layer). The divisor and the image cut stay aligned when panning. Preview pane loads `source_preview` (full-resolution PNG / tone-mapped HDR), not `source_thumbnail` (128px list thumb). Both compare layers fill a shared max(natural) canvas via `object-fit: fill`.
 
 **Why:** Clip-path on the transformed image moved the cut with the pan while the handle stayed viewport-centered. Using the list thumbnail made the left side a small inset next to a full encoded preview.
+
+## 2026-10-11 — Instant inspector mip/layer switching via dual cache
+
+**Decided:** Inspector subresource previews use a two-layer cache. Rust short-circuits `inspector_image` on an existing disk PNG under the inspector workdir and reuses `TextureMeta` stashed from `inspect` (no per-slider `ktx info` spawn). The Vue inspector keeps object URLs in an in-memory map keyed by path + selection, dedupes in-flight IPC, keeps the previous image visible while a miss loads, prefetches ±1 neighbors, and sequentially warms the mip chain for the current face/layer/depth. FramePlayer preload shares that map.
+
+**Why:** Moving the mip/layer sliders re-ran `ktx info` and cleared the viewport to “Loading…” on every tick even when the PNG was already on disk; FramePlayer’s preload discarded bytes so it paid twice. Disk + memory cache makes revisited selections instantaneous and first visits feel continuous.
+
+## 2026-10-11 — Inspector scrub: coalesce extracts; fit from header dims
+
+**Decided:** Uncached inspector image fetches run at most one at a time. Interactive slider targets coalesce to the latest selection (superseded requests abort); prefetch/mip-warm sit on a lower-priority queue that interactive loads flush. ImageViewer debounces miss-loads and idle prefetch while scrubbing, and applies cache hits immediately. Fit/zoom uses KTX header × mip as `contentWidth`/`contentHeight` so the viewport never flashes 1:1 while `naturalWidth` is still 0; same-size layer/face changes do not reset fit.
+
+**Why:** Fast layer scrub on large arrays (e.g. 1024² × 200) spawned dozens of parallel `ktx extract` processes and locked the machine. Resetting natural size on every `src` change made `fitScale` fall back to 1 until `@load`, so the image briefly painted full-res.
+
+## 2026-10-11 — Transcode target from DFD model, not sample count
+
+**Decided:** Choose `ktx extract --transcode` from unpacked channel count derived from the DFD color model and channel types (`unpacked_channels_from_dfd`), not from `samples.len()`. ETC1S `RGB` (+ optional `AAA`) maps to 3/4 channels; UASTC `RGBA`/`RGB` likewise. RGBSDA keeps one sample per channel.
+
+**Why:** BasisLZ DFD packs RGB into one sample. Counting samples selected `r8` (solid-red normals) or `rg8` (yellow color, blue dropped). Confirmed against `headphones_norm.ktx2` / `headphones_color_3.ktx2` by comparing CLI extracts.
+
+## 2026-10-11 — Source-aware format defaults; never offer known-fail encode combos
+
+**Decided:**
+
+1. **Hard rule:** The GUI never allows a sources+options combination the app already knows will fail `ktx create`. Rust `describe_options` filters choices and disables fields; when the current options are invalid for the sources it returns an `OptionSuggestion` that Vue must apply; encode validates again and refuses. Documented in [AGENTS.md](../AGENTS.md) and [requirements.md](requirements.md).
+2. **HDR sources** (EXR / Radiance): default / suggest `R16G16B16A16_SFLOAT`; only `R16G16B16_SFLOAT` and `R16G16B16A16_SFLOAT` appear; ASTC and `--encode` (BasisLZ / UASTC LDR) are hidden — UASTC HDR is deferred on the v4.4.2 pin.
+3. **LDR sources:** keep `R8G8B8A8_SRGB` as the default; hide half-float formats (they mismatch PNG/8-bit inputs).
+4. **Mixed LDR+HDR** in one encode is refused (warning + encode blocked). Multi-source still means one KTX (layers / animation), not batch encode — batch vs single-KTX product wording left open.
+5. **Tone-map HDR→LDR for compression** is out of scope; stay aligned with what `ktx create` accepts.
+6. Split: Rust owns compatibility, filtered choices, and suggestion; Vue applies the suggestion when sources/options change and only renders allowed choices.
+
+**Why:** Dropping an EXR while format stayed on `R8G8B8A8_SRGB` produced a fatal `exr_float` vs 8-bit UNORM from the sidecar. Users should not need to know Vulkan format / input type pairing; the app already classifies `SourceKind` and was ignoring `sources` in `describe_options`.
+
+## 2026-10-11 — Source list changes invalidate encode result
+
+**Decided:** Adding, removing, reordering, or clearing sources resets encoder `job` state to idle (unless a job is currently running). The center preview and Save affordance follow that state, so a stale encoded preview cannot outlive the source list that produced it.
+
+**Why:** After a successful encode, deleting a source cleared the source layer but left `job.status === "done"` and the encoded object URL, so the viewport kept showing the old result until the next encode.

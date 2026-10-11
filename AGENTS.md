@@ -15,6 +15,10 @@ When `ktx create` (or this app) has a known default for an option, put that valu
 
 This matters especially when other options’ enablement depends on the value being set (for example `scale: 1` unlocks mipmap filter controls). Placeholders are only for format hints on fields that truly have no default (for example swizzle pattern `rgba` when the flag is omitted). Unset (`null` / `None`) means “omit the flag”, not “pretend the default is visible”.
 
+## Never offer known-invalid encode combinations
+
+The GUI must **never** let the user select or keep a combination of sources and options that we already know will make `ktx create` (or our wrapper) fail. Hide or auto-correct those choices in the options rules engine; refuse encode as a backstop. Do not rely on the user reading a fatal from the sidecar. When the tool’s rules change (pin bump), update the filters with them.
+
 ## TypeScript
 
 `strict` stays on. Write types the checker can prove.

@@ -4,15 +4,25 @@ use tauri::{AppHandle, State};
 
 use crate::error::AppError;
 use crate::image::classify::{classify, FileKind};
-use crate::ktx::extract_ops::{ensure_ktx2, extract_preview_png, texture_meta_via_info};
+use crate::ktx::extract_ops::{
+    cached_preview_png, ensure_ktx2, extract_preview_png, read_texture_meta,
+    texture_meta_from_report, texture_meta_via_info,
+};
 use crate::ktx::info;
 use crate::ktx::info_types::{ImageSelection, InspectReport};
 use crate::ktx::sidecar::CancellationHandle;
 use crate::state::AppState;
 
 #[tauri::command]
-pub async fn inspect(app: AppHandle, path: String) -> Result<InspectReport, AppError> {
-    info::inspect(&app, PathBuf::from(path).as_path()).await
+pub async fn inspect(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    path: String,
+) -> Result<InspectReport, AppError> {
+    let path_buf = PathBuf::from(&path);
+    let report = info::inspect(&app, path_buf.as_path()).await?;
+    state.set_inspector_meta(path_buf, texture_meta_from_report(&report));
+    Ok(report)
 }
 
 #[tauri::command]
@@ -24,6 +34,14 @@ pub async fn inspector_image(
 ) -> Result<tauri::ipc::Response, AppError> {
     let path = PathBuf::from(path);
     let work = state.inspector_cache(&path)?;
+    let cache = work.join("images");
+    std::fs::create_dir_all(&cache).map_err(|e| AppError::io(e.to_string()))?;
+
+    // Disk cache hit: no sidecar, no info parse.
+    if let Some(bytes) = cached_preview_png(&cache, &selection) {
+        return Ok(tauri::ipc::Response::new(bytes));
+    }
+
     let convert_dir = work.join("ktx1");
     std::fs::create_dir_all(&convert_dir).map_err(|e| AppError::io(e.to_string()))?;
 
@@ -43,13 +61,22 @@ pub async fn inspector_image(
         }
     };
 
-    let meta = match texture_meta_via_info(&app, &ktx2_path).await {
-        Ok(m) => m,
-        Err(_) => texture_meta_via_info(&app, &path).await?,
+    let meta = if let Some(m) = state.inspector_meta_for(&path) {
+        m
+    } else if classify(&ktx2_path) == FileKind::Ktx2 {
+        match read_texture_meta(&ktx2_path) {
+            Ok(m) => m,
+            Err(_) => match texture_meta_via_info(&app, &ktx2_path).await {
+                Ok(m) => m,
+                Err(_) => texture_meta_via_info(&app, &path).await?,
+            },
+        }
+    } else {
+        match texture_meta_via_info(&app, &ktx2_path).await {
+            Ok(m) => m,
+            Err(_) => texture_meta_via_info(&app, &path).await?,
+        }
     };
-
-    let cache = work.join("images");
-    std::fs::create_dir_all(&cache).map_err(|e| AppError::io(e.to_string()))?;
 
     let (bytes, _) = extract_preview_png(
         &app,

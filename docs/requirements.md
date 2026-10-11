@@ -112,6 +112,8 @@ Supercompression:
 
 Every option below is available in the UI. Options the current codec, format, or texture shape cannot use are **hidden** (not shown disabled). Whole option panels hide when every control inside is unavailable. Dependent detail controls follow enable-then-reveal: the master switch stays visible when it can be used; linked options appear only while that feature applies (for example mipmap filter controls only after generate-mipmap, scale, width, or height). Each control has a short tooltip from the tool docs. Defaults match the tool.
 
+The UI must never offer a combination of inputs and options that the app already knows will fail at encode time (for example HDR / EXR float with an 8-bit or ASTC format, or LDR PNG with a half-float format, or mixed LDR and HDR sources in one encode). Incompatible choices are hidden or auto-corrected to a safe default; encode is refused if a known-invalid combination reaches the backend.
+
 **Container**
 
 | Option | Values / notes |

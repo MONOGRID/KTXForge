@@ -201,11 +201,15 @@ const astcColorOptions = [
   },
 ] as const;
 
-const modeOptions = modeValues.map((value) => ({
-  value,
-  label: modeLabels[value],
-  help: modeHelps[value],
-}));
+const modeOptions = computed(() => {
+  const allowed: readonly FormatMode[] =
+    store.report.sourcesClass === "hdr" ? (["uncompressed"] as const) : modeValues;
+  return allowed.map((value) => ({
+    value,
+    label: modeLabels[value],
+    help: modeHelps[value],
+  }));
+});
 
 const groupId = useId();
 
@@ -268,10 +272,19 @@ const formatWarnings = computed(() =>
   ),
 );
 
+function defaultUncompressedFormat(): UncompressedFormat {
+  return store.report.sourcesClass === "hdr"
+    ? "R16G16B16A16_SFLOAT"
+    : "R8G8B8A8_SRGB";
+}
+
 function setMode(next: FormatMode): void {
+  if (store.report.sourcesClass === "hdr" && next !== "uncompressed") {
+    return;
+  }
   if (next === "uncompressed") {
     if (!isUncompressedFormat(store.options.format)) {
-      store.options.format = "R8G8B8A8_SRGB";
+      store.options.format = defaultUncompressedFormat();
     }
     store.options.encode = null;
     return;
@@ -283,7 +296,7 @@ function setMode(next: FormatMode): void {
     return;
   }
   if (!isUncompressedFormat(store.options.format)) {
-    store.options.format = "R8G8B8A8_SRGB";
+    store.options.format = defaultUncompressedFormat();
   }
   if (store.options.encode === null) {
     store.options.encode = "basis-lz";
@@ -324,9 +337,12 @@ function onEncode(value: string | null): void {
     store.options.encode = null;
     return;
   }
+  if (store.report.sourcesClass === "hdr") {
+    return;
+  }
   if (isEncodeCodec(value)) {
     if (!isUncompressedFormat(store.options.format)) {
-      store.options.format = "R8G8B8A8_SRGB";
+      store.options.format = defaultUncompressedFormat();
     }
     store.options.encode = value;
   }

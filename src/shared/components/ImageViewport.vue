@@ -23,6 +23,12 @@ const props = withDefaults(
     originalLabel?: string;
     /** Right wipe label when comparing. */
     resultLabel?: string;
+    /**
+     * Known pixel size (e.g. KTX header × mip). When set, fit uses these
+     * immediately so the image never flashes at 1:1 before `@load`.
+     */
+    contentWidth?: number | null;
+    contentHeight?: number | null;
   }>(),
   {
     compareSrc: null,
@@ -35,6 +41,8 @@ const props = withDefaults(
     hint: null,
     originalLabel: "Original",
     resultLabel: "Result",
+    contentWidth: null,
+    contentHeight: null,
   },
 );
 
@@ -51,7 +59,6 @@ const splitPct = ref(50);
 const canInteract = (): boolean =>
   !splitting.value &&
   props.src !== null &&
-  !props.loading &&
   props.errorLabel === null &&
   props.unavailableLabel === null;
 
@@ -85,13 +92,44 @@ const revealInnerStyle = computed((): { width: string } => ({
   width: `${String(Math.max(frameW.value, 1))}px`,
 }));
 
+const hasContentSize = computed(
+  (): boolean =>
+    props.contentWidth !== null &&
+    props.contentWidth > 0 &&
+    props.contentHeight !== null &&
+    props.contentHeight > 0,
+);
+
+const imageSized = computed(
+  (): boolean => naturalWidth.value > 0 && naturalHeight.value > 0,
+);
+
+function applyContentSize(): void {
+  const width = props.contentWidth;
+  const height = props.contentHeight;
+  if (width === null || width <= 0 || height === null || height <= 0) {
+    return;
+  }
+  naturalWidth.value = width;
+  naturalHeight.value = height;
+}
+
 function noteNaturalSize(width: number, height: number): void {
   if (width <= 0 || height <= 0) {
     return;
   }
-  // Shared canvas = max of both sides so neither is letterboxed away when sizes differ.
-  naturalWidth.value = Math.max(naturalWidth.value, width);
-  naturalHeight.value = Math.max(naturalHeight.value, height);
+  if (comparing.value) {
+    // Shared canvas = max of both sides so neither is letterboxed away when sizes differ.
+    naturalWidth.value = Math.max(naturalWidth.value, width);
+    naturalHeight.value = Math.max(naturalHeight.value, height);
+    return;
+  }
+  if (hasContentSize.value) {
+    // Header dims already drive fit; avoid a one-frame 1:1 flash from decode.
+    return;
+  }
+  naturalWidth.value = width;
+  naturalHeight.value = height;
 }
 
 function onPrimaryLoad(event: Event): void {
@@ -111,8 +149,35 @@ function onCompareLoad(event: Event): void {
 }
 
 watch(
+  () => [props.contentWidth, props.contentHeight] as const,
+  (next, prev) => {
+    const nextW = next[0] ?? 0;
+    const nextH = next[1] ?? 0;
+    const prevW = prev?.[0] ?? 0;
+    const prevH = prev?.[1] ?? 0;
+    if (nextW > 0 && nextH > 0) {
+      applyContentSize();
+      if (prevW !== nextW || prevH !== nextH) {
+        zoomFit();
+      }
+      return;
+    }
+    if (prevW > 0 || prevH > 0) {
+      naturalWidth.value = 0;
+      naturalHeight.value = 0;
+    }
+  },
+  { immediate: true },
+);
+
+watch(
   () => props.src,
   () => {
+    if (hasContentSize.value) {
+      applyContentSize();
+      return;
+    }
+    // Unknown size: hide until `@load` (fitScale is 1 while natural is 0).
     naturalWidth.value = 0;
     naturalHeight.value = 0;
     zoomFit();
@@ -234,13 +299,7 @@ onUnmounted(() => {
       @pointercancel="onPointerUp"
     >
       <div
-        v-if="loading"
-        class="absolute inset-0 flex items-center justify-center text-sm text-ink-muted"
-      >
-        Loading…
-      </div>
-      <div
-        v-else-if="unavailableLabel !== null"
+        v-if="unavailableLabel !== null"
         class="absolute inset-0 flex items-center justify-center p-4 text-sm text-ink-muted"
       >
         {{ unavailableLabel }}
@@ -250,6 +309,12 @@ onUnmounted(() => {
         class="absolute inset-0 flex items-center justify-center p-4 text-sm text-ink-muted"
       >
         {{ errorLabel }}
+      </div>
+      <div
+        v-else-if="src === null && loading"
+        class="absolute inset-0 flex items-center justify-center text-sm text-ink-muted"
+      >
+        Loading…
       </div>
       <div
         v-else-if="src === null"
@@ -262,6 +327,7 @@ onUnmounted(() => {
       <div
         v-else-if="!comparing || !compareSrc"
         class="absolute inset-0 flex items-center justify-center"
+        :class="{ 'opacity-0': !imageSized }"
       >
         <div
           class="will-change-transform"

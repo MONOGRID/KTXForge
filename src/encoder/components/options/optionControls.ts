@@ -90,10 +90,14 @@ export function enumEntriesWithHelp(
   key: OptionKey,
   labels: Record<string, string>,
 ): EnumSelectOption[] {
-  const helps = new Map(
-    fieldState(key).choices.map((choice) => [choice.value, choice.help]),
-  );
-  return Object.keys(labels).map((value) => {
+  const choices = fieldState(key).choices;
+  const helps = new Map(choices.map((choice) => [choice.value, choice.help]));
+  // When Rust filters choices (e.g. HDR vs LDR formats), only offer those values.
+  const values =
+    choices.length > 0
+      ? choices.map((choice) => choice.value).filter((value) => value in labels)
+      : Object.keys(labels);
+  return values.map((value) => {
     const help = helps.get(value);
     const entry: EnumSelectOption = {
       value,

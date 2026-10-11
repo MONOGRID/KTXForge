@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, ref, watch } from "vue";
 import { useIntervalFn } from "@vueuse/core";
-import { call } from "../../../api/commands";
 import type { KtxAnimDataInfo } from "../../../bindings/KtxAnimDataInfo";
+import { prefetchInspectorImage } from "../../imageCache";
 import { path, report, selection } from "../../store";
 
 const playsCompleted = ref(0);
@@ -107,7 +107,7 @@ function togglePlay(): void {
   resume();
 }
 
-async function preloadNext(): Promise<void> {
+function preloadNext(): void {
   const filePath = path.value;
   const data = anim.value;
   if (filePath === null || filePath === "" || data === null) {
@@ -118,19 +118,12 @@ async function preloadNext(): Promise<void> {
     return;
   }
   const nextLayer = (selection.value.layer + 1) % count;
-  try {
-    await call("inspector_image", {
-      path: filePath,
-      selection: {
-        level: selection.value.level,
-        face: selection.value.face,
-        layer: nextLayer,
-        depthSlice: selection.value.depthSlice,
-      },
-    });
-  } catch {
-    // Preload is best-effort; ImageViewer surfaces real load errors.
-  }
+  prefetchInspectorImage(filePath, {
+    level: selection.value.level,
+    face: selection.value.face,
+    layer: nextLayer,
+    depthSlice: selection.value.depthSlice,
+  });
 }
 
 watch(
@@ -144,7 +137,7 @@ watch(
       anim.value,
     ] as const,
   () => {
-    void preloadNext();
+    preloadNext();
   },
 );
 

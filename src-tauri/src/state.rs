@@ -1,8 +1,9 @@
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::Mutex;
 
 use crate::error::AppError;
+use crate::ktx::extract_ops::TextureMeta;
 use crate::ktx::info_types::PreviewKind;
 use crate::ktx::sidecar::CancellationHandle;
 use crate::workspace::Workspace;
@@ -23,6 +24,8 @@ pub struct AppState {
     workspace: Mutex<Option<Workspace>>,
     pub jobs: Mutex<HashMap<String, Job>>,
     pub inspector_file: Mutex<Option<PathBuf>>,
+    /// Texture meta for the open inspector file (avoids re-running `ktx info` per image).
+    pub inspector_meta: Mutex<Option<(PathBuf, TextureMeta)>>,
 }
 
 impl AppState {
@@ -41,6 +44,22 @@ impl AppState {
                 .unwrap_or(std::time::SystemTime::UNIX_EPOCH);
             ws.inspector_cache(path, mtime)
         })
+    }
+
+    pub fn set_inspector_meta(&self, path: PathBuf, meta: TextureMeta) {
+        if let Ok(mut guard) = self.inspector_meta.lock() {
+            *guard = Some((path, meta));
+        }
+    }
+
+    pub fn inspector_meta_for(&self, path: &Path) -> Option<TextureMeta> {
+        let guard = self.inspector_meta.lock().ok()?;
+        let (cached_path, meta) = guard.as_ref()?;
+        if cached_path == path {
+            Some(meta.clone())
+        } else {
+            None
+        }
     }
 
     pub fn with_workspace<F, T>(&self, f: F) -> Result<T, AppError>

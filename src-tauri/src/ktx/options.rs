@@ -704,12 +704,36 @@ pub struct FieldState {
     pub choices: Vec<OptionChoice>,
 }
 
+/// Homogeneous source set for format / encode enablement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "camelCase")]
+pub enum SourcesClass {
+    Empty,
+    Ldr,
+    Hdr,
+    /// Both LDR and HDR inputs in one encode — not allowed.
+    Mixed,
+}
+
+/// Patches Vue must apply when current options would fail `ktx create` for the sources.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "camelCase")]
+pub struct OptionSuggestion {
+    pub format: VkFormat,
+    pub encode: Option<EncodeCodec>,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "camelCase")]
 pub struct OptionReport {
     pub fields: Vec<FieldState>,
     pub warnings: Vec<OptionWarning>,
+    pub sources_class: SourcesClass,
+    /// When set, the current options are known-invalid for these sources; apply before encode.
+    pub suggestion: Option<OptionSuggestion>,
 }
 
 fn serde_name_of_enum_variant<T: Serialize>(value: &T) -> String {

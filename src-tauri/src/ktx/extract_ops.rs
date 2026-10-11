@@ -11,10 +11,11 @@ use crate::error::AppError;
 use crate::image::classify::{classify, FileKind};
 use crate::image::export::{exr_to_preview_png, png_bytes};
 use crate::ktx::extract_args::{
-    build_extract_args, transcode_target_for, Dims, ExtractSpec, TranscodeTarget,
+    build_extract_args, transcode_target_for, unpacked_channels_from_dfd, Dims, ExtractSpec,
+    TranscodeTarget,
 };
 use crate::ktx::info::{self, preview_kind_from_vk_format};
-use crate::ktx::info_types::{ImageSelection, InspectKind, PreviewKind};
+use crate::ktx::info_types::{ImageSelection, InspectKind, InspectReport, PreviewKind};
 use crate::ktx::sidecar::{self, CancellationHandle};
 use crate::workspace::Workspace;
 
@@ -84,6 +85,69 @@ fn selection_cache_name(sel: &ImageSelection, ext: &str) -> String {
         "l{}_f{}_y{}_d{}.{ext}",
         sel.level, sel.face, sel.layer, sel.depth_slice
     )
+}
+
+/// Fast path: return PNG bytes when a prior extract already wrote them.
+pub fn cached_preview_png(cache_dir: &Path, selection: &ImageSelection) -> Option<Vec<u8>> {
+    let path = cache_dir.join(selection_cache_name(selection, "png"));
+    if path.is_file() {
+        png_bytes(&path).ok()
+    } else {
+        None
+    }
+}
+
+/// Build extract meta from an already-parsed [`InspectReport`] (no `ktx info` spawn).
+pub fn texture_meta_from_report(report: &InspectReport) -> TextureMeta {
+    match &report.kind {
+        InspectKind::Ktx2 { info } => {
+            let dims = Dims::from_ktx2_counts(
+                info.header.level_count,
+                info.header.face_count,
+                info.header.layer_count,
+                info.header.pixel_depth,
+            );
+            let channels = channels_from_ktx2_info(info);
+            let mut meta = meta_from_inspect(
+                &info.header.vk_format,
+                &info.header.supercompression_scheme,
+                dims,
+                info.header.pixel_width,
+                info.header.pixel_height,
+                channels,
+            );
+            meta.preview = report.preview.clone();
+            meta
+        }
+        InspectKind::Ktx1 { header, .. } => TextureMeta {
+            dims: Dims::from_ktx2_counts(
+                header.number_of_mipmap_levels.max(1),
+                header.number_of_faces.max(1),
+                header.number_of_array_elements,
+                header.pixel_depth,
+            ),
+            width: header.pixel_width,
+            height: header.pixel_height.max(1),
+            vk_format: String::new(),
+            supercompression: String::new(),
+            preview: report.preview.clone(),
+            channels: 4,
+            needs_transcode: false,
+        },
+    }
+}
+
+fn channels_from_ktx2_info(info: &crate::ktx::info_types::Ktx2Info) -> u8 {
+    info.data_format_descriptor
+        .blocks
+        .first()
+        .map(|b| {
+            unpacked_channels_from_dfd(
+                &b.color_model,
+                b.samples.iter().map(|s| s.channel_type.as_str()),
+            )
+        })
+        .unwrap_or(4)
 }
 
 /// Ensure a KTX2 path for extract. KTX1 is converted with legacy `ktx2ktx2` when available.
@@ -276,19 +340,13 @@ pub async fn texture_meta_via_info(app: &AppHandle, path: &Path) -> Result<Textu
                 info.header.layer_count,
                 info.header.pixel_depth,
             );
-            let channels = info
-                .data_format_descriptor
-                .blocks
-                .first()
-                .map(|b| b.samples.len().min(4) as u8)
-                .unwrap_or(4);
             Ok(meta_from_inspect(
                 &info.header.vk_format,
                 &info.header.supercompression_scheme,
                 dims,
                 info.header.pixel_width,
                 info.header.pixel_height,
-                channels,
+                channels_from_ktx2_info(&info),
             ))
         }
         InspectKind::Ktx1 { header, .. } => {

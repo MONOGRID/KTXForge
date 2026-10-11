@@ -14,7 +14,19 @@ function isJobStatus(status: JobStatus, expected: JobStatus): boolean {
 }
 
 export function canEncode(): boolean {
-  return store.sources.length > 0 && !isJobStatus(store.job.status, "running");
+  if (store.sources.length === 0 || isJobStatus(store.job.status, "running")) {
+    return false;
+  }
+  const hasLdr = store.sources.some((source) => source.kind === "ldr");
+  const hasHdr = store.sources.some((source) => source.kind === "hdr");
+  if (hasLdr && hasHdr) {
+    return false;
+  }
+  // Wait until Rust suggestion has been applied (known-invalid combo).
+  if (store.report.suggestion !== null) {
+    return false;
+  }
+  return true;
 }
 
 export function canCancelEncode(): boolean {

@@ -2,24 +2,32 @@
 
 use strum::IntoEnumIterator;
 
-use crate::commands::SourceInfo;
+use crate::commands::{SourceInfo, SourceKind};
 use crate::ktx::option_help;
 use crate::ktx::options::{
-    ColorPrimaries, CreateOptions, EncodeCodec, FieldState, OptionKey, OptionReport, OptionWarning,
-    Supercompression, TransferFunction, VkFormat, WarningLevel,
+    ColorPrimaries, CreateOptions, EncodeCodec, FieldState, OptionKey, OptionReport,
+    OptionSuggestion, OptionWarning, SourcesClass, Supercompression, TransferFunction, VkFormat,
+    WarningLevel,
 };
 
 /// Return a [`FieldState`] for every [`OptionKey`], plus color / encode warnings.
-pub fn describe(opts: &CreateOptions, _sources: &[SourceInfo]) -> OptionReport {
+///
+/// Filters format / encode choices from the source set so the UI cannot pick a combination
+/// known to fail `ktx create`. When current options are invalid, [`OptionReport::suggestion`]
+/// tells Vue what to apply.
+pub fn describe(opts: &CreateOptions, sources: &[SourceInfo]) -> OptionReport {
+    let sources_class = classify_sources(sources);
     let mut fields = Vec::new();
     for key in OptionKey::iter() {
-        let (enabled, reason) = field_enabled(opts, key);
+        let (mut enabled, mut reason) = field_enabled(opts, key);
+        apply_source_enablement(key, sources_class, &mut enabled, &mut reason);
+        let choices = filter_choices(key, sources_class, option_help::choices_for(key));
         fields.push(FieldState {
             key,
             enabled,
             reason,
             help: option_help::help_for(key).to_owned(),
-            choices: option_help::choices_for(key),
+            choices,
         });
     }
     let mut warnings = Vec::new();
@@ -27,28 +35,226 @@ pub fn describe(opts: &CreateOptions, _sources: &[SourceInfo]) -> OptionReport {
     warn_srgb_format_tf(opts, &mut warnings);
     warn_encode_color_space(opts, &mut warnings);
     warn_srgb_to_linear_lossy(opts, &mut warnings);
-    OptionReport { fields, warnings }
+    warn_mixed_sources(sources_class, &mut warnings);
+    let suggestion = suggestion_for(opts, sources_class);
+    OptionReport {
+        fields,
+        warnings,
+        sources_class,
+        suggestion,
+    }
 }
 
 /// Hard errors used by `create_args` so a bad request never reaches the binary.
 pub fn validate(opts: &CreateOptions) -> Result<(), Vec<String>> {
     let mut errors = Vec::new();
-    reject_zstd_with_basis_lz(opts, &mut errors);
-    reject_zlib_with_basis_lz(opts, &mut errors);
-    reject_generate_mipmap_constraints(opts, &mut errors);
-    reject_runtime_vs_generate(opts, &mut errors);
-    reject_raw_missing_size(opts, &mut errors);
-    reject_convert_tf_with_raw(opts, &mut errors);
-    reject_convert_primaries_with_raw(opts, &mut errors);
-    reject_convert_primaries_when_none(opts, &mut errors);
-    reject_convert_origin_with_raw(opts, &mut errors);
-    reject_normalize_with_raw(opts, &mut errors);
-    reject_depth_origin(opts, &mut errors);
-    reject_cubemap_origin(opts, &mut errors);
+    reject_option_constraints(opts, &mut errors);
     if errors.is_empty() {
         Ok(())
     } else {
         Err(errors)
+    }
+}
+
+/// Like [`validate`], plus source/format pairing rules (mixed LDR+HDR, HDR vs 8-bit, etc.).
+pub fn validate_for_sources(
+    opts: &CreateOptions,
+    sources: &[SourceInfo],
+) -> Result<(), Vec<String>> {
+    let mut errors = Vec::new();
+    reject_option_constraints(opts, &mut errors);
+    reject_source_option_mismatch(opts, sources, &mut errors);
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        Err(errors)
+    }
+}
+
+fn reject_option_constraints(opts: &CreateOptions, errors: &mut Vec<String>) {
+    reject_zstd_with_basis_lz(opts, errors);
+    reject_zlib_with_basis_lz(opts, errors);
+    reject_generate_mipmap_constraints(opts, errors);
+    reject_runtime_vs_generate(opts, errors);
+    reject_raw_missing_size(opts, errors);
+    reject_convert_tf_with_raw(opts, errors);
+    reject_convert_primaries_with_raw(opts, errors);
+    reject_convert_primaries_when_none(opts, errors);
+    reject_convert_origin_with_raw(opts, errors);
+    reject_normalize_with_raw(opts, errors);
+    reject_depth_origin(opts, errors);
+    reject_cubemap_origin(opts, errors);
+}
+
+pub fn classify_sources(sources: &[SourceInfo]) -> SourcesClass {
+    if sources.is_empty() {
+        return SourcesClass::Empty;
+    }
+    let mut saw_ldr = false;
+    let mut saw_hdr = false;
+    for source in sources {
+        match source.kind {
+            SourceKind::Ldr => saw_ldr = true,
+            SourceKind::Hdr => saw_hdr = true,
+        }
+    }
+    match (saw_ldr, saw_hdr) {
+        (true, true) => SourcesClass::Mixed,
+        (false, true) => SourcesClass::Hdr,
+        (true, false) => SourcesClass::Ldr,
+        (false, false) => SourcesClass::Empty,
+    }
+}
+
+fn is_hdr_uncompressed(format: VkFormat) -> bool {
+    matches!(
+        format,
+        VkFormat::R16G16B16Sfloat | VkFormat::R16G16B16A16Sfloat
+    )
+}
+
+fn format_allowed_for_class(format: VkFormat, class: SourcesClass) -> bool {
+    match class {
+        SourcesClass::Empty | SourcesClass::Mixed => true,
+        SourcesClass::Hdr => is_hdr_uncompressed(format),
+        SourcesClass::Ldr => !is_hdr_uncompressed(format),
+    }
+}
+
+fn options_compatible(opts: &CreateOptions, class: SourcesClass) -> bool {
+    match class {
+        SourcesClass::Empty | SourcesClass::Mixed => true,
+        SourcesClass::Hdr => {
+            is_hdr_uncompressed(opts.format)
+                && opts.encode.is_none()
+                && !is_astc_format(opts.format)
+        }
+        SourcesClass::Ldr => !is_hdr_uncompressed(opts.format),
+    }
+}
+
+fn suggestion_for(opts: &CreateOptions, class: SourcesClass) -> Option<OptionSuggestion> {
+    if options_compatible(opts, class) {
+        return None;
+    }
+    match class {
+        SourcesClass::Hdr => Some(OptionSuggestion {
+            format: VkFormat::R16G16B16A16Sfloat,
+            encode: None,
+        }),
+        SourcesClass::Ldr => Some(OptionSuggestion {
+            format: VkFormat::R8G8B8A8Srgb,
+            encode: opts.encode,
+        }),
+        SourcesClass::Empty | SourcesClass::Mixed => None,
+    }
+}
+
+fn apply_source_enablement(
+    key: OptionKey,
+    class: SourcesClass,
+    enabled: &mut bool,
+    reason: &mut Option<String>,
+) {
+    if !*enabled {
+        return;
+    }
+    match (key, class) {
+        (OptionKey::Encode, SourcesClass::Hdr) => {
+            *enabled = false;
+            *reason = Some(
+                "BasisLZ and UASTC LDR require 8-bit input; HDR sources need an uncompressed float format"
+                    .to_owned(),
+            );
+        }
+        (OptionKey::Encode, SourcesClass::Mixed) => {
+            *enabled = false;
+            *reason = Some("cannot encode mixed LDR and HDR sources together".to_owned());
+        }
+        (OptionKey::AstcQuality | OptionKey::AstcPerceptual, SourcesClass::Hdr) => {
+            *enabled = false;
+            *reason =
+                Some("ASTC is LDR-only; HDR sources need an uncompressed float format".to_owned());
+        }
+        (OptionKey::AstcQuality | OptionKey::AstcPerceptual, SourcesClass::Mixed) => {
+            *enabled = false;
+            *reason = Some("cannot encode mixed LDR and HDR sources together".to_owned());
+        }
+        (
+            OptionKey::CompareSsim | OptionKey::ComparePsnr,
+            SourcesClass::Hdr | SourcesClass::Mixed,
+        ) => {
+            *enabled = false;
+            *reason = Some("compare metrics require BasisLZ, UASTC, or ASTC".to_owned());
+        }
+        _ => {}
+    }
+}
+
+fn filter_choices(
+    key: OptionKey,
+    class: SourcesClass,
+    choices: Vec<crate::ktx::options::OptionChoice>,
+) -> Vec<crate::ktx::options::OptionChoice> {
+    match key {
+        OptionKey::Format => choices
+            .into_iter()
+            .filter(|c| {
+                VkFormat::iter()
+                    .any(|f| f.cli() == c.value.as_str() && format_allowed_for_class(f, class))
+            })
+            .collect(),
+        OptionKey::Encode if matches!(class, SourcesClass::Hdr | SourcesClass::Mixed) => Vec::new(),
+        _ => choices,
+    }
+}
+
+fn warn_mixed_sources(class: SourcesClass, warnings: &mut Vec<OptionWarning>) {
+    if class != SourcesClass::Mixed {
+        return;
+    }
+    warnings.push(OptionWarning {
+        key: Some(OptionKey::Format),
+        level: WarningLevel::Warn,
+        message: "sources must be all LDR or all HDR; mixed inputs cannot be encoded together"
+            .to_owned(),
+    });
+}
+
+fn reject_source_option_mismatch(
+    opts: &CreateOptions,
+    sources: &[SourceInfo],
+    errors: &mut Vec<String>,
+) {
+    let class = classify_sources(sources);
+    match class {
+        SourcesClass::Empty => {}
+        SourcesClass::Mixed => {
+            errors.push("sources must be all LDR or all HDR".to_owned());
+        }
+        SourcesClass::Hdr => {
+            if !is_hdr_uncompressed(opts.format) {
+                errors
+                    .push("HDR sources require R16G16B16_SFLOAT or R16G16B16A16_SFLOAT".to_owned());
+            }
+            if opts.encode.is_some() {
+                errors.push(
+                    "HDR sources cannot use BasisLZ or UASTC LDR encode on this tool version"
+                        .to_owned(),
+                );
+            }
+            if is_astc_format(opts.format) {
+                errors.push("HDR sources cannot use ASTC formats".to_owned());
+            }
+        }
+        SourcesClass::Ldr => {
+            if is_hdr_uncompressed(opts.format) {
+                errors.push(
+                    "LDR sources cannot use half-float formats; use an 8-bit or ASTC format"
+                        .to_owned(),
+                );
+            }
+        }
     }
 }
 
@@ -880,5 +1086,94 @@ mod tests {
         o.supercompression = Supercompression::Zstd { level: 3 };
         assert!(field(&report(&o), OptionKey::Zstd).enabled);
         assert!(validate(&o).is_ok());
+    }
+
+    fn hdr_source() -> SourceInfo {
+        SourceInfo {
+            path: "a.exr".into(),
+            name: "a.exr".into(),
+            kind: SourceKind::Hdr,
+            width: 64,
+            height: 64,
+            needs_conversion: false,
+        }
+    }
+
+    fn ldr_source() -> SourceInfo {
+        SourceInfo {
+            path: "a.png".into(),
+            name: "a.png".into(),
+            kind: SourceKind::Ldr,
+            width: 64,
+            height: 64,
+            needs_conversion: false,
+        }
+    }
+
+    #[test]
+    fn hdr_suggests_rgba16_float_and_hides_ldr_formats() {
+        let o = opts();
+        let r = describe(&o, &[hdr_source()]);
+        assert_eq!(r.sources_class, SourcesClass::Hdr);
+        assert_eq!(
+            r.suggestion,
+            Some(OptionSuggestion {
+                format: VkFormat::R16G16B16A16Sfloat,
+                encode: None,
+            })
+        );
+        let format_choices: Vec<_> = field(&r, OptionKey::Format)
+            .choices
+            .iter()
+            .map(|c| c.value.as_str())
+            .collect();
+        assert!(format_choices.contains(&"R16G16B16A16_SFLOAT"));
+        assert!(format_choices.contains(&"R16G16B16_SFLOAT"));
+        assert!(!format_choices.iter().any(|v| v.contains("R8")));
+        assert!(!format_choices.iter().any(|v| v.starts_with("ASTC_")));
+        assert!(!field(&r, OptionKey::Encode).enabled);
+        assert!(validate_for_sources(&o, &[hdr_source()]).is_err());
+    }
+
+    #[test]
+    fn hdr_compatible_options_have_no_suggestion() {
+        let mut o = opts();
+        o.format = VkFormat::R16G16B16A16Sfloat;
+        o.encode = None;
+        let r = describe(&o, &[hdr_source()]);
+        assert!(r.suggestion.is_none());
+        assert!(validate_for_sources(&o, &[hdr_source()]).is_ok());
+    }
+
+    #[test]
+    fn ldr_hides_float_formats_and_rejects_float_selection() {
+        let mut o = opts();
+        o.format = VkFormat::R16G16B16A16Sfloat;
+        let r = describe(&o, &[ldr_source()]);
+        assert_eq!(r.sources_class, SourcesClass::Ldr);
+        assert_eq!(
+            r.suggestion,
+            Some(OptionSuggestion {
+                format: VkFormat::R8G8B8A8Srgb,
+                encode: None,
+            })
+        );
+        let format_choices: Vec<_> = field(&r, OptionKey::Format)
+            .choices
+            .iter()
+            .map(|c| c.value.as_str())
+            .collect();
+        assert!(!format_choices.iter().any(|v| v.contains("SFLOAT")));
+        assert!(validate_for_sources(&o, &[ldr_source()]).is_err());
+    }
+
+    #[test]
+    fn mixed_sources_warn_and_fail_validate() {
+        let o = opts();
+        let r = describe(&o, &[ldr_source(), hdr_source()]);
+        assert_eq!(r.sources_class, SourcesClass::Mixed);
+        assert!(r.suggestion.is_none());
+        assert!(r.warnings.iter().any(|w| w.message.contains("all LDR")));
+        assert!(validate_for_sources(&o, &[ldr_source(), hdr_source()]).is_err());
     }
 }

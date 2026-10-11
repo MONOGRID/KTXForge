@@ -126,6 +126,45 @@ pub fn transcode_target_for(channels: u8, _hdr: bool) -> TranscodeTarget {
     }
 }
 
+/// Unpacked R/G/B/A count for `--transcode`, from a DFD basic block.
+///
+/// Block-compressed models pack several color channels into one DFD sample
+/// (`ETC1S_RGB`, `UASTC_RGBA`). Using `samples.len()` there picks `r8`/`rg8`
+/// and drops blue — yellow color previews and solid-red normal maps.
+pub fn unpacked_channels_from_dfd<'a>(
+    color_model: &str,
+    channel_types: impl IntoIterator<Item = &'a str>,
+) -> u8 {
+    let model = color_model.to_ascii_uppercase();
+    let types: Vec<String> = channel_types
+        .into_iter()
+        .map(|t| t.to_ascii_uppercase())
+        .collect();
+
+    if model.contains("ETC1S") {
+        let has_rgb = types.iter().any(|t| t.contains("ETC1S_RGB"));
+        let has_aaa = types.iter().any(|t| t.contains("ETC1S_AAA"));
+        if has_rgb {
+            return if has_aaa { 4 } else { 3 };
+        }
+        // RRR / GGG / etc. — one sample per plane.
+        return (types.len().min(4) as u8).max(1);
+    }
+
+    if model.contains("UASTC") {
+        if types.iter().any(|t| t.contains("RGBA")) {
+            return 4;
+        }
+        if types.iter().any(|t| t.contains("RGB")) {
+            return 3;
+        }
+        return 4;
+    }
+
+    // RGBSDA and other per-component models: one sample per channel.
+    (types.len().min(4) as u8).max(1)
+}
+
 /// `base_level{n}_face{n}_layer{n}_depth{n}.<ext>` with suffixes omitted when dim is 1.
 pub fn expected_output_name(
     base: &str,
@@ -244,6 +283,46 @@ mod tests {
         assert_eq!(transcode_target_for(4, false), TranscodeTarget::Rgba8);
         // HDR half-float deferred on v4.4.2 — still returns 8-bit unpacked targets.
         assert_eq!(transcode_target_for(4, true), TranscodeTarget::Rgba8);
+    }
+
+    #[test]
+    fn etc1s_rgb_sample_is_three_channels_not_one() {
+        // headphones_norm.ktx2: one ETC1S_RGB sample — must not choose r8.
+        let ch = unpacked_channels_from_dfd("KHR_DF_MODEL_ETC1S", ["KHR_DF_CHANNEL_ETC1S_RGB"]);
+        assert_eq!(ch, 3);
+        assert_eq!(transcode_target_for(ch, false), TranscodeTarget::Rgb8);
+    }
+
+    #[test]
+    fn etc1s_rgb_plus_aaa_is_four_channels_not_two() {
+        // headphones_color_3.ktx2: RGB+AAA samples — must not choose rg8 (drops blue).
+        let ch = unpacked_channels_from_dfd(
+            "KHR_DF_MODEL_ETC1S",
+            ["KHR_DF_CHANNEL_ETC1S_RGB", "KHR_DF_CHANNEL_ETC1S_AAA"],
+        );
+        assert_eq!(ch, 4);
+        assert_eq!(transcode_target_for(ch, false), TranscodeTarget::Rgba8);
+    }
+
+    #[test]
+    fn uastc_rgba_sample_is_four_channels_not_one() {
+        let ch = unpacked_channels_from_dfd("KHR_DF_MODEL_UASTC", ["KHR_DF_CHANNEL_UASTC_RGBA"]);
+        assert_eq!(ch, 4);
+        assert_eq!(transcode_target_for(ch, false), TranscodeTarget::Rgba8);
+    }
+
+    #[test]
+    fn rgbsda_sample_count_is_channel_count() {
+        let ch = unpacked_channels_from_dfd(
+            "KHR_DF_MODEL_RGBSDA",
+            [
+                "KHR_DF_CHANNEL_RGBSDA_RED",
+                "KHR_DF_CHANNEL_RGBSDA_GREEN",
+                "KHR_DF_CHANNEL_RGBSDA_BLUE",
+                "KHR_DF_CHANNEL_RGBSDA_ALPHA",
+            ],
+        );
+        assert_eq!(ch, 4);
     }
 
     #[test]
