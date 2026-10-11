@@ -74,7 +74,7 @@ pub struct UpdateStatusPayload {
 /// Typed payload for `encoder://sources-added` (exported for the frontend).
 pub type SourcesAddedPayload = Vec<SourceInfo>;
 
-/// Native menu command that needs frontend state (encode job, sources, export UI).
+/// Native menu command that needs frontend state (encode job, sources, export UI, viewer zoom).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "kebab-case")]
@@ -84,4 +84,8 @@ pub enum MenuAction {
     Save,
     ClearSources,
     Export,
+    ZoomIn,
+    ZoomOut,
+    ZoomActual,
+    ZoomFit,
 }

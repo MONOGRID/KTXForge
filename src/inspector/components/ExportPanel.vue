@@ -163,7 +163,10 @@ watchEffect(() => {
 </script>
 
 <template>
-  <Panel title="Export">
+  <Panel
+    title="Export"
+    :collapsible="false"
+  >
     <div class="field-row">
       <div class="label">
         Scope
@@ -250,7 +253,7 @@ watchEffect(() => {
 
     <ul
       v-if="writtenFiles.length > 0"
-      class="mt-3 m-0 list-none p-0 text-sm text-ink"
+      class="mt-3 m-0 max-h-24 list-none overflow-auto p-0 text-sm text-ink"
     >
       <li
         v-for="file in writtenFiles"

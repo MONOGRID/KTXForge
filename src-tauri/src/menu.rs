@@ -1,4 +1,4 @@
-//! Native application menu (File / Help, plus macOS app/Edit menus).
+//! Native application menu (File / View / Help, plus macOS app/Edit menus).
 
 use tauri::{AppHandle, Emitter};
 
@@ -17,6 +17,10 @@ pub mod id {
     pub const SAVE: &str = "save";
     pub const CLEAR_SOURCES: &str = "clear-sources";
     pub const EXPORT: &str = "export";
+    pub const ZOOM_IN: &str = "zoom-in";
+    pub const ZOOM_OUT: &str = "zoom-out";
+    pub const ZOOM_ACTUAL: &str = "zoom-actual";
+    pub const ZOOM_FIT: &str = "zoom-fit";
     pub const CHECK_UPDATE: &str = "check-update";
     pub const EXIT: &str = "exit";
 }
@@ -64,6 +68,24 @@ pub fn app_menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>>
         ],
     )?;
 
+    let zoom_in = MenuItem::with_id(app, id::ZOOM_IN, "Zoom &In", true, Some("CmdOrCtrl+="))?;
+    let zoom_out = MenuItem::with_id(app, id::ZOOM_OUT, "Zoom &Out", true, Some("CmdOrCtrl+-"))?;
+    let zoom_actual = MenuItem::with_id(
+        app,
+        id::ZOOM_ACTUAL,
+        "&Actual Size",
+        true,
+        Some("CmdOrCtrl+1"),
+    )?;
+    let zoom_fit = MenuItem::with_id(app, id::ZOOM_FIT, "&Fit", true, Some("CmdOrCtrl+0"))?;
+    let view_sep = PredefinedMenuItem::separator(app)?;
+    let view = Submenu::with_items(
+        app,
+        "&View",
+        true,
+        &[&zoom_in, &zoom_out, &view_sep, &zoom_actual, &zoom_fit],
+    )?;
+
     let check_update = MenuItem::with_id(
         app,
         id::CHECK_UPDATE,
@@ -77,11 +99,11 @@ pub fn app_menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>>
     {
         let app_menu = macos_app_menu(app)?;
         let edit = macos_edit_menu(app)?;
-        return Menu::with_items(app, &[&app_menu, &file, &edit, &help]);
+        return Menu::with_items(app, &[&app_menu, &file, &edit, &view, &help]);
     }
 
     #[cfg(not(target_os = "macos"))]
-    Menu::with_items(app, &[&file, &help])
+    Menu::with_items(app, &[&file, &view, &help])
 }
 
 #[cfg(desktop)]
@@ -130,6 +152,22 @@ pub fn on_menu_event(app: &AppHandle, event: &tauri::menu::MenuEvent) {
     }
     if item == id::EXPORT {
         emit_action(app, MenuAction::Export);
+        return;
+    }
+    if item == id::ZOOM_IN {
+        emit_action(app, MenuAction::ZoomIn);
+        return;
+    }
+    if item == id::ZOOM_OUT {
+        emit_action(app, MenuAction::ZoomOut);
+        return;
+    }
+    if item == id::ZOOM_ACTUAL {
+        emit_action(app, MenuAction::ZoomActual);
+        return;
+    }
+    if item == id::ZOOM_FIT {
+        emit_action(app, MenuAction::ZoomFit);
         return;
     }
     if item == id::CHECK_UPDATE {

@@ -198,7 +198,7 @@ ASTC `--format` strings keep the Vulkan `_BLOCK` suffix required by v4.4.2. This
 
 ## 2026-10-11 — Native File / Help menu for all actions
 
-**Decided:** Expand the native menu (still owned in Rust `menu.rs`) to File → Open…, Encode, Cancel Encode, Save…, Clear Sources, Export…, Exit, plus Help → Check for Updates…. Open and Check for Updates run in Rust (dialog / updater). Encode, Cancel, Save, Clear Sources, and Export emit `menu://action` with a typed `MenuAction`; the encoder and inspector frontends share the same handlers as the on-screen buttons. Enablement is synced from Vue via `set_menu_item_enabled` so menu items match button disabled state. Shortcuts: Cmd/Ctrl+O open, Enter encode, `.` cancel, S save, Shift+E export, Q exit.
+**Decided:** Expand the native menu (still owned in Rust `menu.rs`) to File → Open…, Encode, Cancel Encode, Save…, Clear Sources, Export…, Exit, plus Help → Check for Updates…. Open and Check for Updates run in Rust (dialog / updater). Encode, Cancel, Save, Clear Sources, and Export emit `menu://action` with a typed `MenuAction`; the encoder and inspector frontends share the same handlers as the on-screen buttons. Enablement is synced from Vue via `set_menu_item_enabled` so menu items match button disabled state. Shortcuts: Cmd/Ctrl+O open, Enter encode, `.` cancel, S save, Shift+E export, Q exit. Later extended with View → Zoom In/Out / Actual Size / Fit (see inspector layout entry).
 
 **Why:** Desktop apps expose every primary action in the menu bar with accelerators; the previous menu was Exit-only. Keeping definition and dialogs in Rust preserves the “menu is window chrome” decision while job/export state stays in Vue.
 
@@ -207,3 +207,9 @@ ASTC `--format` strings keep the Vulkan `_BLOCK` suffix required by v4.4.2. This
 **Decided:** Override shadcn CSS variables and the app bridge tokens in `theme.css` (loaded after `virtual:uno.css`) to match VS Code Dark+/Light+ surfaces: editor `#1e1e1e` / raised `#252526` / borders `#3e3e42` in dark; white / `#f3f3f3` / `#cecece` in light with stronger ink (`#1e1e1e`, `#616161`). `primary` / `ring` use VS Code blue (`#007acc`) so switches and focus rings are accent-colored rather than grey-on-grey. Switch thumbs stay white; inputs/selects use `bg-background` for inset fields. Brand green remains on `brand` for encode/primary app actions only. Preset stays on `neutral` as the structural base; palette ownership is `theme.css`.
 
 **Why:** Stock shadcn neutral reads as flat grey (especially unchecked switches and muted panels); light felt washed. Desktop users expect VS Code–like contrast between chrome, inputs, and active controls.
+
+## 2026-10-11 — Inspector layout: viewer left, scrollable info, View zoom menu
+
+**Decided:** Inspector uses a horizontal resizable split (`inspector-layout`, same reka-ui pattern as the encoder): left = mip/layer/depth controls + fixed-size image viewport + pinned Export bar; right = path/size header + scrollable report panels. Drop the in-window “KTX-GUI Inspector” title (window title is enough). Mip and layer (and depth) are range sliders with the current selection in the label (e.g. `Mip L0 · 2048×2048`). The viewport does not scroll or resize with the image; the image pans by drag and zooms with Ctrl/Cmd+wheel. Inline View 1:1/Fit buttons move to the native View menu (Zoom In/Out, Actual Size, Fit) via `menu://action` (`zoom-in` / `zoom-out` / `zoom-actual` / `zoom-fit`), handled only in the inspector.
+
+**Why:** The previous two-column grid put metadata on the left and scrolled the whole viewer column, so export and zoom chrome floated away from a usable preview. Matching the encoder’s resizable + pinned-bottom pattern keeps export reachable and lets the report grow without shrinking the canvas.

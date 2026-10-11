@@ -1,6 +1,12 @@
 <script setup lang="ts">
-import { computed, onMounted } from "vue";
 import { useTitle } from "@vueuse/core";
+import { computed, onMounted, onUnmounted } from "vue";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Toaster } from "@/components/ui/sonner";
 import ModeToggle from "../shared/components/ModeToggle.vue";
 import ExportPanel from "./components/ExportPanel.vue";
@@ -17,6 +23,7 @@ import FramePlayer from "./components/viewer/FramePlayer.vue";
 import ImageViewer from "./components/viewer/ImageViewer.vue";
 import MipStrip from "./components/viewer/MipStrip.vue";
 import SubresourceSelectors from "./components/viewer/SubresourceSelectors.vue";
+import { bindInspectorMenu } from "./menuBridge";
 import {
   displayValue,
   initInspectorStore,
@@ -51,72 +58,115 @@ const previewLabel = computed((): string => {
   return preview.kind;
 });
 
+let unbindMenu: (() => void) | undefined;
+
 onMounted(() => {
+  unbindMenu = bindInspectorMenu();
   void initInspectorStore();
+});
+
+onUnmounted(() => {
+  unbindMenu?.();
 });
 </script>
 
 <template>
-  <main class="box-border grid min-h-screen grid-cols-1 gap-4 p-4 font-sans lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+  <div class="box-border flex h-screen flex-col overflow-hidden font-sans text-ink">
     <Toaster
       rich-colors
       close-button
     />
-    <section class="flex min-h-0 flex-col gap-3 overflow-auto">
-      <header class="panel px-3 py-2">
-        <div class="flex items-start justify-between gap-3">
-          <h1 class="m-0 text-lg font-semibold">
-            KTX-GUI Inspector
-          </h1>
-          <ModeToggle />
-        </div>
-        <p class="m-0 mt-1 break-all font-mono text-xs text-ink-muted">
-          {{ displayValue(path) }}
-        </p>
-        <p class="m-0 mt-1 text-xs text-ink-faint">
-          fileSize: {{ displayValue(report?.fileSize) }} · preview: {{ previewLabel }}
-        </p>
-        <p
-          v-if="loading"
-          class="m-0 mt-2 text-sm text-ink-muted"
+
+    <main class="min-h-0 flex-1 p-2">
+      <ResizablePanelGroup
+        id="inspector-layout"
+        auto-save-id="inspector-layout"
+        direction="horizontal"
+        class="h-full min-h-0"
+      >
+        <ResizablePanel
+          id="inspector-viewer"
+          :default-size="58"
+          :min-size="35"
+          class="min-h-0 min-w-0"
         >
-          Loading…
-        </p>
-      </header>
+          <section
+            class="flex h-full min-h-0 flex-col gap-2 overflow-hidden"
+            aria-label="Image viewer"
+          >
+            <div class="flex shrink-0 flex-col gap-2 px-1">
+              <MipStrip />
+              <SubresourceSelectors />
+              <FramePlayer />
+            </div>
+            <div class="min-h-0 flex-1">
+              <ImageViewer />
+            </div>
+            <div class="shrink-0">
+              <ExportPanel />
+            </div>
+          </section>
+        </ResizablePanel>
 
-      <StatusPanel
-        :valid="statusValid"
-        :messages="statusMessages"
-      />
-      <HeaderPanel
-        :ktx2="ktx2Info?.header ?? null"
-        :ktx1="ktx1Header"
-      />
-      <LevelIndexTable :levels="ktx2Info?.index.levels ?? null" />
-      <IndexPanel
-        :data-format-descriptor="ktx2Info?.index.dataFormatDescriptor ?? null"
-        :key-value-data="ktx2Info?.index.keyValueData ?? null"
-        :supercompression-global-data="ktx2Info?.index.supercompressionGlobalData ?? null"
-      />
-      <DfdPanel :descriptor="ktx2Info?.dataFormatDescriptor ?? null" />
-      <KnownMetadataPanel :key-value-data="ktx2Info?.keyValueData ?? null" />
-      <KeyValueTable :entries="ktx2Info?.keyValueData.other ?? null" />
-      <BasisGlobalDataPanel :data="ktx2Info?.supercompressionGlobalData ?? null" />
-      <Ktx1TextPanel :text="ktx1Text" />
-    </section>
+        <ResizableHandle
+          with-handle
+          class="mx-1"
+        />
 
-    <section
-      class="panel flex min-h-64 flex-col gap-3 overflow-auto p-3"
-      aria-label="Image viewer"
-    >
-      <h2 class="m-0 text-sm font-semibold">
-        Image viewer
-      </h2>
-      <MipStrip />
-      <SubresourceSelectors />
-      <FramePlayer />
-      <ImageViewer />
-      <ExportPanel />
-    </section>
-  </main>
+        <ResizablePanel
+          id="inspector-info"
+          :default-size="42"
+          :min-size="22"
+          :max-size="60"
+          class="min-h-0 min-w-0"
+        >
+          <section class="flex h-full min-h-0 flex-col gap-2 overflow-hidden">
+            <header class="panel shrink-0 px-3 py-2">
+              <div class="flex items-start justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="m-0 break-all font-mono text-xs text-ink-muted">
+                    {{ displayValue(path) }}
+                  </p>
+                  <p class="m-0 mt-1 text-xs text-ink-faint">
+                    fileSize: {{ displayValue(report?.fileSize) }} · preview: {{ previewLabel }}
+                  </p>
+                  <p
+                    v-if="loading"
+                    class="m-0 mt-2 text-sm text-ink-muted"
+                  >
+                    Loading…
+                  </p>
+                </div>
+                <ModeToggle />
+              </div>
+            </header>
+
+            <ScrollArea class="min-h-0 flex-1">
+              <div class="flex flex-col gap-3 pr-3">
+                <StatusPanel
+                  :valid="statusValid"
+                  :messages="statusMessages"
+                />
+                <HeaderPanel
+                  :ktx2="ktx2Info?.header ?? null"
+                  :ktx1="ktx1Header"
+                />
+                <LevelIndexTable :levels="ktx2Info?.index.levels ?? null" />
+                <IndexPanel
+                  :data-format-descriptor="ktx2Info?.index.dataFormatDescriptor ?? null"
+                  :key-value-data="ktx2Info?.index.keyValueData ?? null"
+                  :supercompression-global-data="ktx2Info?.index.supercompressionGlobalData ?? null"
+                />
+                <DfdPanel :descriptor="ktx2Info?.dataFormatDescriptor ?? null" />
+                <KnownMetadataPanel :key-value-data="ktx2Info?.keyValueData ?? null" />
+                <KeyValueTable :entries="ktx2Info?.keyValueData.other ?? null" />
+                <BasisGlobalDataPanel :data="ktx2Info?.supercompressionGlobalData ?? null" />
+                <Ktx1TextPanel :text="ktx1Text" />
+              </div>
+            </ScrollArea>
+          </section>
+        </ResizablePanel>
+      </ResizablePanelGroup>
+    </main>
+  </div>
 </template>

@@ -1,6 +1,11 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { report, selection } from "../../store";
+import RangeTickLabels from "./RangeTickLabels.vue";
+
+function formatMipTick(level: number): string {
+  return `L${String(level)}`;
+}
 
 type MipEntry = {
   level: number;
@@ -42,8 +47,31 @@ const entries = computed((): MipEntry[] => {
   return list;
 });
 
-function selectLevel(level: number): void {
-  selection.value.level = level;
+const maxLevel = computed((): number => Math.max(0, entries.value.length - 1));
+
+const currentEntry = computed((): MipEntry | null => {
+  const list = entries.value;
+  if (list.length === 0) {
+    return null;
+  }
+  const level = Math.min(Math.max(0, selection.value.level), list.length - 1);
+  return list.find((entry) => entry.level === level) ?? null;
+});
+
+const label = computed((): string => {
+  const entry = currentEntry.value;
+  if (entry === null) {
+    return "Mip";
+  }
+  return `Mip L${String(entry.level)} · ${String(entry.width)}×${String(entry.height)}`;
+});
+
+function onLevelInput(event: Event): void {
+  const el = event.target;
+  if (!(el instanceof HTMLInputElement)) {
+    return;
+  }
+  selection.value.level = Number(el.value);
 }
 </script>
 
@@ -52,22 +80,25 @@ function selectLevel(level: number): void {
     v-if="entries.length > 0"
     class="flex flex-col gap-1"
   >
-    <div class="text-sm text-ink-muted">
-      Mip levels
-    </div>
-    <div class="flex flex-wrap gap-1">
-      <button
-        v-for="entry in entries"
-        :key="entry.level"
-        type="button"
-        class="btn font-mono text-xs"
-        :class="{ 'btn-primary': selection.level === entry.level }"
-        :aria-pressed="selection.level === entry.level"
-        @click="selectLevel(entry.level)"
-      >
-        L{{ entry.level }}
-        <span class="text-ink-faint">{{ entry.width }}×{{ entry.height }}</span>
-      </button>
-    </div>
+    <label
+      class="text-sm text-ink-muted"
+      for="inspector-mip"
+    >{{ label }}</label>
+    <input
+      id="inspector-mip"
+      type="range"
+      class="w-full accent-brand"
+      min="0"
+      :max="maxLevel"
+      step="1"
+      :value="selection.level"
+      :disabled="maxLevel === 0"
+      @input="onLevelInput"
+    >
+    <RangeTickLabels
+      :min="0"
+      :max="maxLevel"
+      :format="formatMipTick"
+    />
   </div>
 </template>

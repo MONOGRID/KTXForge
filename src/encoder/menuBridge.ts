@@ -36,6 +36,10 @@ async function handleMenuAction(action: MenuAction): Promise<void> {
       clearSources();
       break;
     case "export":
+    case "zoom-in":
+    case "zoom-out":
+    case "zoom-actual":
+    case "zoom-fit":
       break;
   }
 }

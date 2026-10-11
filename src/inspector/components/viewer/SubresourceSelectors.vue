@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { report, selection } from "../../store";
+import RangeTickLabels from "./RangeTickLabels.vue";
 
 const FACE_LABELS = [
   "+X",
@@ -58,31 +59,29 @@ const visible = computed(
   (): boolean => showFaces.value || showLayers.value || showDepth.value,
 );
 
-const layerOptions = computed((): number[] => {
-  const count = dims.value?.layerCount ?? 0;
-  return Array.from({ length: count }, (_, i) => i);
-});
+const layerMax = computed((): number =>
+  Math.max(0, (dims.value?.layerCount ?? 1) - 1),
+);
 
-const depthOptions = computed((): number[] => {
-  const count = dims.value?.depthCount ?? 0;
-  return Array.from({ length: count }, (_, i) => i);
-});
+const depthMax = computed((): number =>
+  Math.max(0, (dims.value?.depthCount ?? 1) - 1),
+);
 
 function selectFace(face: number): void {
   selection.value.face = face;
 }
 
-function onLayerChange(event: Event): void {
+function onLayerInput(event: Event): void {
   const el = event.target;
-  if (!(el instanceof HTMLSelectElement)) {
+  if (!(el instanceof HTMLInputElement)) {
     return;
   }
   selection.value.layer = Number(el.value);
 }
 
-function onDepthChange(event: Event): void {
+function onDepthInput(event: Event): void {
   const el = event.target;
-  if (!(el instanceof HTMLSelectElement)) {
+  if (!(el instanceof HTMLInputElement)) {
     return;
   }
   selection.value.depthSlice = Number(el.value);
@@ -119,50 +118,50 @@ function onDepthChange(event: Event): void {
 
     <div
       v-if="showLayers"
-      class="field-row items-center"
+      class="flex flex-col gap-1"
     >
       <label
-        class="label pt-0"
+        class="text-sm text-ink-muted"
         for="inspector-layer"
-      >Layer</label>
-      <select
+      >Layer {{ selection.layer }}</label>
+      <input
         id="inspector-layer"
-        class="rounded border border-line bg-surface-raised px-2 py-1 text-sm"
+        type="range"
+        class="w-full accent-brand"
+        min="0"
+        :max="layerMax"
+        step="1"
         :value="selection.layer"
-        @change="onLayerChange"
+        @input="onLayerInput"
       >
-        <option
-          v-for="layer in layerOptions"
-          :key="layer"
-          :value="layer"
-        >
-          {{ layer }}
-        </option>
-      </select>
+      <RangeTickLabels
+        :min="0"
+        :max="layerMax"
+      />
     </div>
 
     <div
       v-if="showDepth"
-      class="field-row items-center"
+      class="flex flex-col gap-1"
     >
       <label
-        class="label pt-0"
+        class="text-sm text-ink-muted"
         for="inspector-depth"
-      >Depth</label>
-      <select
+      >Depth {{ selection.depthSlice }}</label>
+      <input
         id="inspector-depth"
-        class="rounded border border-line bg-surface-raised px-2 py-1 text-sm"
+        type="range"
+        class="w-full accent-brand"
+        min="0"
+        :max="depthMax"
+        step="1"
         :value="selection.depthSlice"
-        @change="onDepthChange"
+        @input="onDepthInput"
       >
-        <option
-          v-for="depth in depthOptions"
-          :key="depth"
-          :value="depth"
-        >
-          {{ depth }}
-        </option>
-      </select>
+      <RangeTickLabels
+        :min="0"
+        :max="depthMax"
+      />
     </div>
   </div>
 </template>
