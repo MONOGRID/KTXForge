@@ -389,3 +389,9 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 **Decided:** Source of truth for the Tauri updater minisign private key is 1Password vault **Tech**, item **KTXForge Tauri updater signing key** (`notesPlain`; no key password). Commit only the public key in `tauri.conf.json`. Mirror the private key into GitHub secret `TAURI_SIGNING_PRIVATE_KEY` for Actions. Developers load the key via `op read` / `npm run tauri:build:signed` (`scripts/with-updater-signing-key.mjs`) and do not keep `~/.tauri/*.key` copies across machines. Document the flow in [updater-signing.md](updater-signing.md). Share access by granting Tech vault membership to tech leads, not by distributing key files.
 
 **Why:** The previous GitHub-only secret could not be recovered for local signed builds or multi-PC setups. A shared vault keeps one recoverable copy for leads without initializing or syncing key files on every Windows/Linux environment.
+
+## 2026-10-12 — `write_anim_data` must emit KTX2-valid mip layout
+
+**Decided:** When rebuilding a KTX2 to insert `KTXanimData`, emit the mip level array **smallest → largest** (level index still base-first). Align each level to the KTX2 required alignment (`lcm(block, 4)` when uncompressed, inferred from existing offsets as 16/8/4; alignment 1 with supercompression). Pad to 8 bytes only before SGD when SGD is present — never before levels when SGD is absent. `ktx validate` must pass; the validate roundtrip test is no longer ignored and resolves the staged sidecar on every host OS.
+
+**Why:** Writing levels largest-first and always 8-padding produced `error-4004` (exact `byteOffset` mismatch). That only failed in Windows CI because the test looked for the Windows staged binary and CI uses `--include-ignored`.

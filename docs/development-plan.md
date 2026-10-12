@@ -349,7 +349,7 @@ These shapes are fixed. Tasks fill in fields exactly as listed; extra fields nee
 
 ## Wave 3 — Rust engines
 
-Status: **complete** (2026-10-10). T3.1–T3.10 implemented with unit tests; `npm run check` green. Wave 4 unlocked staged-binary process tests; AppHandle `inspect` and `ktx validate` after anim rewrite remain `#[ignore]`.
+Status: **complete** (2026-10-10). T3.1–T3.10 implemented with unit tests; `npm run check` green. Wave 4 unlocked staged-binary process tests; AppHandle `inspect` remains `#[ignore]`; `ktx validate` after anim rewrite is covered by `validate_after_write`.
 
 Parallel. Pure or near-pure modules with unit tests. No Tauri commands yet.
 
@@ -396,7 +396,7 @@ Parallel. Pure or near-pure modules with unit tests. No Tauri commands yet.
 - **Owns:** `src-tauri/src/ktx/anim.rs`
 - **Read:** KTX 2.0 spec sections on key/value data and file layout (https://registry.khronos.org/KTX/specs/2.0/ktxspec.v2.html), requirements.md "Multi-frame"
 - **Do:** `pub fn write_anim_data(path: &Path, anim: &AnimationOptions) -> Result<(), AppError>`. Read the whole file, parse the header and index with the `ktx2` crate, rebuild the key/value block with `KTXanimData` added or replaced (12 bytes, three little-endian `u32`), keep keys sorted by byte value as the spec requires, keep every alignment rule (KVD entries 4-byte padded; supercompression global data 8-byte aligned; each mip level aligned per spec), shift `sgdByteOffset` and every level offset by the size delta, write to a temp file in the same dir, then rename over the original. Reject when `layerCount < 2`.
-- **Done when:** tests on `array4_mips.ktx2` and `basis_lz.ktx2` (copy to a temp dir first): after writing, the `ktx2` crate reads the file, the key returns the written values, and every level's bytes equal the original level bytes. An `#[ignore]` test runs `ktx validate` on the result and expects exit 0. `npm run check` passes.
+- **Done when:** tests on `array4_mips.ktx2` and `basis_lz.ktx2` (copy to a temp dir first): after writing, the `ktx2` crate reads the file, the key returns the written values, and every level's bytes equal the original level bytes. A staged-binary test runs `ktx validate` on the result and expects exit 0. `npm run check` passes.
 
 ### T3.8 `ktx extract` argument builder and naming
 

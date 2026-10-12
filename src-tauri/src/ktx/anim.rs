@@ -78,6 +78,10 @@ pub fn write_anim_data(path: &Path, anim: &AnimationOptions) -> Result<(), AppEr
         })
         .collect::<Result<_, _>>()?;
 
+    // KTX2: no supercompression → lcm(texel_block_size, 4); else 1.
+    // Infer from offsets of a file that already validated (common values 4/8/16).
+    let level_align = level_data_alignment(header.supercompression_scheme.is_some(), &levels);
+
     let mut new_header = header;
     let mut out = Vec::new();
     out.extend_from_slice(&new_header.as_bytes());
@@ -92,25 +96,27 @@ pub fn write_anim_data(path: &Path, anim: &AnimationOptions) -> Result<(), AppEr
     new_header.index.kvd_byte_length = new_kvd.len() as u32;
     out.extend_from_slice(&new_kvd);
 
-    // Supercompression global data is 8-byte aligned.
-    while out.len() % 8 != 0 {
-        out.push(0);
-    }
+    // SGD is 8-byte aligned when present. Do not pad when absent — validate
+    // requires exact level byteOffsets after KVD.
     if sgd.is_empty() {
         new_header.index.sgd_byte_offset = 0;
         new_header.index.sgd_byte_length = 0;
     } else {
+        while out.len() % 8 != 0 {
+            out.push(0);
+        }
         new_header.index.sgd_byte_offset = out.len() as u64;
         new_header.index.sgd_byte_length = sgd.len() as u64;
         out.extend_from_slice(&sgd);
     }
 
+    // Mip level array: smallest (levelCount-1) → largest (level 0). Index stays base-first.
     let mut new_levels = levels;
-    for (i, payload) in level_payloads.iter().enumerate() {
-        // Level data regions are 8-byte aligned per KTX2 layout rules.
-        while out.len() % 8 != 0 {
+    for i in (0..level_count).rev() {
+        while out.len() % level_align != 0 {
             out.push(0);
         }
+        let payload = &level_payloads[i];
         new_levels[i].byte_offset = out.len() as u64;
         new_levels[i].byte_length = payload.len() as u64;
         out.extend_from_slice(payload);
@@ -123,6 +129,22 @@ pub fn write_anim_data(path: &Path, anim: &AnimationOptions) -> Result<(), AppEr
     }
 
     write_atomic(path, &out)
+}
+
+/// Required mip-level alignment from the KTX2 spec; inferred from existing offsets.
+fn level_data_alignment(has_supercompression: bool, levels: &[LevelIndex]) -> usize {
+    if has_supercompression {
+        return 1;
+    }
+    for &align in &[16usize, 8, 4] {
+        if levels
+            .iter()
+            .all(|l| (l.byte_offset as usize).is_multiple_of(align))
+        {
+            return align;
+        }
+    }
+    4
 }
 
 fn encode_kvd(pairs: &[(String, Vec<u8>)]) -> Vec<u8> {
@@ -249,14 +271,30 @@ mod tests {
         assert!(!reader.supercompression_global_data().is_empty());
     }
 
-    #[test]
-    #[ignore = "ktx validate rejects rewritten level index order; roundtrip covered by writes_anim_data_*"]
-    fn validate_after_write() {
+    fn staged_ktx_binary() -> Option<PathBuf> {
         let binaries = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries");
-        let staged = binaries.join("ktx-x86_64-pc-windows-msvc.exe");
-        let bin = if staged.is_file() {
-            staged
-        } else {
+        let entries = std::fs::read_dir(&binaries).ok()?;
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if !name.starts_with("ktx-") {
+                continue;
+            }
+            #[cfg(windows)]
+            if name.ends_with(".exe") {
+                return Some(entry.path());
+            }
+            #[cfg(not(windows))]
+            if !name.contains('.') {
+                return Some(entry.path());
+            }
+        }
+        None
+    }
+
+    #[test]
+    fn validate_after_write() {
+        let Some(bin) = staged_ktx_binary() else {
             return;
         };
         let src = fixtures().join("array4_mips.ktx2");
@@ -264,10 +302,15 @@ mod tests {
         let dest = dir.path().join("array4_mips.ktx2");
         std::fs::copy(&src, &dest).unwrap();
         write_anim_data(&dest, &AnimationOptions::default()).unwrap();
-        let status = Command::new(&bin)
-            .args(["validate", dest.to_str().unwrap()])
-            .status()
+        let output = Command::new(&bin)
+            .args(["validate", "--format", "text"])
+            .arg(&dest)
+            .output()
             .expect("run ktx validate");
-        assert!(status.success());
+        assert!(
+            output.status.success(),
+            "ktx validate failed: {}",
+            String::from_utf8_lossy(&output.stdout)
+        );
     }
 }
