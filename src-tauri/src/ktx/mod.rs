@@ -9,6 +9,7 @@ pub mod ktx1;
 pub mod metrics;
 pub mod option_help;
 pub mod options;
+pub mod presets;
 pub mod rules;
 pub mod sidecar;
 

@@ -368,7 +368,11 @@ mod tests {
             .collect();
         let hdr = vec![root.join("hdr.exr")];
 
-        let mut ssim_no_encode = CreateOptions::default();
+        let mut ssim_no_encode = CreateOptions {
+            encode: None,
+            supercompression: Supercompression::None,
+            ..Default::default()
+        };
         ssim_no_encode.encoder.compare_ssim = true;
         ssim_no_encode.encoder.compare_psnr = true;
 
@@ -389,6 +393,8 @@ mod tests {
 
         let mut astc = CreateOptions {
             format: VkFormat::Astc6x6SrgbBlock,
+            encode: None,
+            supercompression: Supercompression::None,
             ..Default::default()
         };
         astc.astc.astc_quality = Some(AstcQuality::Fast);

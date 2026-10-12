@@ -528,3 +528,27 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 **Decided:** Product framing leads with outcome, not tooling. Primary driver: make KTX usable without learning the format or opening a terminal — drop images, press Encode, get a good KTX2. Bundled Khronos tools, full option surface, and the inspector are means and secondary capabilities. Documented in [README.md](../README.md) and the intro of [requirements.md](requirements.md).
 
 **Why:** “Desktop GUI so you need not install Khronos tools” undersells the real reason someone opens the app. Artists and engine folks want the result without a `ktx create` education or a shell. Defaults, the options rules engine, and invalid-combo filtering exist for that driver; the embedded sidecar is how the GUI stays correct.
+
+## 2026-10-12 — Official encode presets (Handbrake-style)
+
+**Decided:** Ship an Official-only encode preset catalog (Color / Data / Normal — not cubemap/array arrangement). Product default is **Official > Color > UASTC RGBA** (`R8G8B8A8_SRGB`, `--encode uastc`, `--zstd 22`). Preset definitions and apply/match live in Rust (`ktx/presets.rs`); Vue shows a Handbrake-style breadcrumb selector as the first control in the options pane and tracks Custom when owned fields diverge. Applying a preset writes format, encode, color TF/normal flags, codec blocks, and supercompression; Inputs role/list and container shape are left alone. Full options rail stays visible. Second Normal leaf is BasisLZ + `--normal-mode` (not ASTC). User-saved presets deferred. Zstd 22 ships with a memory caution (CLI: levels above 20).
+
+**Why:** Uncompressed / no-encode defaults fought the primary driver. Artists need drop → Encode → good KTX2 without learning Vulkan format names; power users still get every `ktx create` control after the recipe fills the form.
+
+## 2026-10-12 — Official preset catalog expanded to twelve leaves
+
+**Decided:** Grow the Official tree to Color / Data / Normal / Mask × UASTC vs BasisLZ × RGBA/RGB where alpha applies (twelve leaves). Mask uses `R8_UNORM`. Data RGB uses `R8G8B8_UNORM`. Color and Data each get BasisLZ counterparts (no zstd). Product default stays Color > UASTC RGBA + zstd 22. ASTC leaves, HDR encode presets, and quality-tier duplicates remain out of scope.
+
+**Why:** The product needs opinions across the common art-pipeline axes (alpha yes/no, UASTC vs size-first BasisLZ, color vs linear data vs normals vs masks), not a minimal five-leaf subset.
+
+## 2026-10-12 — Preset selector in header; no duplicate zstd memory banner
+
+**Decided:** Place the Official preset control in the encoder header beside the KTXForge wordmark (not as the first options-rail panel). Do not surface a separate “zstd levels above 20 use much more memory” banner/tooltip on the preset control; that caution stays on the zstd option help / Supercompression panel only. Drop `zstdHighMemory` from the preset IPC payload.
+
+**Why:** Presets are session-level recipes (Handbrake-style), so they belong next to the brand, not buried in the options rail. The memory note is a property of the zstd level, not of “which Official recipe is active,” and repeating it under every UASTC preset was noise.
+
+## 2026-10-12 — Preset UI omits the Official root segment
+
+**Decided:** Preset breadcrumbs and menu paths are `Category > Leaf` only (e.g. `Color > UASTC RGBA`). Do not show an `Official` root in the selector; the catalog is Official-only until user-saved presets exist.
+
+**Why:** A single-root tree that always says Official adds noise without choice.

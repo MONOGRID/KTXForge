@@ -732,8 +732,13 @@ mod tests {
     use super::*;
     use crate::ktx::options::*;
 
+    /// Baseline without the product Color UASTC default (tests that assert “no encode”).
     fn opts() -> CreateOptions {
-        CreateOptions::default()
+        CreateOptions {
+            encode: None,
+            supercompression: Supercompression::None,
+            ..CreateOptions::default()
+        }
     }
 
     fn source(kind: SourceKind) -> SourceInfo {

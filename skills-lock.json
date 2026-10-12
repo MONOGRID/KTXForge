@@ -1,30 +1,6 @@
 {
   "version": 1,
   "skills": {
-    "openspec-apply-change": {
-      "source": "full-stack-skills/tauri-skills",
-      "sourceType": "github",
-      "skillPath": ".agents/skills/openspec-apply-change/SKILL.md",
-      "computedHash": "9f4fd31611a7485b7d5ecdeeb771540dc152836b04c75d14a87cc4ca87b35d13"
-    },
-    "openspec-archive-change": {
-      "source": "full-stack-skills/tauri-skills",
-      "sourceType": "github",
-      "skillPath": ".agents/skills/openspec-archive-change/SKILL.md",
-      "computedHash": "c9e374e6f8b8380ab76ef194c8af913ff7c336613eae4910cf02f418e2bd92c1"
-    },
-    "openspec-explore": {
-      "source": "full-stack-skills/tauri-skills",
-      "sourceType": "github",
-      "skillPath": ".agents/skills/openspec-explore/SKILL.md",
-      "computedHash": "c3d568e1c6b3035d2fec15511e251295531e390145de80da4ffe5253860d7e21"
-    },
-    "openspec-propose": {
-      "source": "full-stack-skills/tauri-skills",
-      "sourceType": "github",
-      "skillPath": ".agents/skills/openspec-propose/SKILL.md",
-      "computedHash": "d23cc33093e73d6bd78c4634f9e3a1b951a016d3c205fb5344f600eefee66f65"
-    },
     "tauri": {
       "source": "full-stack-skills/tauri-skills",
       "sourceType": "github",

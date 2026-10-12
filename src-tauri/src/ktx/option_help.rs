@@ -131,7 +131,7 @@ pub fn help_for(key: OptionKey) -> &'static str {
         OptionKey::CompareSsim => "Compute SSIM after encode (BasisLZ, UASTC, or ASTC).",
         OptionKey::ComparePsnr => "Compute PSNR after encode (BasisLZ, UASTC, or ASTC).",
         OptionKey::Zstd => {
-            "Zstd supercompression level 1–22. Not valid with BasisLZ. Recommended with UASTC."
+            "Zstd supercompression level 1–22. Levels above 20 use much more memory. Not valid with BasisLZ. Recommended with UASTC."
         }
         OptionKey::Zlib => "Zlib supercompression level 1–9. Not valid with BasisLZ.",
     }

@@ -25,6 +25,7 @@ import OutputsQueue from "./components/OutputsQueue.vue";
 import PreviewPane from "./components/PreviewPane.vue";
 import QueueModal from "./components/QueueModal.vue";
 import OptionsPanel from "./components/options/OptionsPanel.vue";
+import PresetSection from "./components/options/PresetSection.vue";
 import { consumeCommittedDropZone } from "./dropTarget";
 import { bindWindowsMenuShortcuts } from "../shared/menuShortcuts";
 import { bindEncoderMenu } from "./menuBridge";
@@ -81,17 +82,24 @@ onUnmounted(() => {
       <QueueModal />
 
       <header class="flex shrink-0 items-center justify-between gap-3 border-b border-line/40 bg-surface-raised px-4 py-2 shadow-sm">
-        <div class="flex min-w-0 items-center gap-2">
-          <img
-            src="/favicon-32.png"
-            alt=""
-            width="28"
-            height="28"
-            class="size-7 shrink-0"
-          >
-          <h1 class="m-0 text-lg font-semibold tracking-tight">
-            KTXForge
-          </h1>
+        <div class="flex min-w-0 items-center gap-3">
+          <div class="flex shrink-0 items-center gap-2">
+            <img
+              src="/favicon-32.png"
+              alt=""
+              width="28"
+              height="28"
+              class="size-7 shrink-0"
+            >
+            <h1 class="m-0 text-lg font-semibold tracking-tight">
+              KTXForge
+            </h1>
+          </div>
+          <div
+            class="h-5 w-px shrink-0 bg-line/60"
+            aria-hidden="true"
+          />
+          <PresetSection />
         </div>
         <div class="flex items-center gap-2">
           <span class="badge font-mono">

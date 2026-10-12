@@ -115,7 +115,7 @@ function changeZlib(value: string | number): void {
   >
     <div class="field-row">
       <HelpTooltip
-        text="Optional Zstd or Zlib supercompression after encode. Not valid with BasisLZ."
+        text="Optional Zstd or Zlib supercompression after encode. Not valid with BasisLZ. Zstd levels above 20 use much more memory."
         class="label"
       >
         <label

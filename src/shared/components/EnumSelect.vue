@@ -86,6 +86,7 @@ function onUpdate(value: unknown): void {
         <HelpTooltip
           :text="emptyHelp ?? ''"
           side="right"
+          class="w-full"
         >
           <span class="block w-full truncate">{{ emptyLabel }}</span>
         </HelpTooltip>
@@ -98,8 +99,9 @@ function onUpdate(value: unknown): void {
         <HelpTooltip
           :text="option.help ?? ''"
           side="right"
+          class="w-full"
         >
-          <span class="flex min-w-0 items-center gap-2">
+          <span class="flex w-full min-w-0 items-center gap-2">
             <component
               :is="option.icon"
               v-if="option.icon"
@@ -123,8 +125,9 @@ function onUpdate(value: unknown): void {
           <HelpTooltip
             :text="option.help ?? ''"
             side="right"
+            class="w-full"
           >
-            <span class="flex min-w-0 items-center gap-2">
+            <span class="flex w-full min-w-0 items-center gap-2">
               <component
                 :is="option.icon"
                 v-if="option.icon"

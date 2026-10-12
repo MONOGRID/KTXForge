@@ -332,8 +332,14 @@ mod tests {
                 "1".to_owned(),
                 "--mipmap-wrap".to_owned(),
                 "clamp".to_owned(),
+                "--encode".to_owned(),
+                "uastc".to_owned(),
+                "--uastc-quality".to_owned(),
+                "1".to_owned(),
                 "--threads".to_owned(),
                 threads.to_string(),
+                "--zstd".to_owned(),
+                "22".to_owned(),
                 "in0.png".to_owned(),
                 "out.ktx2".to_owned(),
             ]
@@ -345,9 +351,9 @@ mod tests {
         // Regression: SSIM enabled under UASTC, then encode set back to none.
         let mut opts = CreateOptions::default();
         opts.encoder.compare_ssim = true;
-        assert!(!has_flag(&emit(&opts), "--compare-ssim"));
-        opts.encode = Some(EncodeCodec::Uastc);
         assert!(has_flag(&emit(&opts), "--compare-ssim"));
+        opts.encode = None;
+        assert!(!has_flag(&emit(&opts), "--compare-ssim"));
     }
 
     #[test]

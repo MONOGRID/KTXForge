@@ -25,7 +25,7 @@ const props = withDefaults(
   <Tooltip v-if="text.length > 0">
     <TooltipTrigger
       as-child
-      :class="cn('inline-flex max-w-full', props.class)"
+      :class="cn('inline-flex max-w-full min-w-0', props.class)"
     >
       <slot />
     </TooltipTrigger>
@@ -38,7 +38,7 @@ const props = withDefaults(
   </Tooltip>
   <span
     v-else
-    :class="cn('inline-flex max-w-full', props.class)"
+    :class="cn('inline-flex max-w-full min-w-0', props.class)"
   >
     <slot />
   </span>

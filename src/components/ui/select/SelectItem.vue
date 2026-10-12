@@ -33,7 +33,7 @@ const forwardedProps = useForwardProps(delegatedProps);
         <Check class="h-4 w-4" />
       </SelectItemIndicator>
     </span>
-    <SelectItemText>
+    <SelectItemText class="w-full min-w-0">
       <slot />
     </SelectItemText>
   </SelectItem>

@@ -75,6 +75,7 @@ Drop one or more ordinary images onto the main window. The encoder session is a 
 - **Top-left — KTX outputs:** queue of independent outputs. Drop here → one new output per image. Selectable rows; Add / delete; no reorder. A **+** on each row opens Inputs for that output and picks more images.
 - **Bottom-left — Inputs:** shown only when the selected output has (or is about to have) multiple inputs. Role selector is array layers, cubemap faces, mip chain, or depth slices (single-image Base 2D is implicit when Inputs is hidden). List length **is** the arity (`--layers`, `--cubemap` + 6 faces, `--levels`, `--depth`). Drop here → append inputs for the selected output.
 - **Center — Preview** for the selected output (source vs encoded wipe). Drop here opens a dialog: separate KTX outputs, or pack into one KTX with a chosen input kind.
+- **Header — Official preset** selector beside the product name (Handbrake-style breadcrumb + nested Color / Data / Normal / Mask menu). Applies to every output in the queue.
 - **Right — Shared encode options** for every output in the queue. New outputs incompatible with the first (e.g. HDR vs LDR) are rejected.
 
 Encode runs a limited-parallel queue with a modal (`Done i / N`, Cancel queue). Save can write the selected result or all completed results to a folder.
@@ -121,9 +122,30 @@ Supercompression:
 - `--zstd <1-22>` — not valid with BasisLZ. Levels above 20 use much more memory. Recommended together with UASTC.
 - `--zlib <1-9>` — not valid with BasisLZ.
 
+### Official encode presets
+
+The product ships an **Official** preset tree of opinionated content recipes (not cubemap/array arrangement): Color / Data / Normal / Mask × UASTC vs BasisLZ × alpha where it applies. Selecting a preset fills format, encode, color/normal flags, codec knobs, and supercompression. **Inputs role/list and container shape stay untouched.** The full options rail stays visible afterward. Editing any field the active preset owns switches the selector to **Custom** until another Official preset is chosen. User-saved presets are a later feature.
+
+| Preset | Intent |
+| --- | --- |
+| Color > UASTC RGBA | Product default: `R8G8B8A8_SRGB`, `--encode uastc`, `--zstd 22` |
+| Color > UASTC RGB | Color without alpha (`R8G8B8_SRGB`, UASTC, zstd 22) |
+| Color > BasisLZ RGBA | Smaller color with alpha (`R8G8B8A8_SRGB`, BasisLZ, no zstd) |
+| Color > BasisLZ RGB | Smaller color without alpha (`R8G8B8_SRGB`, BasisLZ, no zstd) |
+| Data > UASTC RGBA | Linear data with alpha (`R8G8B8A8_UNORM`, UASTC, zstd 22) |
+| Data > UASTC RGB | Linear data without alpha (`R8G8B8_UNORM`, UASTC, zstd 22) |
+| Data > BasisLZ RGBA | Smaller linear data with alpha (BasisLZ, no zstd) |
+| Data > BasisLZ RGB | Smaller linear data without alpha (BasisLZ, no zstd) |
+| Normal > UASTC | High-quality normals (UNORM, `--normal-mode`, `--normalize`, UASTC RDO λ 0.5, zstd 22) |
+| Normal > BasisLZ | Smaller normals (UNORM, `--normal-mode`, `--normalize`, BasisLZ, no zstd) |
+| Mask > UASTC R8 | Single-channel mask (`R8_UNORM`, UASTC, zstd 22) |
+| Mask > BasisLZ R8 | Smaller single-channel mask (`R8_UNORM`, BasisLZ, no zstd) |
+
+UASTC presets use zstd 22. BasisLZ presets omit supercompression (invalid with BasisLZ). The zstd level control’s own help notes that levels above 20 use much more memory. Source compatibility rules still win (e.g. HDR clearing UASTC → Custom).
+
 ### Options that must appear in the UI
 
-Every option below is available in the UI. Options the current codec, format, or texture shape cannot use are **hidden** (not shown disabled). Whole option panels hide when every control inside is unavailable. Dependent detail controls follow enable-then-reveal: the master switch stays visible when it can be used; linked options appear only while that feature applies (for example mipmap filter controls only after generate-mipmap, scale, width, or height). Each control has a short tooltip from the tool docs. Defaults match the tool.
+Every option below is available in the UI. Options the current codec, format, or texture shape cannot use are **hidden** (not shown disabled). Whole option panels hide when every control inside is unavailable. Dependent detail controls follow enable-then-reveal: the master switch stays visible when it can be used; linked options appear only while that feature applies (for example mipmap filter controls only after generate-mipmap, scale, width, or height). Each control has a short tooltip from the tool docs. The product default for a new session is Color > UASTC RGBA (not uncompressed / no-encode). Other individual flag defaults match the tool when a preset does not set them.
 
 The UI must never offer a combination of inputs and options that the app already knows will fail at encode time (for example HDR / EXR float with an 8-bit or ASTC format, or LDR PNG with a half-float format, or mixed LDR and HDR sources in one encode). Incompatible choices are hidden or auto-corrected to a safe default; encode is refused if a known-invalid combination reaches the backend.
 

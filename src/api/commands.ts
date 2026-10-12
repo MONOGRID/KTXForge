@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { CreateOptions } from "../bindings/CreateOptions";
+import type { EncodePresetInfo } from "../bindings/EncodePresetInfo";
 import type { EncodeRequest } from "../bindings/EncodeRequest";
 import type { EncodeResult } from "../bindings/EncodeResult";
 import type { ExportRequest } from "../bindings/ExportRequest";
@@ -20,6 +21,15 @@ export type Commands = {
   extract_concurrency: { args: EmptyArgs; result: number };
   ktx_version: { args: EmptyArgs; result: KtxVersion };
   default_create_options: { args: EmptyArgs; result: CreateOptions };
+  list_encode_presets: { args: EmptyArgs; result: EncodePresetInfo[] };
+  apply_encode_preset: {
+    args: { options: CreateOptions; id: string };
+    result: CreateOptions;
+  };
+  encode_preset_matches: {
+    args: { options: CreateOptions; id: string };
+    result: boolean;
+  };
   describe_options: {
     args: {
       options: CreateOptions;

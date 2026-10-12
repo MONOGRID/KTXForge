@@ -12,6 +12,7 @@ use crate::image::classify::{classify, FileKind};
 use crate::image::convert::{read_source_info, source_preview_png, thumbnail_png};
 use crate::ktx::input_role::{self, InputRole, RoleArity};
 use crate::ktx::options::CreateOptions;
+use crate::ktx::presets::{self, EncodePresetInfo};
 use crate::ktx::rules;
 use crate::state::AppState;
 
@@ -25,6 +26,22 @@ const THUMB_MAX: u32 = 128;
 #[tauri::command]
 pub fn default_create_options() -> Result<CreateOptions, AppError> {
     Ok(CreateOptions::default())
+}
+
+#[tauri::command]
+pub fn list_encode_presets() -> Vec<EncodePresetInfo> {
+    presets::list_presets()
+}
+
+#[tauri::command]
+pub fn apply_encode_preset(options: CreateOptions, id: String) -> Result<CreateOptions, AppError> {
+    presets::apply_preset(&options, &id)
+        .ok_or_else(|| AppError::invalid_input(format!("unknown encode preset: {id}")))
+}
+
+#[tauri::command]
+pub fn encode_preset_matches(options: CreateOptions, id: String) -> bool {
+    presets::matches_preset(&options, &id)
 }
 
 #[tauri::command]

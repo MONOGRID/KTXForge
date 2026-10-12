@@ -3,6 +3,7 @@ import { computed, reactive, watch } from "vue";
 import { call } from "../api/commands";
 import type { AnimationOptions } from "../bindings/AnimationOptions";
 import type { CreateOptions } from "../bindings/CreateOptions";
+import type { EncodePresetInfo } from "../bindings/EncodePresetInfo";
 import type { EncodeResult } from "../bindings/EncodeResult";
 import type { EncodeStage } from "../bindings/EncodeStage";
 import type { FieldState } from "../bindings/FieldState";
@@ -13,6 +14,7 @@ import type { OptionReport } from "../bindings/OptionReport";
 import type { RoleArity } from "../bindings/RoleArity";
 import type { SourceInfo } from "../bindings/SourceInfo";
 import { isPackRole, roleLabel, type PackInputRole } from "./inputRole";
+import { DEFAULT_ENCODE_PRESET_ID, presetBreadcrumb } from "./presets";
 
 export type JobStatus = "idle" | "queued" | "running" | "done" | "error";
 
@@ -51,6 +53,10 @@ type EncoderStore = {
   /** Output id whose Inputs panel was opened via "+" (even with one input). */
   inputsExpandedId: string | null;
   options: CreateOptions;
+  /** Official encode presets from Rust. */
+  presets: EncodePresetInfo[];
+  /** Active Official preset id, or `null` when options diverge (Custom). */
+  activePresetId: string | null;
   report: OptionReport;
   /** Input-count bounds per role, from Rust `input_role_arities`. */
   arities: RoleArity[];
@@ -112,7 +118,7 @@ function applySuggestion(report: OptionReport): boolean {
 function interimOptions(): CreateOptions {
   return {
     format: "R8G8B8A8_SRGB",
-    encode: null,
+    encode: "uastc",
     container: {
       oneD: false,
       cubemap: false,
@@ -178,8 +184,22 @@ function interimOptions(): CreateOptions {
       compareSsim: false,
       comparePsnr: false,
     },
-    supercompression: { kind: "none" },
+    supercompression: { kind: "zstd", level: 22 },
   } satisfies CreateOptions;
+}
+
+async function syncActivePreset(): Promise<void> {
+  const id = store.activePresetId;
+  if (id === null) {
+    return;
+  }
+  const matches = await call("encode_preset_matches", {
+    options: store.options,
+    id,
+  });
+  if (!matches) {
+    store.activePresetId = null;
+  }
 }
 
 export const store = reactive<EncoderStore>({
@@ -187,6 +207,8 @@ export const store = reactive<EncoderStore>({
   selectedId: null,
   inputsExpandedId: null,
   options: interimOptions(),
+  presets: [],
+  activePresetId: DEFAULT_ENCODE_PRESET_ID,
   report: emptyReport(),
   arities: [],
   ktxVersion: null,
@@ -306,6 +328,7 @@ const refreshReport = useDebounceFn(async () => {
     }
     store.report = report;
     applySuggestion(report);
+    await syncActivePreset();
   } catch {
     // Keep the last successful report.
   }
@@ -664,13 +687,37 @@ export function outputLabel(slot: OutputSlot): string {
   return `${primary.name} (+${String(slot.inputs.length - 1)})`;
 }
 
+export async function applyEncodePreset(id: string): Promise<void> {
+  const next = await call("apply_encode_preset", {
+    options: store.options,
+    id,
+  });
+  store.options = next;
+  store.activePresetId = id;
+}
+
+export function presetLabel(): string {
+  const id = store.activePresetId;
+  if (id === null) {
+    return "Custom";
+  }
+  const preset = store.presets.find((entry) => entry.id === id);
+  if (preset === undefined) {
+    return "Custom";
+  }
+  return presetBreadcrumb(preset);
+}
+
 export async function initStore(): Promise<void> {
-  const [options, ktxVersion, arities] = await Promise.all([
+  const [options, presets, ktxVersion, arities] = await Promise.all([
     call("default_create_options", {}),
+    call("list_encode_presets", {}),
     call("ktx_version", {}),
     call("input_role_arities", {}),
   ]);
   store.options = options;
+  store.presets = presets;
+  store.activePresetId = DEFAULT_ENCODE_PRESET_ID;
   store.ktxVersion = ktxVersion;
   store.arities = arities;
   store.ready = true;
@@ -678,5 +725,7 @@ export async function initStore(): Promise<void> {
   const report = await describeOptions();
   if (seq === reportSeq) {
     store.report = report;
+    applySuggestion(report);
+    await syncActivePreset();
   }
 }

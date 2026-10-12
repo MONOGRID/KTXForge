@@ -551,7 +551,7 @@ pub struct ColorOptions {
     pub normal_mode: bool,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "camelCase")]
 pub struct BasisLzOptions {
@@ -580,7 +580,7 @@ impl Default for BasisLzOptions {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "camelCase")]
 pub struct UastcLdrOptions {
@@ -609,7 +609,7 @@ impl Default for UastcLdrOptions {
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, TS)]
 #[ts(export)]
 #[serde(rename_all = "camelCase")]
 pub struct AstcOptions {
@@ -685,18 +685,8 @@ pub struct CreateOptions {
 
 impl Default for CreateOptions {
     fn default() -> Self {
-        Self {
-            format: VkFormat::R8G8B8A8Srgb,
-            encode: None,
-            container: ContainerOptions::default(),
-            filter: FilterOptions::default(),
-            color: ColorOptions::default(),
-            basis_lz: BasisLzOptions::default(),
-            uastc_ldr: UastcLdrOptions::default(),
-            astc: AstcOptions::default(),
-            encoder: EncoderOptions::default(),
-            supercompression: Supercompression::None,
-        }
+        // Product default = Official > Color > UASTC RGBA (+ zstd 22).
+        crate::ktx::presets::product_default_options()
     }
 }
 
@@ -815,8 +805,11 @@ mod tests {
         let json = serde_json::to_string(&opts).unwrap();
         let back: CreateOptions = serde_json::from_str(&json).unwrap();
         assert_eq!(back.format, VkFormat::R8G8B8A8Srgb);
-        assert_eq!(back.encode, None);
-        assert!(matches!(back.supercompression, Supercompression::None));
+        assert_eq!(back.encode, Some(EncodeCodec::Uastc));
+        assert!(matches!(
+            back.supercompression,
+            Supercompression::Zstd { level: 22 }
+        ));
         assert!(!back.container.generate_mipmap);
     }
 
