@@ -19,7 +19,7 @@
     "icons": "node scripts/generate-icons.mjs",
     "lint": "eslint src",
     "lint:style": "stylelint \"src/**/*.{css,scss,vue}\"",
-    "prepare": "husky",
+    "prepare": "husky && git lfs install --local --skip-repo",
     "preview": "vite preview",
     "release": "semantic-release",
     "release-outputs": "node scripts/release-outputs.mjs",

@@ -473,3 +473,9 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 **Decided:** License KTXForge under the MIT License (`LICENSE`, copyright MONOGRID). Declare `license: "MIT"` in `package.json` and `license = "MIT"` in `src-tauri/Cargo.toml`. README states MIT for this repo and points at `src-tauri/licenses/KTX-Software-LICENSE.md` for the embedded KTX-Software sidecar (primarily Apache-2.0; Ericsson `etcdec` special case noted upstream).
 
 **Why:** Public GitHub distribution needs a clear grant for our code. MIT is compatible with redistributing the Apache-2.0-oriented KTX-Software binary; that dependency does not force our license to be Apache-2.0, but its notices must stay shipped with the app.
+
+## 2026-10-12 — Husky owns Git LFS hooks
+
+**Decided:** Install Git LFS hooks under `.husky/` (`pre-push`, `post-checkout`, `post-commit`, `post-merge`) so a normal `git push` uploads LFS objects. `package.json` `prepare` runs `husky && git lfs install --local --skip-repo` (filters only; do not write into `.git/hooks`). Do not rely on `git lfs push --all` as the everyday path.
+
+**Why:** `core.hooksPath` is `.husky/_`, so the hooks from `git lfs install` in `.git/hooks` never run. Screenshot PNG commits then pushed pointer-only refs; GitHub rejected with GH008 unknown LFS objects. The earlier LFS decision’s “push `--all` if skipped” was a recovery tip, not a workflow.
