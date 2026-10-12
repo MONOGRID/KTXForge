@@ -479,3 +479,9 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 **Decided:** Install Git LFS hooks under `.husky/` (`pre-push`, `post-checkout`, `post-commit`, `post-merge`) so a normal `git push` uploads LFS objects. `package.json` `prepare` runs `husky && git lfs install --local --skip-repo` (filters only; do not write into `.git/hooks`). Do not rely on `git lfs push --all` as the everyday path.
 
 **Why:** `core.hooksPath` is `.husky/_`, so the hooks from `git lfs install` in `.git/hooks` never run. Screenshot PNG commits then pushed pointer-only refs; GitHub rejected with GH008 unknown LFS objects. The earlier LFS decision’s “push `--all` if skipped” was a recovery tip, not a workflow.
+
+## 2026-10-12 — OS file associations for `.ktx` / `.ktx2`
+
+**Decided:** Register Viewer associations for `.ktx2` (`image/ktx2`) and `.ktx` (`image/ktx`) in `tauri.conf.json` `bundle.fileAssociations`, with app-scoped `exportedType` identifiers for Apple. Route opens entirely in Rust (`os_open.rs` → existing `open_inspector_path`): argv on Windows/Linux (setup + `tauri-plugin-single-instance` second launch), `RunEvent::Opened` on macOS. First KTX path wins, same as drag-drop. No frontend open-URL plumbing.
+
+**Why:** Spec now includes “Open with” / double-click for the inspector. Associations only ship in installers; single-instance keeps a second double-click from spawning another process and forwards the path into the running app.

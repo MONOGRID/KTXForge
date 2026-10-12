@@ -8,6 +8,7 @@ mod events;
 mod image;
 mod ktx;
 mod menu;
+mod os_open;
 mod state;
 mod updater;
 mod window_bounds;
@@ -17,7 +18,23 @@ use state::{AppState, PendingUpdate};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
-    let mut builder = tauri::Builder::default()
+    let mut builder = tauri::Builder::default();
+
+    // single-instance must be registered before other plugins (plugin order).
+    #[cfg(desktop)]
+    {
+        use tauri::Manager;
+
+        builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_focus();
+            }
+            // argv[0] is the executable; remaining args may include opened paths.
+            os_open::open_from_args(app, argv.into_iter().skip(1));
+        }));
+    }
+
+    builder = builder
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
@@ -60,6 +77,9 @@ pub fn run() {
             window_bounds::restore_open_windows(app.handle());
             drop::register_drop_handler(app.handle());
             updater::setup_updater(app.handle());
+            // Windows / Linux cold start: OS passes the path on argv.
+            #[cfg(desktop)]
+            os_open::open_from_args(app.handle(), std::env::args().skip(1));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -86,6 +106,17 @@ pub fn run() {
             menu::set_menu_item_enabled,
             menu::dispatch_menu_action,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .build(tauri::generate_context!())
+        .expect("error while building tauri application")
+        .run(|app, event| {
+            // macOS delivers file opens via Opened URLs (not always argv).
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Opened { urls } = &event {
+                os_open::open_from_urls(app, urls);
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                let _ = (app, event);
+            }
+        });
 }

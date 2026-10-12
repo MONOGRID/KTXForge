@@ -53,6 +53,7 @@ panic = "abort"
 strip = true
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = "2.5.3"
 tauri-plugin-window-state = "2.5.0"
 
 [target.'cfg(target_os = "linux")'.dependencies]

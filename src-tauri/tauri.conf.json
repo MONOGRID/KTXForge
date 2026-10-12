@@ -38,6 +38,32 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "fileAssociations": [
+      {
+        "ext": ["ktx2"],
+        "name": "KTX2 Texture",
+        "description": "Khronos KTX2 Texture",
+        "mimeType": "image/ktx2",
+        "role": "Viewer",
+        "rank": "Default",
+        "exportedType": {
+          "identifier": "com.monogrid.ktxforge.ktx2",
+          "conformsTo": ["public.data"]
+        }
+      },
+      {
+        "ext": ["ktx"],
+        "name": "KTX Texture",
+        "description": "Khronos KTX Texture",
+        "mimeType": "image/ktx",
+        "role": "Viewer",
+        "rank": "Default",
+        "exportedType": {
+          "identifier": "com.monogrid.ktxforge.ktx",
+          "conformsTo": ["public.data"]
+        }
+      }
+    ],
     "macOS": {
       "signingIdentity": "-"
     }

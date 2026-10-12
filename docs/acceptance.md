@@ -15,7 +15,7 @@ Verified: 2026-10-12. Quality gate: `npm run check` (includes `vitest run`). `fa
 | 3 | Auto-update | `src-tauri/src/updater.rs`, `commands/update.rs`, `UpdateBanner.vue`, `plugins.updater` | Config + runtime skip in debug; first public release updater path → smoke N/A | pass |
 | 4 | Drag-and-drop encode | `drop.rs`, `OutputsQueue.vue`, `InputsPanel.vue`, `DropOverlay.vue`, `DropIntentDialog.vue` | T7.2 Linux smoke; Rust classify tests | pass |
 | 5 | Every create option + preview | `CreateOptions` / `rules.rs` / option sections; `PreviewPane.vue` | `ktx::rules::tests::*`, `create_args` flag coverage; UI accepted | pass (deferred flags below) |
-| 6 | KTX inspector window | `inspector_window.rs`, `InspectorApp.vue`, report panels | T7.2; `info_types` sample deserialize tests | pass |
+| 6 | KTX inspector window (+ OS open) | `inspector_window.rs`, `os_open.rs`, `fileAssociations`, `InspectorApp.vue` | T7.2; `os_open` argv/URL unit tests; associations need installed bundle smoke | pass |
 | 7 | Multi-frame + anim metadata | `AnimationSection.vue`, `ktx/anim.rs`, encode pipeline | `writes_anim_data_*`, `encode_animation_frames_writes_anim_key` | pass |
 | 8 | Mipmap preview | `MipStrip.vue`, `PreviewIndexSliders.vue`, `inspector_image` | T7.2; extract/inspect staged-binary tests | pass |
 | 9 | Responsive UI | async commands, scrub gate, extract concurrency | Vitest `scrubGate`; decision-context extract slots | pass |

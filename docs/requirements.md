@@ -11,7 +11,7 @@ The app is a local desktop tool. It does not upload textures. The installed app 
 3. **Auto-update.** The installed app checks GitHub Releases and updates itself through the Tauri updater.
 4. **Drag and drop encode.** Dropping ordinary images opens the encoder. The user encodes them to KTX2.
 5. **Every encoding option in the UI, plus a preview.** Every option documented for `ktx create` is visible. A small preview of the encoded result is shown when the tool can produce a viewable image.
-6. **KTX inspector in its own window.** Dropping a `.ktx` or `.ktx2` file opens a separate inspector window. The user can export the image as PNG or JPEG and can see every detail the format reports.
+6. **KTX inspector in its own window.** Dropping a `.ktx` or `.ktx2` file, or opening one via the OS (“Open with” / double-click when the installed app is registered), opens a separate inspector window. The user can export the image as PNG or JPEG and can see every detail the format reports.
 7. **Multi-frame encode and decode.** Multiple frames can be packed into one KTX file and unpacked again, including animation metadata.
 8. **Mipmap preview.** The inspector shows each mip level, not only the base image.
 9. **Modern, snappy interface.** The UI stays responsive while encoding, extracting, and updating.
@@ -29,6 +29,8 @@ The app is a local desktop tool. It does not upload textures. The installed app 
 The frontend calls Tauri commands and listens for progress events. It never receives a shell, a binary path, or a raw command line it can edit. Rust builds the `ktx` argument list from a typed options struct.
 
 Drag-and-drop uses Tauri's file-drop events (`over`, `drop`, `cancel`), which provide absolute paths. Rust classifies each path. Image drops stay on the encoder window. KTX drops open the inspector. The webview drag-drop handler stays enabled so those paths are delivered. HTML5 drop is not the file pipeline.
+
+Installed builds register OS file associations for `.ktx` and `.ktx2` (`bundle.fileAssociations`). Opening a file that way routes through the same Rust inspector open path: Windows/Linux pass the path on argv (cold start in `setup`, warm start via `tauri-plugin-single-instance`); macOS also delivers `RunEvent::Opened` file URLs. Associations apply to bundled installs, not `tauri dev`.
 
 The inspector is a second webview window, created from Rust with `WebviewWindowBuilder` on an async command. On Windows that builder deadlocks inside a synchronous command, so window creation stays async. The window label is stable and reused if the inspector is already open.
 
@@ -252,7 +254,7 @@ Block-compressed transcode targets (`etc-rgb`, `etc-rgba`, `eac-r11`, `eac-rg11`
 
 ## Inspector
 
-Dropping `.ktx` or `.ktx2` opens the inspector window for that file. KTX2 details come from `ktx info --format json`, which follows the [info schema](https://schema.khronos.org/ktx/info_v1.json). The command also validates KTX2 and returns errors and warnings. Invalid files still show a best-effort report.
+Dropping `.ktx` or `.ktx2`, or opening one through the OS file association, opens the inspector window for that file. KTX2 details come from `ktx info --format json`, which follows the [info schema](https://schema.khronos.org/ktx/info_v1.json). The command also validates KTX2 and returns errors and warnings. Invalid files still show a best-effort report.
 
 The inspector shows every field the schema can return:
 

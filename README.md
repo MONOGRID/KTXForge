@@ -44,7 +44,7 @@ Drop a `.ktx` / `.ktx2` to browse mips, layers, and faces while the sidebar show
 
 ### 🔍 Inspector
 
-- Drop `.ktx` / `.ktx2` to open a dedicated inspector window.
+- Drop `.ktx` / `.ktx2`, or open them via the OS (“Open with” / double-click on an installed build), to open a dedicated inspector window.
 - Full **`ktx info`** report (JSON for KTX2, text + best-effort header for KTX1), including validation messages.
 - Browse **mips**, **layers / frames**, **faces**, and **depth** slices; pan / zoom; View menu zoom controls.
 - Known metadata keys (`KTXorientation`, `KTXswizzle`, `KTXwriter`, `KTXanimData`, platform format keys, …).
@@ -54,6 +54,7 @@ Drop a `.ktx` / `.ktx2` to browse mips, layers, and faces while the sidebar show
 ### 💻 Platform
 
 - Embedded, pinned `ktx` sidecar — no system install required.
+- Installed builds register as a viewer for `.ktx` / `.ktx2` (OS file associations).
 - Auto-update from GitHub Releases (when configured).
 - Heavy work in Rust; Vue is visualization and controls only.
 
