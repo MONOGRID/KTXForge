@@ -335,7 +335,7 @@ onUnmounted(() => {
             :src="src"
             :alt="alt"
             class="viewer-img block max-w-none"
-            :class="{ 'viewer-img--canvas': canvasStyle !== undefined }"
+            :class="{ 'viewer-img-canvas': canvasStyle !== undefined }"
             draggable="false"
             @load="onPrimaryLoad"
             @dragstart.prevent
@@ -388,7 +388,7 @@ onUnmounted(() => {
 }
 
 /* Header/mip dims own the box so Actual size + mip scrub match content size. */
-.viewer-img--canvas {
+.viewer-img-canvas {
   width: 100%;
   height: 100%;
   object-fit: fill;
