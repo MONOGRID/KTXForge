@@ -14,7 +14,7 @@ use crate::image::classify::{classify, FileKind};
 #[derive(Debug, Clone)]
 pub struct PreparedInput {
     pub path: PathBuf,
-    /// True when the original path is used unchanged (PNG / EXR).
+    /// True when the original path is used unchanged (PNG / scanline EXR).
     pub passthrough: bool,
 }
 
@@ -41,7 +41,14 @@ fn stage_copy(src: &Path, workdir: &Path, ext: &str) -> Result<PathBuf, AppError
 }
 
 fn passthrough_or_stage(src: &Path, workdir: &Path, ext: &str) -> Result<PreparedInput, AppError> {
-    if basename_unsafe_for_ktx(src) {
+    if ext == "exr" && exr_is_tiled(src)? {
+        let out = staged_path(workdir, src, ext);
+        restage_exr_as_scanline(src, &out)?;
+        Ok(PreparedInput {
+            path: out,
+            passthrough: false,
+        })
+    } else if basename_unsafe_for_ktx(src) {
         Ok(PreparedInput {
             path: stage_copy(src, workdir, ext)?,
             passthrough: false,
@@ -54,7 +61,64 @@ fn passthrough_or_stage(src: &Path, workdir: &Path, ext: &str) -> Result<Prepare
     }
 }
 
-/// PNG and EXR pass through; JPEG/WebP/BMP/GIF/TIFF → PNG; Radiance HDR → half-float EXR.
+/// The Linux v4.4.2 `ktx` segfaults on tiled EXR (any compression) and reads scanline EXR.
+/// ZIP over 16-line blocks, written top to bottom.
+const SCANLINE_EXR: exr::image::Encoding = exr::image::Encoding::SMALL_LOSSLESS;
+
+fn exr_error(e: exr::error::Error) -> AppError {
+    AppError::image(format!("OpenEXR: {e}"))
+}
+
+fn exr_is_tiled(src: &Path) -> Result<bool, AppError> {
+    let meta = exr::meta::MetaData::read_from_file(src, false).map_err(exr_error)?;
+    Ok(meta
+        .headers
+        .iter()
+        .any(|h| matches!(h.blocks, exr::meta::BlockDescription::Tiles(_))))
+}
+
+/// Rewrite every layer as scanline, keeping channels, sample types, and attributes.
+/// Only the full-resolution level survives; `ktx create` reads nothing else.
+fn restage_exr_as_scanline(src: &Path, out: &Path) -> Result<(), AppError> {
+    use exr::prelude::WritableImage;
+
+    let mut image = exr::prelude::read_all_flat_layers_from_file(src).map_err(exr_error)?;
+    for layer in &mut image.layer_data {
+        layer.encoding = SCANLINE_EXR;
+    }
+    image.write().to_file(out).map_err(exr_error)
+}
+
+/// 32-bit float scanline EXR; RGBA only when the source has alpha.
+fn write_scanline_exr(img: &DynamicImage, out: &Path) -> Result<(), AppError> {
+    use exr::prelude::{Image, Layer, LayerAttributes, SpecificChannels, Vec2, WritableImage};
+
+    let size = (img.width() as usize, img.height() as usize);
+    let attributes = LayerAttributes::default();
+    if img.color().has_alpha() {
+        let rgba = img.to_rgba32f();
+        let channels = SpecificChannels::rgba(|Vec2(x, y)| {
+            let p = rgba.get_pixel(x as u32, y as u32).0;
+            (p[0], p[1], p[2], p[3])
+        });
+        Image::from_layer(Layer::new(size, attributes, SCANLINE_EXR, channels))
+            .write()
+            .to_file(out)
+    } else {
+        let rgb = img.to_rgb32f();
+        let channels = SpecificChannels::rgb(|Vec2(x, y)| {
+            let p = rgb.get_pixel(x as u32, y as u32).0;
+            (p[0], p[1], p[2])
+        });
+        Image::from_layer(Layer::new(size, attributes, SCANLINE_EXR, channels))
+            .write()
+            .to_file(out)
+    }
+    .map_err(exr_error)
+}
+
+/// PNG passes through; EXR passes through unless tiled (re-staged as scanline);
+/// JPEG/WebP/BMP/GIF/TIFF → PNG; Radiance HDR → 32-bit float scanline EXR.
 pub fn prepare_input(src: &Path, workdir: &Path) -> Result<PreparedInput, AppError> {
     std::fs::create_dir_all(workdir).map_err(|e| AppError::io(e.to_string()))?;
     match classify(src) {
@@ -72,8 +136,7 @@ pub fn prepare_input(src: &Path, workdir: &Path) -> Result<PreparedInput, AppErr
         } => {
             let img = image::open(src).map_err(|e| AppError::image(e.to_string()))?;
             let out = staged_path(workdir, src, "exr");
-            img.save_with_format(&out, ImageFormat::OpenExr)
-                .map_err(|e| AppError::image(e.to_string()))?;
+            write_scanline_exr(&img, &out)?;
             Ok(PreparedInput {
                 path: out,
                 passthrough: false,
@@ -213,6 +276,104 @@ mod tests {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
     }
 
+    fn staged_ktx() -> Option<PathBuf> {
+        let binaries = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries");
+        std::fs::read_dir(&binaries).ok()?.flatten().find_map(|e| {
+            let name = e.file_name();
+            let name = name.to_string_lossy();
+            if name.starts_with("ktx-") && (name.ends_with(".exe") || !name.contains('.')) {
+                Some(e.path())
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Run the staged `ktx create` on a prepared HDR input; skip when no binary is staged.
+    fn assert_ktx_accepts_hdr(input: &Path, out_dir: &Path) {
+        let Some(ktx) = staged_ktx() else {
+            return;
+        };
+        let out = out_dir.join("out.ktx2");
+        let output = std::process::Command::new(&ktx)
+            .args(["create", "--format", "R16G16B16A16_SFLOAT"])
+            .arg(input)
+            .arg(&out)
+            .output()
+            .unwrap();
+        assert!(
+            output.status.success(),
+            "ktx create {}: {:?}\n{}",
+            input.display(),
+            output.status,
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(out.is_file());
+    }
+
+    fn first_pixel_rgba(path: &Path) -> (f32, f32, f32, f32) {
+        let image = exr::prelude::read_first_rgba_layer_from_file(
+            path,
+            |_, _| None,
+            |first: &mut Option<(f32, f32, f32, f32)>, _, px: (f32, f32, f32, f32)| {
+                first.get_or_insert(px);
+            },
+        )
+        .unwrap();
+        image.layer_data.channel_data.pixels.unwrap()
+    }
+
+    #[test]
+    fn radiance_hdr_converts_to_scanline_exr_ktx_accepts() {
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("in.hdr");
+        image::Rgb32FImage::from_pixel(32, 32, image::Rgb([0.5, 1.5, 2.0]))
+            .save(&src)
+            .unwrap();
+
+        let prepared = prepare_input(&src, &dir.path().join("work")).unwrap();
+        assert!(!prepared.passthrough);
+        assert_eq!(
+            prepared.path.extension().and_then(|e| e.to_str()),
+            Some("exr")
+        );
+        assert!(!exr_is_tiled(&prepared.path).unwrap());
+        let (r, g, b, a) = first_pixel_rgba(&prepared.path);
+        assert_eq!((r, g, b, a), (0.5, 1.5, 2.0, 1.0));
+
+        assert_ktx_accepts_hdr(&prepared.path, dir.path());
+    }
+
+    #[test]
+    fn tiled_exr_restaged_as_scanline_ktx_accepts() {
+        use exr::prelude::{
+            Encoding, Image, Layer, LayerAttributes, SpecificChannels, WritableImage,
+        };
+
+        let dir = tempfile::tempdir().unwrap();
+        let src = dir.path().join("tiled.exr");
+        let channels = SpecificChannels::rgba(|_| (0.25_f32, 4.0_f32, 8.0_f32, 0.5_f32));
+        // Tiled RLE: the layout the `image` crate writes and the Linux `ktx` crashes on.
+        Image::from_layer(Layer::new(
+            (32, 32),
+            LayerAttributes::default(),
+            Encoding::FAST_LOSSLESS,
+            channels,
+        ))
+        .write()
+        .to_file(&src)
+        .unwrap();
+        assert!(exr_is_tiled(&src).unwrap());
+
+        let prepared = prepare_input(&src, &dir.path().join("work")).unwrap();
+        assert!(!prepared.passthrough);
+        assert_ne!(prepared.path, src);
+        assert!(!exr_is_tiled(&prepared.path).unwrap());
+        assert_eq!(first_pixel_rgba(&prepared.path), (0.25, 4.0, 8.0, 0.5));
+
+        assert_ktx_accepts_hdr(&prepared.path, dir.path());
+    }
+
     #[test]
     fn converts_jpeg_to_png_same_size() {
         let root = fixtures();
@@ -248,6 +409,7 @@ mod tests {
         let a = std::fs::read(&src).unwrap();
         let b = std::fs::read(&prepared.path).unwrap();
         assert_eq!(a, b);
+        assert_ktx_accepts_hdr(&prepared.path, dir.path());
     }
 
     #[test]

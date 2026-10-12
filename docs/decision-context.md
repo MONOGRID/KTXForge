@@ -374,7 +374,8 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 
 ## 2026-10-12 — Git LFS for binaries; SVGs stay in Git
 
-**Decided:** Brand/Tauri icons and test-fixture binaries (*.png / *.jpg / *.ktx / *.ktx2, plus other binary patterns in .gitattributes) are Git LFS. *.svg is not LFS-tracked. Every ctions/checkout in ci.yml and elease.yml sets `lfs: true`. After converting blobs to pointers, push LFS objects with `git lfs push --all origin` if a normal push skipped them.
+**Decided:** Brand/Tauri icons and test-fixture binaries (*.png / *.jpg / *.ktx / *.ktx2, plus other binary patterns in .gitattributes) are Git LFS. *.svg is not LFS-tracked. Every ctions/checkout in ci.yml and 
+elease.yml sets `lfs: true`. After converting blobs to pointers, push LFS objects with `git lfs push --all origin` if a normal push skipped them.
 
 **Why:** Icon LFS blobs never reached GitHub (clone 404). Without `lfs: true`, CI saw pointer text and failed with Invalid PNG signature. Fixtures were committed as raw blobs while LFS rules applied (`should have been pointers`). Docs SVG placeholders are small text and do not belong in LFS.
 
@@ -485,3 +486,9 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 **Decided:** Register Viewer associations for `.ktx2` (`image/ktx2`) and `.ktx` (`image/ktx`) in `tauri.conf.json` `bundle.fileAssociations`, with app-scoped `exportedType` identifiers for Apple. Route opens entirely in Rust (`os_open.rs` → existing `open_inspector_path`): argv on Windows/Linux (setup + `tauri-plugin-single-instance` second launch), `RunEvent::Opened` on macOS. First KTX path wins, same as drag-drop. No frontend open-URL plumbing.
 
 **Why:** Spec now includes “Open with” / double-click for the inspector. Associations only ship in installers; single-instance keeps a second double-click from spawning another process and forwards the path into the running app.
+
+## 2026-10-12 — Stage HDR inputs as scanline EXR
+
+**Decided:** `prepare_input` writes Radiance `.hdr` conversions with the `exr` crate as 32-bit float scanline EXR (ZIP16, increasing line order; RGB, or RGBA when the source has alpha) instead of `image`'s `save_with_format(OpenExr)`. Passthrough `.exr` inputs whose header is tiled are re-staged in the workdir as scanline (all layers, channels, sample types, and attributes kept; only the largest resolution level). Scanline EXRs still pass through untouched. The `hdr.exr` fixture is re-encoded as scanline with identical pixels. `convert.rs` tests run the staged `ktx create` on a converted `.hdr` and a re-staged tiled EXR.
+
+**Why:** The Linux v4.4.2 `ktx` segfaults (exit 139) on any tiled EXR, whatever the compression (RLE, ZIP, none), and reads scanline EXR fine. The `image` crate always writes tiled RLE, so every Radiance encode crashed on Linux. Re-staging is one header read for scanline files and a small rewrite for tiled ones, cheaper than documenting a limitation users cannot see coming.
