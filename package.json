@@ -26,6 +26,8 @@
     "setup": "npm run ensure-tools && npm run fetch-ktx",
     "pretauri": "npm run fetch-ktx",
     "tauri": "tauri",
+    "tauri:build:signed": "node scripts/with-updater-signing-key.mjs npm run tauri -- build",
+    "with-signing-key": "node scripts/with-updater-signing-key.mjs",
     "test:image-cache-lru": "node scripts/image-cache-lru-selftest.mjs",
     "test:menu-shortcuts": "node scripts/menu-shortcuts-selftest.mjs",
     "test:scrub-gate": "node scripts/scrub-gate-selftest.mjs"

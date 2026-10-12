@@ -75,6 +75,12 @@ Quality gate before commit:
 npm run check
 ```
 
+Local release-style builds that produce updater signatures need the private key from 1Password (Tech vault), not a key file on disk. See [docs/updater-signing.md](docs/updater-signing.md):
+
+```bash
+npm run tauri:build:signed
+```
+
 ### Commits and releases
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org/). On `main` / `beta`, [semantic-release](https://semantic-release.gitbook.io/) derives the version (`feat` → minor, `fix` / `perf` → patch, `!` or `BREAKING CHANGE:` → major; other types do not release), updates [`CHANGELOG.md`](CHANGELOG.md), tags, and publishes GitHub Release artifacts via Actions.

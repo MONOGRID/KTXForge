@@ -383,3 +383,9 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 **Decided:** Add `scripts/ensure-tools.mjs` and `npm run setup` / `npm run ensure-tools`. On a fresh checkout, `setup` installs `rustfmt` and `clippy` via rustup when missing, installs `cargo-machete` via `cargo install --locked` when missing, then runs `fetch-ktx`. Wire tool install + fetch into `precheck:rust` only. `pretauri` runs `fetch-ktx` alone (host triple). CI quality-gate jobs drop the explicit `fetch-ktx` step; release matrix builds keep `fetch-ktx -- --target <triple>` because tauri-action’s `npm run tauri` prehook cannot see the matrix target.
 
 **Why:** A clean machine failed `npm run check` at `cargo machete` (`no such command`) after tests passed, and earlier failed Tauri builds without a staged sidecar. Putting `ensure-tools` on `pretauri` would compile machete on every release OS/arch build; release `check` had no machete step before, so `precheck:rust` also closes that gap.
+
+## 2026-10-12 — Updater private key in 1Password Tech vault
+
+**Decided:** Source of truth for the Tauri updater minisign private key is 1Password vault **Tech**, item **KTXForge Tauri updater signing key** (`notesPlain`; no key password). Commit only the public key in `tauri.conf.json`. Mirror the private key into GitHub secret `TAURI_SIGNING_PRIVATE_KEY` for Actions. Developers load the key via `op read` / `npm run tauri:build:signed` (`scripts/with-updater-signing-key.mjs`) and do not keep `~/.tauri/*.key` copies across machines. Document the flow in [updater-signing.md](updater-signing.md). Share access by granting Tech vault membership to tech leads, not by distributing key files.
+
+**Why:** The previous GitHub-only secret could not be recovered for local signed builds or multi-PC setups. A shared vault keeps one recoverable copy for leads without initializing or syncing key files on every Windows/Linux environment.
