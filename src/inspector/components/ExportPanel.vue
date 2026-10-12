@@ -9,7 +9,7 @@ import type { ImageSelection } from "../../bindings/ImageSelection";
 import type { PreviewKind } from "../../bindings/PreviewKind";
 import Button from "../../shared/components/Button.vue";
 import Panel from "../../shared/components/Panel.vue";
-import { toastAppError } from "../../shared/toastAppError";
+import { alertAppError } from "../../shared/alertAppError";
 import { path, report, selection } from "../store";
 
 type ScopeKind = "one" | "allFrames" | "all";
@@ -128,7 +128,7 @@ async function onExport(): Promise<void> {
     });
     writtenFiles.value = result.files;
   } catch (err: unknown) {
-    toastAppError(toAppError(err));
+    await alertAppError(toAppError(err));
   } finally {
     busy.value = false;
   }

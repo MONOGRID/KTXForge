@@ -7,13 +7,15 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { on } from "../api/events";
 import { toAppError } from "../api/guards";
+import {
+  alertAppError,
+  alertInvalidInput,
+} from "../shared/alertAppError";
 import ModeToggle from "../shared/components/ModeToggle.vue";
 import UpdateBanner from "../shared/components/UpdateBanner.vue";
-import { toastAppError } from "../shared/toastAppError";
 import { handleDroppedSources } from "./actions";
 import DropIntentDialog from "./components/DropIntentDialog.vue";
 import DropOverlay from "./components/DropOverlay.vue";
@@ -46,7 +48,7 @@ onMounted(() => {
   unbindMenu = bindEncoderMenu();
   unbindShortcuts = bindWindowsMenuShortcuts();
   void initStore().catch((err: unknown) => {
-    toastAppError(toAppError(err));
+    void alertAppError(toAppError(err));
   });
   void on("encoder://sources-added", (sources) => {
     void handleDroppedSources(sources, consumeCommittedDropZone());
@@ -56,10 +58,7 @@ onMounted(() => {
   void on("encoder://drop-rejected", (payload) => {
     const paths =
       payload.paths.length > 0 ? ` (${payload.paths.join(", ")})` : "";
-    toastAppError({
-      kind: "invalidInput",
-      message: `${payload.reason}${paths}`,
-    });
+    void alertInvalidInput(`${payload.reason}${paths}`);
   }).then((unlisten) => {
     dropUnlisteners.push(unlisten);
   });
@@ -77,10 +76,6 @@ onUnmounted(() => {
 <template>
   <TooltipProvider :delay-duration="400">
     <div class="box-border flex h-screen flex-col overflow-hidden font-sans text-ink">
-      <Toaster
-        rich-colors
-        close-button
-      />
       <DropOverlay />
       <DropIntentDialog />
       <QueueModal />

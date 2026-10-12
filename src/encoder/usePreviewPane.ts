@@ -1,11 +1,9 @@
 import { computed, onUnmounted, ref, watch } from "vue";
 import { call } from "../api/commands";
-import { toAppError } from "../api/guards";
 import type { EncodeResult } from "../bindings/EncodeResult";
 import type { ImageSelection } from "../bindings/ImageSelection";
 import type { InputRole } from "../bindings/InputRole";
 import { createScrubGate } from "../shared/scrubGate";
-import { toastAppError } from "../shared/toastAppError";
 import { composeCubemapCross } from "../shared/cubemapCross";
 import { selectedOutput, store, type OutputSlot } from "./store";
 
@@ -628,11 +626,8 @@ export function usePreviewPane() {
     encodedLoading.value = encodedNeedsLoading(currentRole);
     try {
       await loadEncodedByRole(jobId, currentRole, gen);
-    } catch (err: unknown) {
-      if (gen !== encodedGen) {
-        return;
-      }
-      toastAppError(toAppError(err));
+    } catch {
+      // Preview load failures stay in-pane (loading clears); no toast / notify.
     } finally {
       if (gen === encodedGen) {
         encodedLoading.value = false;

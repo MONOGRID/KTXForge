@@ -7,7 +7,7 @@ import type { InspectReport } from "../bindings/InspectReport";
 import type { Ktx1Header } from "../bindings/Ktx1Header";
 import type { Ktx2Info } from "../bindings/Ktx2Info";
 import type { KeyValueValue } from "../bindings/KeyValueValue";
-import { toastAppError } from "../shared/toastAppError";
+import { alertAppError } from "../shared/alertAppError";
 
 export const MISSING = "—";
 
@@ -85,7 +85,7 @@ async function loadPath(nextPath: string): Promise<void> {
     selection.value = { ...DEFAULT_SELECTION };
   } catch (err: unknown) {
     report.value = null;
-    toastAppError(toAppError(err));
+    void alertAppError(toAppError(err));
   } finally {
     loading.value = false;
   }

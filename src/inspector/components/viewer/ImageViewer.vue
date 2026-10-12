@@ -1,10 +1,8 @@
 <script setup lang="ts">
 import { computed, onUnmounted, ref, watch } from "vue";
-import { toAppError } from "../../../api/guards";
 import type { ImageSelection } from "../../../bindings/ImageSelection";
 import DepthVolumeView from "../../../shared/components/DepthVolumeView.vue";
 import ImageViewport from "../../../shared/components/ImageViewport.vue";
-import { toastAppError } from "../../../shared/toastAppError";
 import {
   clearInspectorImageCache,
   loadInspectorImageUrl,
@@ -257,7 +255,6 @@ async function fetchMiss(
       return;
     }
     loadFailed.value = true;
-    toastAppError(toAppError(err));
   } finally {
     if (gen === fetchGen.value) {
       loading.value = false;

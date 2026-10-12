@@ -395,3 +395,9 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 **Decided:** When rebuilding a KTX2 to insert `KTXanimData`, emit the mip level array **smallest → largest** (level index still base-first). Align each level to the KTX2 required alignment (`lcm(block, 4)` when uncompressed, inferred from existing offsets as 16/8/4; alignment 1 with supercompression). Pad to 8 bytes only before SGD when SGD is present — never before levels when SGD is absent. `ktx validate` must pass; the validate roundtrip test is no longer ignored and resolves the staged sidecar on every host OS.
 
 **Why:** Writing levels largest-first and always 8-padding produced `error-4004` (exact `byteOffset` mismatch). That only failed in Windows CI because the test looked for the Windows staged binary and CI uses `--include-ignored`.
+
+## 2026-10-12 — No Sonner; OS notify for encode jobs only
+
+**Decided:** Remove all Sonner / `vue-sonner` toast usage (`toastAppError`, Toaster mounts, dependency). Encode job feedback uses OS native notifications only: **complete** → `sendNotification` alone; **failure** → OS notification **and** native `dialog.message` alert (existing `alertErrorText`). Soft / non-job failures (save, inspect, drop reject, invalid input) use a native alert only — no OS notification. In-pane preview load failures stay silent (viewer `loadFailed` / loading state).
+
+**Why:** Toasts duplicated encode failure surfaces and do not match desktop chrome; OS notifications are for batch encode outcomes when the window may be unfocused, while modals remain for errors that need acknowledgment.

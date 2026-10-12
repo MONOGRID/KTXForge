@@ -6,7 +6,6 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
-import { Toaster } from "@/components/ui/sonner";
 import ExportPanel from "./components/ExportPanel.vue";
 import InspectorInfoSidebar from "./components/InspectorInfoSidebar.vue";
 import FramePlayer from "./components/viewer/FramePlayer.vue";
@@ -63,11 +62,6 @@ onUnmounted(() => {
 
 <template>
   <div class="box-border flex h-screen flex-col overflow-hidden font-sans text-ink">
-    <Toaster
-      rich-colors
-      close-button
-    />
-
     <main class="min-h-0 flex-1 p-2">
       <ResizablePanelGroup
         id="inspector-layout"

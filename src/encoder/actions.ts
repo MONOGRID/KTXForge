@@ -2,9 +2,13 @@ import { call } from "../api/commands";
 import { toAppError } from "../api/guards";
 import type { EncodeResult } from "../bindings/EncodeResult";
 import type { SourceInfo } from "../bindings/SourceInfo";
-import { alertErrorText } from "../shared/alertAppError";
+import {
+  alertAppError,
+  alertErrorText,
+  alertInvalidInput,
+  notifyText,
+} from "../shared/alertAppError";
 import { formatAppError } from "../shared/formatAppError";
-import { toastAppError } from "../shared/toastAppError";
 import type { DropZone } from "./dropTarget";
 import type { PackInputRole } from "./inputRole";
 import {
@@ -86,22 +90,16 @@ export async function openSourcesAsOutputs(): Promise<void> {
     }
     const rejected = await addOutputsFromSources(picked);
     if (rejected.length > 0) {
-      toastAppError({
-        kind: "invalidInput",
-        message: rejected.join("; "),
-      });
+      await alertInvalidInput(rejected.join("; "));
     }
   } catch (err: unknown) {
-    toastAppError(toAppError(err));
+    await alertAppError(toAppError(err));
   }
 }
 
 export async function openSourcesAsInputs(): Promise<void> {
   if (selectedOutput.value === null) {
-    toastAppError({
-      kind: "invalidInput",
-      message: "Select a KTX output before adding inputs",
-    });
+    await alertInvalidInput("Select a KTX output before adding inputs");
     return;
   }
   try {
@@ -111,10 +109,10 @@ export async function openSourcesAsInputs(): Promise<void> {
     }
     const notice = addInputsToSelected(picked);
     if (notice !== null) {
-      toastAppError({ kind: "invalidInput", message: notice });
+      await alertInvalidInput(notice);
     }
   } catch (err: unknown) {
-    toastAppError(toAppError(err));
+    await alertAppError(toAppError(err));
   }
 }
 
@@ -274,28 +272,44 @@ export async function encode(): Promise<void> {
     return;
   }
 
-  await alertEncodeFailures(slots);
+  await notifyEncodeFinished(slots);
 }
 
-function alertEncodeFailures(slots: readonly OutputSlot[]): Promise<void> {
-  const errors = slots.filter((s) => s.job.status === "error");
-  if (errors.length === 0) {
-    return Promise.resolve();
-  }
+function formatEncodeFailureBody(
+  errors: readonly OutputSlot[],
+  total: number,
+): string {
   if (errors.length === 1) {
-    return alertErrorText(
-      errors[0].job.errorMessage ?? "Encode failed",
-      "Encode failed",
-    );
+    return errors[0].job.errorMessage ?? "Encode failed";
   }
-  const body = [
-    `${String(errors.length)} of ${String(slots.length)} encodes failed`,
+  return [
+    `${String(errors.length)} of ${String(total)} encodes failed`,
     ...errors.map((slot) => {
       const detail = slot.job.errorMessage ?? "Encode failed";
       return `${outputLabel(slot)}:\n${detail}`;
     }),
   ].join("\n\n");
-  return alertErrorText(body, "Encode failed");
+}
+
+async function notifyEncodeFinished(
+  slots: readonly OutputSlot[],
+): Promise<void> {
+  const errors = slots.filter((s) => s.job.status === "error");
+  if (errors.length > 0) {
+    await alertErrorText(
+      formatEncodeFailureBody(errors, slots.length),
+      "Encode failed",
+    );
+    return;
+  }
+
+  const done = slots.filter((s) => s.job.status === "done").length;
+  if (done === 0) {
+    return;
+  }
+  const body =
+    done === 1 ? "1 texture encoded" : `${String(done)} textures encoded`;
+  await notifyText("Encode complete", body);
 }
 
 export async function cancelEncode(): Promise<void> {
@@ -312,7 +326,7 @@ export async function cancelEncode(): Promise<void> {
     try {
       await call("cancel_encode", { jobId });
     } catch (err: unknown) {
-      toastAppError(toAppError(err));
+      await alertAppError(toAppError(err));
     }
   }
 }
@@ -329,7 +343,7 @@ export async function saveEncoded(): Promise<void> {
   try {
     await call("save_encoded", { jobId });
   } catch (err: unknown) {
-    toastAppError(toAppError(err));
+    await alertAppError(toAppError(err));
   }
 }
 
@@ -353,14 +367,14 @@ export async function saveAllEncoded(): Promise<void> {
     try {
       await call("save_encoded", { jobId: jobIds[0] });
     } catch (err: unknown) {
-      toastAppError(toAppError(err));
+      await alertAppError(toAppError(err));
     }
     return;
   }
   try {
     await call("save_encoded_batch", { jobIds });
   } catch (err: unknown) {
-    toastAppError(toAppError(err));
+    await alertAppError(toAppError(err));
   }
 }
 
@@ -373,25 +387,21 @@ export function clearSources(): void {
 
 function dropOntoInputs(sources: readonly SourceInfo[]): void {
   if (selectedOutput.value === null) {
-    toastAppError({
-      kind: "invalidInput",
-      message: "Select a KTX output (or use +) before dropping inputs",
-    });
+    void alertInvalidInput(
+      "Select a KTX output (or use +) before dropping inputs",
+    );
     return;
   }
   const notice = addInputsToSelected(sources);
   if (notice !== null) {
-    toastAppError({ kind: "invalidInput", message: notice });
+    void alertInvalidInput(notice);
   }
 }
 
 async function dropOntoOutputs(sources: readonly SourceInfo[]): Promise<void> {
   const rejected = await addOutputsFromSources(sources);
   if (rejected.length > 0) {
-    toastAppError({
-      kind: "invalidInput",
-      message: rejected.join("; "),
-    });
+    await alertInvalidInput(rejected.join("; "));
   }
 }
 
@@ -424,10 +434,7 @@ export async function applyCenterDropAsOutputs(): Promise<void> {
   clearPendingCenterDrop();
   const rejected = await addOutputsFromSources(sources);
   if (rejected.length > 0) {
-    toastAppError({
-      kind: "invalidInput",
-      message: rejected.join("; "),
-    });
+    await alertInvalidInput(rejected.join("; "));
   }
 }
 
@@ -442,7 +449,7 @@ export async function applyCenterDropAsPacked(
   clearPendingCenterDrop();
   const error = await addPackedOutputFromSources(sources, role);
   if (error !== null) {
-    toastAppError({ kind: "invalidInput", message: error });
+    await alertInvalidInput(error);
   }
 }
 
