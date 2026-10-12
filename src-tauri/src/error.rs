@@ -10,8 +10,6 @@ use ts_rs::TS;
 #[serde(tag = "kind", rename_all = "camelCase")]
 pub enum AppError {
     #[error("{message}")]
-    NotImplemented { message: String },
-    #[error("{message}")]
     Io { message: String },
     #[error("{message}")]
     InvalidInput { message: String },
@@ -34,12 +32,6 @@ pub enum AppError {
 }
 
 impl AppError {
-    pub fn not_implemented(name: &'static str) -> Self {
-        Self::NotImplemented {
-            message: format!("not implemented: {name}"),
-        }
-    }
-
     pub fn io(msg: impl Into<String>) -> Self {
         Self::Io {
             message: msg.into(),
@@ -98,10 +90,22 @@ impl AppError {
             _ => "Unknown exit code",
         }
     }
+}
 
-    /// JSON form used when surfacing errors to the webview (keeps `serde_json` linked).
-    pub fn to_json_value(&self) -> serde_json::Value {
-        serde_json::to_value(self)
-            .unwrap_or_else(|_| serde_json::json!({ "kind": "io", "message": self.to_string() }))
+#[cfg(test)]
+mod tests {
+    use super::AppError;
+
+    #[test]
+    fn exit_meaning_covers_known_codes() {
+        assert_eq!(AppError::exit_meaning(0), "Success");
+        assert_eq!(AppError::exit_meaning(1), "Command line error");
+        assert_eq!(AppError::exit_meaning(2), "IO failure");
+        assert_eq!(AppError::exit_meaning(3), "Invalid input file");
+        assert_eq!(AppError::exit_meaning(4), "Runtime or library error");
+        assert_eq!(AppError::exit_meaning(5), "Unsupported state or operation");
+        assert_eq!(AppError::exit_meaning(6), "Feature not implemented yet");
+        assert_eq!(AppError::exit_meaning(99), "Unknown exit code");
+        assert_eq!(AppError::exit_meaning(-1), "Unknown exit code");
     }
 }

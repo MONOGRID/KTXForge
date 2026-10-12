@@ -563,6 +563,16 @@ function forgetOutputIds(id: string): void {
   }
 }
 
+/** Rust deletes the encoded files kept for outputs that left the queue. */
+function discardEncodes(outputIds: string[]): void {
+  if (outputIds.length === 0) {
+    return;
+  }
+  void call("discard_outputs", { outputIds }).catch(() => {
+    // Temp files are still removed when the app exits.
+  });
+}
+
 export function removeOutput(id: string): void {
   const index = store.outputs.findIndex((o) => o.id === id);
   if (index < 0) {
@@ -573,12 +583,14 @@ export function removeOutput(id: string): void {
   }
   store.outputs.splice(index, 1);
   forgetOutputIds(id);
+  discardEncodes([id]);
 }
 
 export function clearOutputs(): void {
   if (store.queue !== null) {
     return;
   }
+  discardEncodes(store.outputs.map((slot) => slot.id));
   store.outputs.splice(0, store.outputs.length);
   store.selectedId = null;
   store.inputsExpandedId = null;

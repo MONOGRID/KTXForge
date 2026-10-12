@@ -164,6 +164,7 @@ async function encodeOne(slot: OutputSlot): Promise<void> {
     const result = await call("encode", {
       request: {
         jobId,
+        outputId: slot.id,
         sources: slot.inputs.map((source) => source.path),
         options: store.options,
         animation: slot.role === "arrayLayers" ? slot.animation : null,

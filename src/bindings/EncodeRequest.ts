@@ -3,4 +3,12 @@ import type { AnimationOptions } from "./AnimationOptions";
 import type { CreateOptions } from "./CreateOptions";
 import type { InputRole } from "./InputRole";
 
-export type EncodeRequest = { jobId: string, sources: Array<string>, options: CreateOptions, animation: AnimationOptions | null, inputRole: InputRole, };
+export type EncodeRequest = { 
+/**
+ * UUID naming this encode's temp directory.
+ */
+jobId: string, 
+/**
+ * Queue output being encoded; its previous job is discarded.
+ */
+outputId: string, sources: Array<string>, options: CreateOptions, animation: AnimationOptions | null, inputRole: InputRole, };

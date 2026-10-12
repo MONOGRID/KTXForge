@@ -1,7 +1,6 @@
-// Engine modules keep unused helpers from failing clippy -D warnings until the frontend consumes them.
-#![allow(dead_code)]
-
+mod blocking;
 mod commands;
+mod dialog;
 mod drop;
 mod error;
 mod events;
@@ -10,11 +9,14 @@ mod ktx;
 mod menu;
 mod os_open;
 mod state;
+#[cfg(test)]
+mod test_support;
 mod updater;
 mod window_bounds;
 mod workspace;
 
 use state::{AppState, PendingUpdate};
+use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -23,8 +25,6 @@ pub fn run() {
     // single-instance must be registered before other plugins (plugin order).
     #[cfg(desktop)]
     {
-        use tauri::Manager;
-
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
             if let Some(window) = app.get_webview_window("main") {
                 let _ = window.set_focus();
@@ -75,7 +75,6 @@ pub fn run() {
         .setup(|app| {
             window_bounds::init(app.handle());
             window_bounds::restore_open_windows(app.handle());
-            drop::register_drop_handler(app.handle());
             updater::setup_updater(app.handle());
             // Windows / Linux cold start: OS passes the path on argv.
             #[cfg(desktop)]
@@ -94,6 +93,7 @@ pub fn run() {
             commands::encoder::source_preview,
             commands::encode::encode,
             commands::encode::cancel_encode,
+            commands::encode::discard_outputs,
             commands::encode::encoded_preview,
             commands::encode::save_encoded,
             commands::encode::save_encoded_batch,
@@ -109,15 +109,16 @@ pub fn run() {
         ])
         .build(tauri::generate_context!())
         .expect("error while building tauri application")
-        .run(|app, event| {
+        .run(|app, event| match event {
             // macOS delivers file opens via Opened URLs (not always argv).
             #[cfg(target_os = "macos")]
-            if let tauri::RunEvent::Opened { urls } = &event {
-                os_open::open_from_urls(app, urls);
+            tauri::RunEvent::Opened { urls } => os_open::open_from_urls(app, &urls),
+            // The process exits right after this without dropping managed state or
+            // pending tasks: stop running `ktx` children and delete the temp workspace.
+            tauri::RunEvent::Exit => {
+                ktx::sidecar::kill_all();
+                app.state::<AppState>().shutdown();
             }
-            #[cfg(not(target_os = "macos"))]
-            {
-                let _ = (app, event);
-            }
+            _ => {}
         });
 }

@@ -1,7 +1,6 @@
 import type { AppError } from "../bindings/AppError";
 
 const APP_ERROR_KINDS = new Set([
-  "notImplemented",
   "io",
   "invalidInput",
   "unsupportedFile",

@@ -2,18 +2,15 @@
 
 use std::path::PathBuf;
 
-use tauri::{AppHandle, DragDropEvent, Emitter, Manager, Runtime, Window, WindowEvent};
+use tauri::{AppHandle, DragDropEvent, Emitter, Manager, Window, WindowEvent};
 
+use crate::blocking::run_blocking;
 use crate::commands::inspector_window::{self, INSPECTOR_LABEL};
 use crate::error::AppError;
 use crate::events::{DropRejectedPayload, ENCODER_DROP_REJECTED, ENCODER_SOURCES_ADDED};
 use crate::image::classify::{classify, order_frames, FileKind};
 use crate::image::convert::read_source_info;
 use crate::state::AppState;
-
-pub fn register_drop_handler<R: Runtime>(_app: &AppHandle<R>) {
-    // Handler is attached via `Builder::on_window_event` in `lib.rs`.
-}
 
 pub fn on_window_event(window: &Window, event: &WindowEvent) {
     let WindowEvent::DragDrop(DragDropEvent::Drop { paths, .. }) = event else {
@@ -45,20 +42,23 @@ async fn handle_drop(app: &AppHandle, label: &str, paths: Vec<PathBuf>) -> Resul
 
 async fn handle_main_drop(app: &AppHandle, paths: Vec<PathBuf>) -> Result<(), AppError> {
     let ordered = order_frames(paths);
-    let mut images = Vec::new();
-    let mut ktx_files = Vec::new();
-    let mut rejected = Vec::new();
-
-    for path in ordered {
-        match classify(&path) {
-            FileKind::Image { .. } => match read_source_info(&path) {
-                Ok(info) => images.push(info),
-                Err(_) => rejected.push(path.to_string_lossy().into_owned()),
-            },
-            FileKind::Ktx1 | FileKind::Ktx2 => ktx_files.push(path),
-            FileKind::Unsupported => rejected.push(path.to_string_lossy().into_owned()),
+    let (images, ktx_files, rejected) = run_blocking(move || {
+        let mut images = Vec::new();
+        let mut ktx_files = Vec::new();
+        let mut rejected = Vec::new();
+        for path in ordered {
+            match classify(&path) {
+                FileKind::Image { .. } => match read_source_info(&path) {
+                    Ok(info) => images.push(info),
+                    Err(_) => rejected.push(path.to_string_lossy().into_owned()),
+                },
+                FileKind::Ktx1 | FileKind::Ktx2 => ktx_files.push(path),
+                FileKind::Unsupported => rejected.push(path.to_string_lossy().into_owned()),
+            }
         }
-    }
+        Ok((images, ktx_files, rejected))
+    })
+    .await?;
 
     if !images.is_empty() {
         app.emit(ENCODER_SOURCES_ADDED, images)

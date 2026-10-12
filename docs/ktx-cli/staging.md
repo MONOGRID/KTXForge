@@ -40,6 +40,10 @@ Tauri staging recommendation for Windows:
 
 The Linux `.tar.bz2` has a top-level `KTX-Software-4.4.2-Linux-<arch>/` directory. `bin/ktx` is a regular file. `lib/libktx.so.4` is a symlink to `libktx.so.4.4.2`, and that soname is what the binary’s `NEEDED` entry names. Copy the symlink’s target bytes to `libktx.so.4` (a directory walk that skips symlinks will not see it).
 
+## `ktx2ktx2` (KTX1 → KTX2)
+
+`ktx extract` reads only KTX2, so the inspector converts legacy `.ktx` files with `ktx2ktx2` from the same release. It is a second `bundle.externalBin` entry, staged as `binaries/ktx2ktx2-<triple>[.exe]`. Every release keeps it in the same directory as `ktx` (`bin/`, or `usr/local/bin/` in the macOS tools payload), so `fetch-ktx` derives its archive path from `ktxPath`. It links the same `libktx` and gets the same rpath fix. It prints `--version` on stderr.
+
 ## License
 
 The Windows NSIS tree did not expose a top-level `LICENSE` file next to `bin/`. T2.4 should commit Khronos’s Apache-2.0-oriented project license from the v4.4.2 tag (`LICENSE.md` / `LICENSES/*`) into `src-tauri/licenses/KTX-Software-LICENSE.md` (and note Ericsson `etcdec` special case from that file).

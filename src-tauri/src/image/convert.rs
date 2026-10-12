@@ -11,13 +11,6 @@ use crate::commands::{SourceInfo, SourceKind};
 use crate::error::AppError;
 use crate::image::classify::{classify, FileKind};
 
-#[derive(Debug, Clone)]
-pub struct PreparedInput {
-    pub path: PathBuf,
-    /// True when the original path is used unchanged (PNG / scanline EXR).
-    pub passthrough: bool,
-}
-
 /// `ktx create` splits input paths on `,` and treats a leading `@` as a response file.
 fn basename_unsafe_for_ktx(path: &Path) -> bool {
     let name = path
@@ -40,24 +33,16 @@ fn stage_copy(src: &Path, workdir: &Path, ext: &str) -> Result<PathBuf, AppError
     Ok(out)
 }
 
-fn passthrough_or_stage(src: &Path, workdir: &Path, ext: &str) -> Result<PreparedInput, AppError> {
+/// The original path when `ktx create` can read it as is, else a staged copy.
+fn passthrough_or_stage(src: &Path, workdir: &Path, ext: &str) -> Result<PathBuf, AppError> {
     if ext == "exr" && exr_is_tiled(src)? {
         let out = staged_path(workdir, src, ext);
         restage_exr_as_scanline(src, &out)?;
-        Ok(PreparedInput {
-            path: out,
-            passthrough: false,
-        })
+        Ok(out)
     } else if basename_unsafe_for_ktx(src) {
-        Ok(PreparedInput {
-            path: stage_copy(src, workdir, ext)?,
-            passthrough: false,
-        })
+        stage_copy(src, workdir, ext)
     } else {
-        Ok(PreparedInput {
-            path: src.to_path_buf(),
-            passthrough: true,
-        })
+        Ok(src.to_path_buf())
     }
 }
 
@@ -119,7 +104,7 @@ fn write_scanline_exr(img: &DynamicImage, out: &Path) -> Result<(), AppError> {
 
 /// PNG passes through; EXR passes through unless tiled (re-staged as scanline);
 /// JPEG/WebP/BMP/GIF/TIFF → PNG; Radiance HDR → 32-bit float scanline EXR.
-pub fn prepare_input(src: &Path, workdir: &Path) -> Result<PreparedInput, AppError> {
+pub fn prepare_input(src: &Path, workdir: &Path) -> Result<PathBuf, AppError> {
     std::fs::create_dir_all(workdir).map_err(|e| AppError::io(e.to_string()))?;
     match classify(src) {
         FileKind::Image {
@@ -137,10 +122,7 @@ pub fn prepare_input(src: &Path, workdir: &Path) -> Result<PreparedInput, AppErr
             let img = image::open(src).map_err(|e| AppError::image(e.to_string()))?;
             let out = staged_path(workdir, src, "exr");
             write_scanline_exr(&img, &out)?;
-            Ok(PreparedInput {
-                path: out,
-                passthrough: false,
-            })
+            Ok(out)
         }
         FileKind::Image {
             kind: SourceKind::Ldr,
@@ -150,10 +132,7 @@ pub fn prepare_input(src: &Path, workdir: &Path) -> Result<PreparedInput, AppErr
             let out = staged_path(workdir, src, "png");
             img.save_with_format(&out, ImageFormat::Png)
                 .map_err(|e| AppError::image(e.to_string()))?;
-            Ok(PreparedInput {
-                path: out,
-                passthrough: false,
-            })
+            Ok(out)
         }
         FileKind::Ktx1 | FileKind::Ktx2 => Err(AppError::invalid_input(
             "KTX files are not valid create inputs; open them in the inspector",
@@ -247,7 +226,7 @@ pub fn source_preview_png(path: &Path) -> Result<Vec<u8>, AppError> {
         } => {
             let dir = tempfile::tempdir().map_err(|e| AppError::io(e.to_string()))?;
             let prepared = prepare_input(path, dir.path())?;
-            crate::image::export::exr_to_preview_png(&prepared.path)
+            crate::image::export::exr_to_preview_png(&prepared)
         }
         FileKind::Ktx1 | FileKind::Ktx2 => Err(AppError::invalid_input(
             "KTX files are inspected, not used as encode sources",
@@ -272,30 +251,12 @@ mod tests {
     use super::*;
     use image::GenericImageView;
 
-    fn fixtures() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
-    }
+    use crate::test_support::{fixtures, staged_ktx};
 
-    fn staged_ktx() -> Option<PathBuf> {
-        let binaries = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries");
-        std::fs::read_dir(&binaries).ok()?.flatten().find_map(|e| {
-            let name = e.file_name();
-            let name = name.to_string_lossy();
-            if name.starts_with("ktx-") && (name.ends_with(".exe") || !name.contains('.')) {
-                Some(e.path())
-            } else {
-                None
-            }
-        })
-    }
-
-    /// Run the staged `ktx create` on a prepared HDR input; skip when no binary is staged.
+    /// Run the staged `ktx create` on a prepared HDR input.
     fn assert_ktx_accepts_hdr(input: &Path, out_dir: &Path) {
-        let Some(ktx) = staged_ktx() else {
-            return;
-        };
         let out = out_dir.join("out.ktx2");
-        let output = std::process::Command::new(&ktx)
+        let output = std::process::Command::new(staged_ktx())
             .args(["create", "--format", "R16G16B16A16_SFLOAT"])
             .arg(input)
             .arg(&out)
@@ -332,16 +293,12 @@ mod tests {
             .unwrap();
 
         let prepared = prepare_input(&src, &dir.path().join("work")).unwrap();
-        assert!(!prepared.passthrough);
-        assert_eq!(
-            prepared.path.extension().and_then(|e| e.to_str()),
-            Some("exr")
-        );
-        assert!(!exr_is_tiled(&prepared.path).unwrap());
-        let (r, g, b, a) = first_pixel_rgba(&prepared.path);
+        assert_eq!(prepared.extension().and_then(|e| e.to_str()), Some("exr"));
+        assert!(!exr_is_tiled(&prepared).unwrap());
+        let (r, g, b, a) = first_pixel_rgba(&prepared);
         assert_eq!((r, g, b, a), (0.5, 1.5, 2.0, 1.0));
 
-        assert_ktx_accepts_hdr(&prepared.path, dir.path());
+        assert_ktx_accepts_hdr(&prepared, dir.path());
     }
 
     #[test]
@@ -366,12 +323,11 @@ mod tests {
         assert!(exr_is_tiled(&src).unwrap());
 
         let prepared = prepare_input(&src, &dir.path().join("work")).unwrap();
-        assert!(!prepared.passthrough);
-        assert_ne!(prepared.path, src);
-        assert!(!exr_is_tiled(&prepared.path).unwrap());
-        assert_eq!(first_pixel_rgba(&prepared.path), (0.25, 4.0, 8.0, 0.5));
+        assert_ne!(prepared, src);
+        assert!(!exr_is_tiled(&prepared).unwrap());
+        assert_eq!(first_pixel_rgba(&prepared), (0.25, 4.0, 8.0, 0.5));
 
-        assert_ktx_accepts_hdr(&prepared.path, dir.path());
+        assert_ktx_accepts_hdr(&prepared, dir.path());
     }
 
     #[test]
@@ -379,13 +335,8 @@ mod tests {
         let root = fixtures();
         let dir = tempfile::tempdir().unwrap();
         let prepared = prepare_input(&root.join("rgb.jpg"), dir.path()).unwrap();
-        assert!(!prepared.passthrough);
-        assert_eq!(
-            prepared.path.extension().and_then(|e| e.to_str()),
-            Some("png")
-        );
+        assert_eq!(prepared.extension().and_then(|e| e.to_str()), Some("png"));
         let name = prepared
-            .path
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or_default();
@@ -393,7 +344,7 @@ mod tests {
             !name.contains(','),
             "staged name must be safe for ktx create: {name}"
         );
-        let (w, h) = image::image_dimensions(&prepared.path).unwrap();
+        let (w, h) = image::image_dimensions(&prepared).unwrap();
         let (sw, sh) = image::image_dimensions(root.join("rgb.jpg")).unwrap();
         assert_eq!((w, h), (sw, sh));
     }
@@ -404,12 +355,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let src = root.join("hdr.exr");
         let prepared = prepare_input(&src, dir.path()).unwrap();
-        assert!(prepared.passthrough);
-        assert_eq!(prepared.path, src);
+        assert_eq!(prepared, src);
         let a = std::fs::read(&src).unwrap();
-        let b = std::fs::read(&prepared.path).unwrap();
+        let b = std::fs::read(&prepared).unwrap();
         assert_eq!(a, b);
-        assert_ktx_accepts_hdr(&prepared.path, dir.path());
+        assert_ktx_accepts_hdr(&prepared, dir.path());
     }
 
     #[test]
@@ -421,15 +371,14 @@ mod tests {
             .join("snapshot_camera_cucina_nfc31_irwg_06_08_2026, 18_33_22.png");
         std::fs::copy(root.join("rgba.png"), &src).unwrap();
         let prepared = prepare_input(&src, dir.path()).unwrap();
-        assert!(!prepared.passthrough);
-        assert!(prepared.path.exists());
+        assert_ne!(prepared, src);
+        assert!(prepared.exists());
         let name = prepared
-            .path
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or_default();
         assert!(!name.contains(','));
-        assert!(!basename_unsafe_for_ktx(&prepared.path));
+        assert!(!basename_unsafe_for_ktx(&prepared));
     }
 
     #[test]
@@ -439,17 +388,12 @@ mod tests {
         let src = dir.path().join("foo, bar.jpg");
         std::fs::copy(root.join("rgb.jpg"), &src).unwrap();
         let prepared = prepare_input(&src, dir.path()).unwrap();
-        assert!(!prepared.passthrough);
         let name = prepared
-            .path
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or_default();
         assert!(!name.contains(','));
-        assert_eq!(
-            prepared.path.extension().and_then(|e| e.to_str()),
-            Some("png")
-        );
+        assert_eq!(prepared.extension().and_then(|e| e.to_str()), Some("png"));
     }
 
     #[test]

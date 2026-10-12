@@ -412,6 +412,8 @@ pub enum OptionKey {
     Zlib,
 }
 
+/// `ktx create` flag name, for tests that check help text and argv against each key.
+#[cfg(test)]
 impl OptionKey {
     pub fn cli(self) -> &'static str {
         match self {
@@ -795,17 +797,17 @@ pub struct OptionReport {
     pub suggestion: Option<OptionSuggestion>,
 }
 
-fn serde_name_of_enum_variant<T: Serialize>(value: &T) -> String {
-    match serde_json::to_value(value).expect("enum serializes") {
-        serde_json::Value::String(s) => s,
-        other => panic!("expected string enum, got {other}"),
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
     use strum::IntoEnumIterator;
+
+    fn serde_name_of_enum_variant<T: Serialize>(value: &T) -> String {
+        match serde_json::to_value(value).expect("enum serializes") {
+            serde_json::Value::String(s) => s,
+            other => panic!("expected string enum, got {other}"),
+        }
+    }
 
     #[test]
     fn default_round_trips_serde() {

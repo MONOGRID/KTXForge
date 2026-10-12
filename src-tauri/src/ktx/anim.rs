@@ -271,32 +271,9 @@ mod tests {
         assert!(!reader.supercompression_global_data().is_empty());
     }
 
-    fn staged_ktx_binary() -> Option<PathBuf> {
-        let binaries = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries");
-        let entries = std::fs::read_dir(&binaries).ok()?;
-        for entry in entries.flatten() {
-            let name = entry.file_name();
-            let name = name.to_string_lossy();
-            if !name.starts_with("ktx-") {
-                continue;
-            }
-            #[cfg(windows)]
-            if name.ends_with(".exe") {
-                return Some(entry.path());
-            }
-            #[cfg(not(windows))]
-            if !name.contains('.') {
-                return Some(entry.path());
-            }
-        }
-        None
-    }
-
     #[test]
     fn validate_after_write() {
-        let Some(bin) = staged_ktx_binary() else {
-            return;
-        };
+        let bin = crate::test_support::staged_ktx();
         let src = fixtures().join("array4_mips.ktx2");
         let dir = tempfile::tempdir().unwrap();
         let dest = dir.path().join("array4_mips.ktx2");

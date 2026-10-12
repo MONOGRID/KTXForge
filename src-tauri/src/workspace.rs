@@ -25,10 +25,6 @@ impl Workspace {
         Ok(Self { root })
     }
 
-    pub fn root(&self) -> &Path {
-        self.root.path()
-    }
-
     /// Job ids come from the webview and name a directory: accept only a UUID.
     fn job_path(&self, job_id: &str) -> Result<PathBuf, AppError> {
         let id = Uuid::parse_str(job_id)
@@ -72,7 +68,7 @@ mod tests {
     #[test]
     fn creates_reuses_and_removes_job_dirs() {
         let ws = Workspace::new().unwrap();
-        let root = ws.root().to_path_buf();
+        let root = ws.root.path().to_path_buf();
         assert!(root.exists());
 
         let a = ws.job_dir(JOB_A).unwrap();

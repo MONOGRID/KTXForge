@@ -8,12 +8,13 @@ use crate::error::AppError;
 use crate::image::classify::{classify, FileKind};
 use crate::ktx::info_types::{InspectKind, InspectReport, Ktx2Info, PreviewKind};
 use crate::ktx::ktx1;
-use crate::ktx::sidecar::{self, CancellationHandle};
+use crate::ktx::sidecar::{self, CancellationHandle, Sidecar};
 
 /// Inspect a KTX1 or KTX2 file. Non-zero `ktx info` with JSON on stdout still yields a report.
 pub async fn inspect(app: &AppHandle, path: &Path) -> Result<InspectReport, AppError> {
     let path_str = path.to_string_lossy().into_owned();
-    let file_size = std::fs::metadata(path)
+    let file_size = tokio::fs::metadata(path)
+        .await
         .map_err(|e| AppError::io(e.to_string()))?
         .len();
 
@@ -26,7 +27,8 @@ pub async fn inspect(app: &AppHandle, path: &Path) -> Result<InspectReport, AppE
                 path_str.clone(),
             ];
             let out =
-                sidecar::run_ktx_collect(app, args, |_| {}, CancellationHandle::new()).await?;
+                sidecar::run_collect(app, Sidecar::Ktx, args, |_| {}, CancellationHandle::new())
+                    .await?;
             let mut info = match parse_ktx2_info_json(&out.stdout) {
                 Ok(info) => info,
                 Err(parse_err) => {
@@ -47,11 +49,14 @@ pub async fn inspect(app: &AppHandle, path: &Path) -> Result<InspectReport, AppE
         FileKind::Ktx1 => {
             let args = vec!["info".to_owned(), path_str.clone()];
             let out =
-                sidecar::run_ktx_collect(app, args, |_| {}, CancellationHandle::new()).await?;
+                sidecar::run_collect(app, Sidecar::Ktx, args, |_| {}, CancellationHandle::new())
+                    .await?;
             if out.code != 0 && out.stdout.trim().is_empty() {
                 return Err(AppError::ktx(out.code, out.stderr));
             }
-            let bytes = std::fs::read(path).map_err(|e| AppError::io(e.to_string()))?;
+            let bytes = tokio::fs::read(path)
+                .await
+                .map_err(|e| AppError::io(e.to_string()))?;
             let header = ktx1::read_header(&bytes)?;
             Ok(InspectReport {
                 path: path_str,
@@ -158,11 +163,5 @@ mod tests {
         let parse_err = AppError::invalid_input("ktx info stdout has no JSON object");
         let err = ktx_info_failure(0, "", parse_err);
         assert!(matches!(err, AppError::InvalidInput { .. }));
-    }
-
-    #[test]
-    #[ignore = "requires AppHandle + staged ktx sidecar"]
-    fn inspect_process_call_ignored() {
-        // Covered by Wave 4 integration; kept as a marker for the process path.
     }
 }

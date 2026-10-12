@@ -1,10 +1,12 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use tauri::{AppHandle, Manager};
 use tauri_plugin_dialog::DialogExt;
 
+use crate::blocking::run_blocking;
 use crate::commands::inspector_window;
 use crate::commands::{OptionReport, SourceInfo};
+use crate::dialog;
 use crate::error::AppError;
 use crate::image::classify::{classify, FileKind};
 use crate::image::convert::{read_source_info, source_preview_png, thumbnail_png};
@@ -48,27 +50,18 @@ pub fn check_output_compatible(anchor: SourceInfo, candidate: SourceInfo) -> Res
 
 #[tauri::command]
 pub async fn pick_sources(app: AppHandle) -> Result<Vec<SourceInfo>, AppError> {
-    let picked = app
+    let picker = app
         .dialog()
         .file()
-        .add_filter("Images and KTX", SOURCE_EXTENSIONS)
-        .blocking_pick_files();
+        .add_filter("Images and KTX", SOURCE_EXTENSIONS);
+    let files = dialog::pick_files(picker).await?;
 
-    let Some(files) = picked else {
-        return Ok(Vec::new());
-    };
-
-    let mut sources = Vec::new();
+    let mut images = Vec::new();
     let mut first_ktx: Option<PathBuf> = None;
 
-    for file in files {
-        let path = file
-            .into_path()
-            .map_err(|e| AppError::io(format!("dialog path: {e}")))?;
+    for path in files {
         match classify(&path) {
-            FileKind::Image { .. } => {
-                sources.push(read_source_info(&path)?);
-            }
+            FileKind::Image { .. } => images.push(path),
             FileKind::Ktx1 | FileKind::Ktx2 => {
                 if first_ktx.is_none() {
                     first_ktx = Some(path);
@@ -83,10 +76,17 @@ pub async fn pick_sources(app: AppHandle) -> Result<Vec<SourceInfo>, AppError> {
         }
     }
 
+    let sources = run_blocking(move || {
+        images
+            .iter()
+            .map(|path| read_source_info(path))
+            .collect::<Result<Vec<_>, _>>()
+    })
+    .await?;
+
     if let Some(ktx) = first_ktx {
         let state = app.state::<AppState>();
-        inspector_window::open_inspector(app.clone(), state, ktx.to_string_lossy().into_owned())
-            .await?;
+        inspector_window::open_inspector_path(&app, state.inner(), ktx).await?;
     }
 
     Ok(sources)
@@ -94,12 +94,12 @@ pub async fn pick_sources(app: AppHandle) -> Result<Vec<SourceInfo>, AppError> {
 
 #[tauri::command]
 pub async fn source_thumbnail(path: String) -> Result<tauri::ipc::Response, AppError> {
-    let bytes = thumbnail_png(PathBuf::from(path).as_path(), THUMB_MAX)?;
+    let bytes = run_blocking(move || thumbnail_png(Path::new(&path), THUMB_MAX)).await?;
     Ok(tauri::ipc::Response::new(bytes))
 }
 
 #[tauri::command]
 pub async fn source_preview(path: String) -> Result<tauri::ipc::Response, AppError> {
-    let bytes = source_preview_png(PathBuf::from(path).as_path())?;
+    let bytes = run_blocking(move || source_preview_png(Path::new(&path))).await?;
     Ok(tauri::ipc::Response::new(bytes))
 }
