@@ -127,7 +127,7 @@ defineExpose({ showNotice });
   <section
     class="panel flex h-full min-h-0 flex-col overflow-hidden transition-colors"
     :class="
-      highlighted ? 'ring-2 ring-inset ring-brand bg-brand/10' : ''
+      highlighted ? 'ring-2 ring-inset ring-primary/50 bg-primary/10' : ''
     "
     data-drop-zone="inputs"
     @pointerenter="onPointerEnter"
@@ -190,9 +190,9 @@ defineExpose({ showNotice });
         <li
           v-for="(source, index) in inputs"
           :key="`${source.path}:${String(index)}`"
-          class="mb-1 flex items-center gap-2 rounded border border-line bg-surface px-2 py-1.5 last:mb-0"
+          class="mb-1 flex items-center gap-2 rounded-md border border-transparent bg-surface-sunken px-2 py-1.5 last:mb-0"
         >
-          <div class="h-10 w-10 shrink-0 overflow-hidden rounded bg-surface-sunken">
+          <div class="h-10 w-10 shrink-0 overflow-hidden rounded bg-surface">
             <img
               v-if="thumbnails.get(source.path)"
               :src="thumbnails.get(source.path)"

@@ -99,7 +99,7 @@ function onSceneDblClick(): void {
 <template>
   <div
     ref="sceneRef"
-    class="depth-scene relative min-h-0 flex-1 overflow-hidden rounded border border-line bg-surface-sunken select-none"
+    class="depth-scene relative min-h-0 flex-1 overflow-hidden rounded-lg border border-transparent bg-surface-sunken shadow-sm select-none"
     :class="canOrbit ? (dragging ? 'cursor-grabbing' : 'cursor-grab') : ''"
     role="img"
     :aria-label="`Depth volume, ${String(sliceCount)} slices, active ${String(activeIndex)}. Drag to orbit, double-click to reset.`"

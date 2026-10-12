@@ -2,44 +2,44 @@
   --font-sans: "Segoe UI", "Helvetica Neue", sans-serif;
   --font-mono: "Cascadia Mono", "Consolas", "Menlo", monospace;
 
-  /* App tokens used by existing UnoCSS shortcuts (bridge until UI migrates).
-     Aligned with VS Code Light+ surfaces for clearer layer contrast. */
-  --color-surface: #f3f3f3;
+  /* Soft, borderless-leaning surfaces; brand from assets/icon-full.png flame blue. */
+  --color-surface: #f0f2f5;
   --color-surface-raised: #ffffff;
-  --color-surface-sunken: #e8e8e8;
-  --color-ink: #1e1e1e;
-  --color-ink-muted: #616161;
-  --color-ink-faint: #8b8b8b;
-  --color-line: #cecece;
-  --color-brand: #0e7a4f;
-  --color-brand-fg: #f5fff9;
+  --color-surface-sunken: #e6e9ef;
+  --color-ink: #14171f;
+  --color-ink-muted: #5c6578;
+  --color-ink-faint: #8b93a7;
+  --color-line: #e2e5ec;
+  --color-brand: #0870f8;
+  --color-brand-fg: #ffffff;
   --color-danger: #c50f1f;
   --color-danger-fg: #fff5f5;
 
-  /* shadcn tokens — VS Code Light+; override preset preflight (imported after virtual:uno.css). */
-  --background: 0 0% 100%;
-  --foreground: 0 0% 12%;
+  /* shadcn tokens — soft light chrome; primary = logo electric blue. */
+  --background: 220 16% 96%;
+  --foreground: 224 20% 10%;
   --card: 0 0% 100%;
-  --card-foreground: 0 0% 12%;
+  --card-foreground: 224 20% 10%;
   --popover: 0 0% 100%;
-  --popover-foreground: 0 0% 12%;
-  --primary: 206 100% 40%;
+  --popover-foreground: 224 20% 10%;
+  --primary: 214 94% 50%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 0 0% 93%;
-  --secondary-foreground: 0 0% 12%;
-  --muted: 0 0% 93%;
-  --muted-foreground: 0 0% 38%;
-  --accent: 0 0% 91%;
-  --accent-foreground: 0 0% 12%;
+  --secondary: 220 14% 93%;
+  --secondary-foreground: 224 20% 10%;
+  --muted: 220 14% 93%;
+  --muted-foreground: 220 10% 40%;
+  --accent: 214 90% 95%;
+  --accent-foreground: 214 80% 30%;
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
-  --border: 0 0% 78%;
-  --input: 0 0% 78%;
-  --ring: 206 100% 40%;
+  --border: 220 14% 90%;
+  --input: 220 14% 90%;
+  --ring: 214 94% 50%;
+  --radius: 0.5rem;
 }
 
 .dark {
-  /* VS Code Dark+ editor / sidebar / widget surfaces. */
+  /* VS Code Dark+ editor / sidebar / widget surfaces; logo electric blue brand. */
   --color-surface: #1e1e1e;
   --color-surface-raised: #252526;
   --color-surface-sunken: #181818;
@@ -47,8 +47,8 @@
   --color-ink-muted: #9d9d9d;
   --color-ink-faint: #6e6e6e;
   --color-line: #3e3e42;
-  --color-brand: #3d9b6e;
-  --color-brand-fg: #06140e;
+  --color-brand: #0870f8;
+  --color-brand-fg: #ffffff;
   --color-danger: #f14c4c;
   --color-danger-fg: #1a0808;
 
@@ -58,7 +58,7 @@
   --card-foreground: 0 0% 80%;
   --popover: 240 2% 15%;
   --popover-foreground: 0 0% 80%;
-  --primary: 206 100% 40%;
+  --primary: 214 94% 50%;
   --primary-foreground: 0 0% 100%;
   --secondary: 0 0% 18%;
   --secondary-foreground: 0 0% 83%;
@@ -70,7 +70,8 @@
   --destructive-foreground: 0 0% 100%;
   --border: 240 3% 25%;
   --input: 0 0% 24%;
-  --ring: 204 100% 42%;
+  --ring: 214 94% 55%;
+  --radius: 0.5rem;
 }
 
 html,

@@ -304,7 +304,7 @@ onUnmounted(() => {
 
     <div
       ref="frameRef"
-      class="viewer-frame relative min-h-0 flex-1 overflow-hidden rounded border border-line bg-surface-sunken"
+      class="viewer-frame relative min-h-0 flex-1 overflow-hidden rounded-lg border border-transparent bg-surface-sunken shadow-sm"
       :style="{ cursor: frameCursor }"
       aria-label="Image preview"
       @pointerdown="onPointerDown"

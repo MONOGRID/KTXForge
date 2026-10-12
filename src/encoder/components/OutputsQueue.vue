@@ -64,7 +64,7 @@ function canAddInputs(slot: OutputSlot): boolean {
   <section
     class="panel flex h-full min-h-0 flex-col overflow-hidden transition-colors"
     :class="
-      highlighted ? 'ring-2 ring-inset ring-brand bg-brand/10' : ''
+      highlighted ? 'ring-2 ring-inset ring-primary/50 bg-primary/10' : ''
     "
     data-drop-zone="outputs"
     @pointerenter="onPointerEnter"
@@ -99,11 +99,11 @@ function canAddInputs(slot: OutputSlot): boolean {
         <li
           v-for="slot in rows"
           :key="slot.id"
-          class="mb-1 flex items-center gap-2 rounded border px-2 py-1.5 last:mb-0"
+          class="mb-1 flex items-center gap-2 rounded-md border px-2 py-1.5 last:mb-0"
           :class="
             slot.id === store.selectedId
-              ? 'border-primary bg-primary/10'
-              : 'border-line bg-surface'
+              ? 'border-transparent bg-primary/15 ring-2 ring-inset ring-primary/45'
+              : 'border-transparent bg-surface-sunken'
           "
         >
           <button
@@ -114,13 +114,10 @@ function canAddInputs(slot: OutputSlot): boolean {
             <div class="truncate text-sm font-medium">
               {{ outputLabel(slot) }}
             </div>
-            <div class="hint">
+            <div class="mt-0.5 text-xs text-ink-muted">
               {{ slot.inputs.length }}
               input{{ slot.inputs.length === 1 ? "" : "s" }}
-              <span
-                v-if="statusLabel(slot)"
-                class="text-ink-muted"
-              > · {{ statusLabel(slot) }}</span>
+              <span v-if="statusLabel(slot)"> · {{ statusLabel(slot) }}</span>
             </div>
           </button>
           <button

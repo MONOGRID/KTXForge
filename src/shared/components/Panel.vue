@@ -37,7 +37,7 @@ function toggle(): void {
 <template>
   <section class="panel overflow-hidden">
     <header
-      class="flex items-center justify-between gap-2 border-b border-line px-3 py-2"
+      class="flex items-center justify-between gap-2 border-b border-line/50 px-3 py-2"
       :class="{ 'cursor-pointer select-none': collapsible }"
       @click="toggle"
     >

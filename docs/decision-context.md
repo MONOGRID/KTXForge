@@ -407,3 +407,9 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 **Decided:** Use the existing `@lucide/vue` package (no lucide-lab / extra pack) for panel titles, action buttons, input-role options, drop-intent choices, theme menu items, and collapsible chevrons. Shared seams: optional `icon` on `Panel` and `EnumSelectOption`; role → icon map in `src/encoder/inputRoleIcons.ts`. Semantic picks: `Boxes` (KTX outputs), `Images` (inputs), `Layers` / `Cuboid` / `Pyramid` / `Cylinder` (roles), `ListOrdered` (encode queue), `ImageUp` (drop), `Split` / `Combine` / `PackagePlus` (drop intent), `CirclePlay` / `CircleStop` / `Save` / `SaveAll` (encode bar), `Download` (export / update), `Sun` / `Moon` / `Monitor` (theme).
 
 **Why:** Icons were missing across the encoder/inspector chrome. Lucide already matched `components.json` and UI primitives; the named set maps cleanly to texture roles and desktop actions without a second icon dependency.
+
+## 2026-10-12 — Soft chrome + logo electric blue brand
+
+**Decided:** Soft chrome keyed to `assets/icon-full.png` brand blue, without brand green/orange. Brand / primary / ring are the flame electric blue `#0870f8` (`214 94% 50%`) in both modes. Light mode uses cool off-white page (`#f0f2f5`) and white raised cards. Dark mode keeps VS Code Dark+ panel surfaces (`#1e1e1e` / `#252526` / `#181818`, borders `#3e3e42`, ink `#cccccc`) from the 2026-10-11 theme entry — only the accent is the logo blue. Surfaces and controls prefer `border-transparent` + soft shadow / fill contrast over hard strokes; `--radius` is `0.5rem` with mostly `rounded-md` / `rounded-lg`. Supersedes the brand-green choice in the 2026-10-11 shadcn/theme entries; dark panel greys stay VS Code–aligned. Palette ownership stays in `theme.css`.
+
+**Why:** Match the product mark on accents while keeping dark panels familiar for a desktop tool; navy-tinted dark fought the VS Code look users expected.

@@ -62,7 +62,7 @@ onUnmounted(() => {
 
 <template>
   <div class="box-border flex h-screen flex-col overflow-hidden font-sans text-ink">
-    <main class="min-h-0 flex-1 p-2">
+    <main class="min-h-0 flex-1 bg-surface p-2.5">
       <ResizablePanelGroup
         id="inspector-layout"
         auto-save-id="inspector-layout"

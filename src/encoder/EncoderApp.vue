@@ -80,7 +80,7 @@ onUnmounted(() => {
       <DropIntentDialog />
       <QueueModal />
 
-      <header class="flex shrink-0 items-center justify-between gap-3 border-b border-line bg-surface-raised px-4 py-2">
+      <header class="flex shrink-0 items-center justify-between gap-3 border-b border-line/40 bg-surface-raised px-4 py-2 shadow-sm">
         <div class="flex min-w-0 items-center gap-2">
           <img
             src="/favicon-32.png"
@@ -103,7 +103,7 @@ onUnmounted(() => {
 
       <UpdateBanner />
 
-      <main class="min-h-0 flex-1 p-2">
+      <main class="min-h-0 flex-1 bg-surface p-2.5">
         <ResizablePanelGroup
           id="encoder-layout"
           auto-save-id="encoder-layout"

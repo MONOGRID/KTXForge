@@ -38,7 +38,7 @@ const blocks = computed((): DfdBlock[] => props.descriptor?.blocks ?? []);
       <div
         v-for="(block, blockIndex) in blocks"
         :key="blockIndex"
-        class="mt-3 rounded border border-line p-2"
+        class="mt-3 rounded-md border border-transparent bg-surface-sunken p-2 shadow-sm"
       >
         <div class="mb-1 text-xs font-medium text-ink-muted">
           Block {{ blockIndex }}

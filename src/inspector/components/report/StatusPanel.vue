@@ -39,7 +39,7 @@ const rows = computed((): ValidationMessage[] => props.messages ?? []);
     <div
       v-for="(msg, index) in rows"
       :key="index"
-      class="mt-2 rounded border border-line bg-surface-sunken p-2"
+      class="mt-2 rounded-md border border-transparent bg-surface-sunken p-2 shadow-sm"
     >
       <ReportField
         label="type"

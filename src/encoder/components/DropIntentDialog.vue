@@ -86,7 +86,7 @@ function onPackOne(): void {
 
         <button
           type="button"
-          class="flex gap-3 rounded border border-line bg-surface px-3 py-2.5 text-left transition-colors hover:border-primary hover:bg-primary/10"
+          class="flex gap-3 rounded-lg border border-transparent bg-surface-sunken px-3 py-2.5 text-left shadow-sm transition-colors hover:bg-primary/10 hover:ring-2 hover:ring-inset hover:ring-primary/40"
           @click="onSeparateOutputs"
         >
           <Split
@@ -103,7 +103,7 @@ function onPackOne(): void {
           </div>
         </button>
 
-        <div class="flex gap-3 rounded border border-line bg-surface px-3 py-2.5">
+        <div class="flex gap-3 rounded-lg border border-transparent bg-surface-sunken px-3 py-2.5 shadow-sm">
           <Combine
             class="mt-0.5 size-4 shrink-0 text-ink-muted"
             aria-hidden="true"

@@ -17,7 +17,7 @@ export default defineConfig({
     presetAnimations(),
     presetShadcn(
       {
-        // Palette overridden in src/shared/styles/theme.css (VS Code–inspired).
+        // Palette overridden in src/shared/styles/theme.css (logo blue, soft chrome).
         color: "neutral",
         darkSelector: ".dark",
       },
@@ -49,13 +49,19 @@ export default defineConfig({
       },
       line: "var(--color-line)",
       brand: {
-        DEFAULT: "var(--color-brand)",
-        fg: "var(--color-brand-fg)",
+        // Relative color so bg-brand/10 etc. tint instead of solid hex.
+        DEFAULT: "rgb(from var(--color-brand) r g b / <alpha-value>)",
+        fg: "rgb(from var(--color-brand-fg) r g b / <alpha-value>)",
       },
       danger: {
-        DEFAULT: "var(--color-danger)",
-        fg: "var(--color-danger-fg)",
+        DEFAULT: "rgb(from var(--color-danger) r g b / <alpha-value>)",
+        fg: "rgb(from var(--color-danger-fg) r g b / <alpha-value>)",
       },
+    },
+    borderRadius: {
+      lg: "var(--radius)",
+      md: "calc(var(--radius) - 2px)",
+      sm: "calc(var(--radius) - 4px)",
     },
     fontFamily: {
       sans: "var(--font-sans)",
@@ -63,16 +69,16 @@ export default defineConfig({
     },
   },
   shortcuts: {
-    btn: "inline-flex items-center justify-center gap-1.5 rounded border border-line bg-surface-raised px-2.5 py-1 text-sm text-ink hover:bg-surface disabled:opacity-50 disabled:pointer-events-none",
+    btn: "inline-flex items-center justify-center gap-1.5 rounded-md border border-transparent bg-surface-sunken px-2.5 py-1 text-sm text-ink shadow-sm hover:bg-surface disabled:opacity-50 disabled:pointer-events-none",
     "btn-primary":
-      "btn border-brand bg-brand text-brand-fg hover:opacity-90",
-    panel: "rounded border border-line bg-surface-raised text-ink",
+      "btn border-transparent bg-brand text-brand-fg shadow-sm hover:opacity-90",
+    panel: "rounded-lg border border-transparent bg-surface-raised text-ink shadow-sm",
     "field-row":
       "grid grid-cols-[minmax(0,42%)_minmax(0,1fr)] items-start gap-x-2 py-1.5",
     label:
       "min-w-0 cursor-pointer truncate pt-1 text-sm text-ink-muted select-none",
     hint: "mt-0.5 text-xs text-ink-faint",
     badge:
-      "inline-flex items-center rounded px-1.5 py-0.5 text-xs font-medium bg-surface-sunken text-ink-muted",
+      "inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium bg-surface-sunken text-ink-muted",
   },
 });

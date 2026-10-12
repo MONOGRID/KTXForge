@@ -98,7 +98,7 @@ async function onInstall(): Promise<void> {
 <template>
   <div
     v-if="visible"
-    class="flex shrink-0 flex-col gap-2 border-b border-brand/30 bg-brand/10 px-4 py-2"
+    class="flex shrink-0 flex-col gap-2 border-b border-primary/30 bg-primary/10 px-4 py-2"
     role="status"
   >
     <div class="flex flex-wrap items-start justify-between gap-3">

@@ -83,7 +83,7 @@ const emit = defineEmits<{
     />
     <button
       type="button"
-      class="absolute top-1/2 z-20 flex h-10 w-4 -translate-x-1/2 -translate-y-1/2 cursor-col-resize items-center justify-center rounded border border-line bg-surface-raised shadow-sm"
+      class="absolute top-1/2 z-20 flex h-10 w-4 -translate-x-1/2 -translate-y-1/2 cursor-col-resize items-center justify-center rounded-md border border-transparent bg-surface-raised shadow-md"
       :style="{ left: `${String(splitPct)}%` }"
       :aria-label="`Compare slider, ${String(Math.round(splitPct))} percent original`"
       @pointerdown="emit('splitPointerDown', $event)"
