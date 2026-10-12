@@ -497,3 +497,10 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 **Decided:** `OutputSlot` carries its own `role: InputRole` and `animation: AnimationOptions | null`. Single-image outputs stay Base 2D while another output is packed as layers or a cubemap; `describe_options`, the preview and the Inputs panel use the selected output's role; Encode all sends each slot's role, and animation only for array-layer slots. Shared `CreateOptions` for the whole queue is unchanged. Supersedes the implicit global role (and shared animation) from the 2026-10-11 batch-outputs entry.
 
 **Why:** With one global role, setting any output to array layers made every single-image output encode as a one-layer array, and a cubemap output failed arity for all others, blocking Encode.
+
+
+## 2026-10-12 — Stage HDR inputs as scanline EXR
+
+**Decided:** `prepare_input` writes Radiance `.hdr` conversions with the `exr` crate as 32-bit float scanline EXR (ZIP16, increasing line order; RGB, or RGBA when the source has alpha) instead of `image`'s `save_with_format(OpenExr)`. Passthrough `.exr` inputs whose header is tiled are re-staged in the workdir as scanline (all layers, channels, sample types, and attributes kept; only the largest resolution level). Scanline EXRs still pass through untouched. The `hdr.exr` fixture is re-encoded as scanline with identical pixels. `convert.rs` tests run the staged `ktx create` on a converted `.hdr` and a re-staged tiled EXR.
+
+**Why:** The Linux v4.4.2 `ktx` segfaults (exit 139) on any tiled EXR, whatever the compression (RLE, ZIP, none), and reads scanline EXR fine. The `image` crate always writes tiled RLE, so every Radiance encode crashed on Linux. Re-staging is one header read for scanline files and a small rewrite for tiled ones, cheaper than documenting a limitation users cannot see coming.
