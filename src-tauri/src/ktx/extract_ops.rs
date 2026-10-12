@@ -33,7 +33,7 @@ const EXTRACT_SLOTS_MAX: usize = 16;
 /// ~80% of `cores`, at least 1, at most [`EXTRACT_SLOTS_MAX`].
 pub fn extract_slots_for_cores(cores: usize) -> usize {
     let roughly_eighty = cores.saturating_mul(4) / 5;
-    roughly_eighty.max(1).min(EXTRACT_SLOTS_MAX)
+    roughly_eighty.clamp(1, EXTRACT_SLOTS_MAX)
 }
 
 /// Process-wide extract concurrency for this host.

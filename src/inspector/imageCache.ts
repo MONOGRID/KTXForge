@@ -316,7 +316,7 @@ export function ensureInspectorImageUrl(
 }
 
 /** Best-effort warm of a subresource (no throw); never outruns interactive loads. */
-export function prefetchInspectorImage(
+function prefetchInspectorImage(
   filePath: string,
   sel: ImageSelection,
 ): void {
