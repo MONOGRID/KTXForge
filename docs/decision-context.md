@@ -431,3 +431,15 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 **Decided:** After the viewport settles, inspector idle warm enqueues the **full** array-layer / anim-frame stack for the current level/face/depth (`warmInspectorLayerStack`, nearest-first), in addition to the existing mip-chain warm. FramePlayer uses the same warm instead of only the next frame. Interactive scrub still coalesces to the latest selection and takes free extract slots first, but **no longer clears** the prefetch queue — spare slots keep background pre-extract running. Disk PNG cache remains the durable hit; in-memory LRU stays capped.
 
 **Why:** Scrubbing only needs a fresh `ktx extract` for selections not yet on disk. Warming only ±1 neighbors left the rest of an anim/array cold, so each new frame still paid a decompress. Filling the stack while the user is stopped (or slowly scrubbing) makes later scrub hits cache.
+
+## 2026-10-12 — Inspector chrome header with brand + file info
+
+**Decided:** Put path, file size, preview kind, and loading state in a full-width inspector header (above the resizable viewer/info split), next to the KTXForge mark (`/favicon-32.png` + title), matching the encoder header. Mode toggle lives in that header. The right info panel is report sections only — no file-info strip constrained by the divisor width.
+
+**Why:** Long paths were truncated by the sidebar column; branding was missing from the inspector window while the encoder already had a brand header.
+
+## 2026-10-12 — Session action footers + inspector Viewer card
+
+**Decided:** (Replaces the three 2026-10-12 entries on export toolbar, Viewer card, and Encode footer.) Inspector Viewer is a `panel` card (`Eye` + “Viewer”). Encode and Export are titleless full-width footers below each window’s `ResizablePanelGroup`, controls right-aligned (progress left on Encode). Export uses Scope/Format `EnumSelect`s; HDR → EXR only.
+
+**Why:** Session actions aren’t column-local; footers match across apps and free column space.

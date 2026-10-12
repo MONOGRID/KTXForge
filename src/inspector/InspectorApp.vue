@@ -6,6 +6,8 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
+import { Eye } from "@lucide/vue";
+import ModeToggle from "../shared/components/ModeToggle.vue";
 import ExportPanel from "./components/ExportPanel.vue";
 import InspectorInfoSidebar from "./components/InspectorInfoSidebar.vue";
 import FramePlayer from "./components/viewer/FramePlayer.vue";
@@ -18,6 +20,7 @@ import {
   displayValue,
   initInspectorStore,
   ktx2Info,
+  loading,
   path,
   report,
 } from "./store";
@@ -34,6 +37,8 @@ useTitle(title);
 
 const statusValid = computed((): boolean | null => ktx2Info.value?.valid ?? null);
 const statusMessages = computed(() => ktx2Info.value?.messages ?? null);
+const pathLabel = computed((): string => displayValue(path.value));
+const fileSizeLabel = computed((): string => displayValue(report.value?.fileSize));
 const previewLabel = computed((): string => {
   const preview = report.value?.preview;
   if (preview === undefined) {
@@ -44,6 +49,7 @@ const previewLabel = computed((): string => {
   }
   return preview.kind;
 });
+const isLoading = computed((): boolean => loading.value);
 
 let unbindMenu: (() => void) | undefined;
 let unbindShortcuts: (() => void) | undefined;
@@ -62,12 +68,47 @@ onUnmounted(() => {
 
 <template>
   <div class="box-border flex h-screen flex-col overflow-hidden font-sans text-ink">
-    <main class="min-h-0 flex-1 bg-surface p-2.5">
+    <header
+      class="flex shrink-0 items-center justify-between gap-3 border-b border-line/40 bg-surface-raised px-4 py-2 shadow-sm"
+    >
+      <div class="flex min-w-0 items-center gap-3">
+        <div class="flex shrink-0 items-center gap-2">
+          <img
+            src="/favicon-32.png"
+            alt=""
+            width="28"
+            height="28"
+            class="size-7 shrink-0"
+          >
+          <h1 class="m-0 text-lg font-semibold tracking-tight">
+            KTXForge
+          </h1>
+        </div>
+        <div class="min-w-0 border-l border-line/40 pl-3">
+          <p
+            class="m-0 truncate font-mono text-xs text-ink-muted"
+            :title="pathLabel"
+          >
+            {{ pathLabel }}
+          </p>
+          <p class="m-0 mt-0.5 text-xs text-ink-faint">
+            fileSize: {{ fileSizeLabel }} · preview: {{ previewLabel }}
+            <span
+              v-if="isLoading"
+              class="text-ink-muted"
+            > · Loading…</span>
+          </p>
+        </div>
+      </div>
+      <ModeToggle />
+    </header>
+
+    <main class="flex min-h-0 flex-1 flex-col gap-2 bg-surface p-2.5">
       <ResizablePanelGroup
         id="inspector-layout"
         auto-save-id="inspector-layout"
         direction="horizontal"
-        class="h-full min-h-0"
+        class="min-h-0 flex-1"
       >
         <ResizablePanel
           id="inspector-viewer"
@@ -76,19 +117,27 @@ onUnmounted(() => {
           class="min-h-0 min-w-0"
         >
           <section
-            class="flex h-full min-h-0 flex-col gap-2 overflow-hidden"
+            class="panel flex h-full min-h-0 flex-col overflow-hidden"
             aria-label="Image viewer"
           >
-            <div class="flex shrink-0 flex-col gap-2 px-1">
-              <MipStrip />
-              <SubresourceSelectors />
-              <FramePlayer />
-            </div>
-            <div class="min-h-0 flex-1">
-              <ImageViewer />
-            </div>
-            <div class="shrink-0">
-              <ExportPanel />
+            <header class="shrink-0 border-b border-line/50 px-3 py-2">
+              <h2 class="m-0 flex items-center gap-1.5 text-sm font-semibold">
+                <Eye
+                  class="size-4 shrink-0 text-ink-muted"
+                  aria-hidden="true"
+                />
+                Viewer
+              </h2>
+            </header>
+            <div class="flex min-h-0 flex-1 flex-col gap-2 p-3">
+              <div class="flex shrink-0 flex-col gap-2">
+                <MipStrip />
+                <SubresourceSelectors />
+                <FramePlayer />
+              </div>
+              <div class="min-h-0 flex-1">
+                <ImageViewer />
+              </div>
             </div>
           </section>
         </ResizablePanel>
@@ -108,10 +157,11 @@ onUnmounted(() => {
           <InspectorInfoSidebar
             :status-valid="statusValid"
             :status-messages="statusMessages"
-            :preview-label="previewLabel"
           />
         </ResizablePanel>
       </ResizablePanelGroup>
+
+      <ExportPanel class="shrink-0" />
     </main>
   </div>
 </template>

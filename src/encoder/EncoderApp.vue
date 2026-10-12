@@ -103,12 +103,12 @@ onUnmounted(() => {
 
       <UpdateBanner />
 
-      <main class="min-h-0 flex-1 bg-surface p-2.5">
+      <main class="flex min-h-0 flex-1 flex-col gap-2 bg-surface p-2.5">
         <ResizablePanelGroup
           id="encoder-layout"
           auto-save-id="encoder-layout"
           direction="horizontal"
-          class="h-full min-h-0"
+          class="min-h-0 flex-1"
         >
           <ResizablePanel
             id="encoder-sources"
@@ -177,16 +177,15 @@ onUnmounted(() => {
             :max-size="48"
             class="min-h-0 min-w-0"
           >
-            <section class="flex h-full min-h-0 flex-col gap-2 overflow-hidden">
-              <ScrollArea class="min-h-0 flex-1">
-                <div class="pr-3">
-                  <OptionsPanel />
-                </div>
-              </ScrollArea>
-              <EncodeBar />
-            </section>
+            <ScrollArea class="h-full min-h-0">
+              <div class="pr-3">
+                <OptionsPanel />
+              </div>
+            </ScrollArea>
           </ResizablePanel>
         </ResizablePanelGroup>
+
+        <EncodeBar class="shrink-0" />
       </main>
     </div>
   </TooltipProvider>

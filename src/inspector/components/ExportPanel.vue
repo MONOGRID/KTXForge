@@ -8,8 +8,10 @@ import type { ExportSelection } from "../../bindings/ExportSelection";
 import type { ImageSelection } from "../../bindings/ImageSelection";
 import type { PreviewKind } from "../../bindings/PreviewKind";
 import { Download } from "@lucide/vue";
+import { Input } from "@/components/ui/input";
 import Button from "../../shared/components/Button.vue";
-import Panel from "../../shared/components/Panel.vue";
+import EnumSelect from "../../shared/components/EnumSelect.vue";
+import type { EnumSelectOption } from "../../shared/enumSelect";
 import { alertAppError } from "../../shared/alertAppError";
 import { path, report, selection } from "../store";
 
@@ -43,8 +45,12 @@ function ldrExportBlockReason(
   return HDR_LDR_REASON;
 }
 
-function isLdrFormat(kind: FormatKind): boolean {
-  return kind === "png" || kind === "jpeg";
+function isFormatKind(value: string): value is FormatKind {
+  return value === "png" || value === "jpeg" || value === "exr";
+}
+
+function isScopeKind(value: string): value is ScopeKind {
+  return value === "one" || value === "allFrames" || value === "all";
 }
 
 function toExportFormat(kind: FormatKind, quality: number): ExportFormat {
@@ -94,6 +100,37 @@ watch(
   { immediate: true },
 );
 
+const scopeOptions = SCOPE_OPTIONS satisfies readonly EnumSelectOption[];
+
+const formatOptions = computed((): EnumSelectOption[] => {
+  const reason = pngJpegDisabledReason.value;
+  return FORMAT_OPTIONS.filter(
+    (option) => !pngJpegDisabled.value || option.value === "exr",
+  ).map((option) =>
+    option.value === "exr" && reason !== null
+      ? { ...option, help: reason }
+      : { ...option },
+  );
+});
+
+const scopeModel = computed({
+  get: (): string | null => scope.value,
+  set: (value: string | null): void => {
+    if (value !== null && isScopeKind(value)) {
+      scope.value = value;
+    }
+  },
+});
+
+const formatModel = computed({
+  get: (): string | null => formatKind.value,
+  set: (value: string | null): void => {
+    if (value !== null && isFormatKind(value)) {
+      formatKind.value = value;
+    }
+  },
+});
+
 const fileReady = computed(
   (): boolean => Boolean(path.value) && report.value !== null,
 );
@@ -105,6 +142,14 @@ const formatAllowed = computed(
 const canExport = computed(
   (): boolean => fileReady.value && formatAllowed.value && !busy.value,
 );
+
+function onJpegQualityUpdate(value: string | number): void {
+  const n = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(n)) {
+    return;
+  }
+  jpegQuality.value = Math.min(100, Math.max(1, Math.round(n)));
+}
 
 async function onExport(): Promise<void> {
   if (!canExport.value) {
@@ -164,86 +209,49 @@ watchEffect(() => {
 </script>
 
 <template>
-  <Panel
-    title="Export"
-    :icon="Download"
-    :collapsible="false"
-  >
-    <div class="field-row">
-      <div class="label">
-        Scope
-      </div>
-      <div class="min-w-0 flex-1 flex flex-col gap-1">
-        <label
-          v-for="option in SCOPE_OPTIONS"
-          :key="option.value"
-          class="flex items-center gap-2 text-sm text-ink"
-        >
-          <input
-            v-model="scope"
-            type="radio"
-            name="export-scope"
-            :value="option.value"
-          >
-          {{ option.label }}
-        </label>
-      </div>
-    </div>
-
-    <div class="field-row">
-      <div class="label">
-        Format
-      </div>
-      <div class="min-w-0 flex-1 flex flex-col gap-1">
-        <label
-          v-for="option in FORMAT_OPTIONS"
-          :key="option.value"
-          class="flex items-center gap-2 text-sm text-ink"
-          :class="{ 'opacity-50': pngJpegDisabled && isLdrFormat(option.value) }"
-        >
-          <input
-            v-model="formatKind"
-            type="radio"
-            name="export-format"
-            :value="option.value"
-            :disabled="pngJpegDisabled && isLdrFormat(option.value)"
-          >
-          {{ option.label }}
-        </label>
-        <p
-          v-if="pngJpegDisabledReason"
-          class="hint"
-        >
-          {{ pngJpegDisabledReason }}
-        </p>
-      </div>
-    </div>
-
+  <div class="flex w-full flex-col gap-1.5">
     <div
-      v-if="formatKind === 'jpeg'"
-      class="field-row"
+      class="panel flex w-full flex-wrap items-center justify-end gap-2 px-2.5 py-1.5"
+      role="group"
+      aria-label="Export"
     >
-      <div class="label">
-        JPEG quality
-      </div>
-      <div class="min-w-0 flex-1">
-        <div class="flex items-center gap-2">
-          <input
-            v-model.number="jpegQuality"
-            type="range"
-            min="1"
-            max="100"
-            step="1"
-            class="min-w-0 flex-1"
-          >
-          <span class="w-8 shrink-0 text-right text-sm text-ink-muted tabular-nums">
-            {{ jpegQuality }}
-          </span>
-        </div>
-      </div>
-    </div>
+      <label class="flex min-w-0 items-center gap-1.5 text-xs text-ink-muted">
+        <span class="shrink-0">Scope</span>
+        <EnumSelect
+          v-model="scopeModel"
+          :options="scopeOptions"
+          :empty-label="false"
+          class="h-8 w-[13.5rem] max-w-[40vw]"
+        />
+      </label>
 
-    <div class="mt-2 flex items-center gap-2">
+      <label class="flex items-center gap-1.5 text-xs text-ink-muted">
+        <span class="shrink-0">Format</span>
+        <EnumSelect
+          v-model="formatModel"
+          :options="formatOptions"
+          :empty-label="false"
+          class="h-8 w-[5.5rem]"
+        />
+      </label>
+
+      <label
+        v-if="formatKind === 'jpeg'"
+        class="flex items-center gap-1.5 text-xs text-ink-muted"
+      >
+        <span class="shrink-0">Q</span>
+        <Input
+          type="number"
+          min="1"
+          max="100"
+          step="1"
+          class="h-8 w-14 px-1.5 text-center font-mono tabular-nums"
+          aria-label="JPEG quality"
+          :model-value="String(jpegQuality)"
+          @update:model-value="onJpegQualityUpdate"
+        />
+      </label>
+
       <Button
         variant="primary"
         :disabled="!canExport"
@@ -259,15 +267,15 @@ watchEffect(() => {
 
     <ul
       v-if="writtenFiles.length > 0"
-      class="mt-3 m-0 max-h-24 list-none overflow-auto p-0 text-sm text-ink"
+      class="m-0 max-h-20 w-full list-none overflow-auto p-0 text-right text-sm text-ink"
     >
       <li
         v-for="file in writtenFiles"
         :key="file"
-        class="break-all border-t border-line py-1 font-mono text-xs first:border-t-0"
+        class="break-all py-0.5 font-mono text-xs text-ink-muted"
       >
         {{ file }}
       </li>
     </ul>
-  </Panel>
+  </div>
 </template>

@@ -2,15 +2,10 @@
 import { computed } from "vue";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { ValidationMessage } from "../../bindings/ValidationMessage";
-import ModeToggle from "../../shared/components/ModeToggle.vue";
 import {
-  displayValue,
   ktx1Header,
   ktx1Text,
   ktx2Info,
-  loading,
-  path,
-  report,
 } from "../store";
 import BasisGlobalDataPanel from "./report/BasisGlobalDataPanel.vue";
 import DfdPanel from "./report/DfdPanel.vue";
@@ -25,12 +20,7 @@ import StatusPanel from "./report/StatusPanel.vue";
 defineProps<{
   statusValid: boolean | null;
   statusMessages: ValidationMessage[] | null;
-  previewLabel: string;
 }>();
-
-const pathLabel = computed((): string => displayValue(path.value));
-const fileSizeLabel = computed((): string => displayValue(report.value?.fileSize));
-const isLoading = computed((): boolean => loading.value);
 
 const ktx2Header = computed(() => ktx2Info.value?.header ?? null);
 const levelIndex = computed(() => ktx2Info.value?.index.levels ?? null);
@@ -54,27 +44,10 @@ const ktx1HeaderValue = computed(() => ktx1Header.value);
 </script>
 
 <template>
-  <section class="flex h-full min-h-0 flex-col gap-2 overflow-hidden">
-    <header class="panel shrink-0 px-3 py-2">
-      <div class="flex items-start justify-between gap-3">
-        <div class="min-w-0">
-          <p class="m-0 break-all font-mono text-xs text-ink-muted">
-            {{ pathLabel }}
-          </p>
-          <p class="m-0 mt-1 text-xs text-ink-faint">
-            fileSize: {{ fileSizeLabel }} · preview: {{ previewLabel }}
-          </p>
-          <p
-            v-if="isLoading"
-            class="m-0 mt-2 text-sm text-ink-muted"
-          >
-            Loading…
-          </p>
-        </div>
-        <ModeToggle />
-      </div>
-    </header>
-
+  <section
+    class="flex h-full min-h-0 flex-col overflow-hidden"
+    aria-label="File details"
+  >
     <ScrollArea class="min-h-0 flex-1">
       <div class="flex flex-col gap-3 pr-3">
         <StatusPanel

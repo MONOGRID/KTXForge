@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { CirclePlay, CircleStop, Cpu, Save, SaveAll } from "@lucide/vue";
+import { CirclePlay, CircleStop, Save, SaveAll } from "@lucide/vue";
 import { computed, onMounted, onUnmounted } from "vue";
 import { on } from "../../api/events";
 import type { EncodeStage } from "../../bindings/EncodeStage";
@@ -63,66 +63,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="panel shrink-0 overflow-hidden">
-    <header class="border-b border-line px-3 py-2">
-      <h2 class="m-0 flex items-center gap-1.5 text-sm font-semibold">
-        <Cpu
-          class="size-4 shrink-0 text-ink-muted"
-          aria-hidden="true"
-        />
-        Encode
-      </h2>
-    </header>
-
-    <div class="flex flex-col gap-2 px-3 py-2">
-      <div class="flex flex-wrap items-center gap-2">
-        <Button
-          variant="primary"
-          :disabled="!encodeEnabled"
-          @click="encode"
-        >
-          <CirclePlay
-            class="size-4 shrink-0"
-            aria-hidden="true"
-          />
-          Encode all
-        </Button>
-        <Button
-          :disabled="!cancelEnabled"
-          @click="cancelEncode"
-        >
-          <CircleStop
-            class="size-4 shrink-0"
-            aria-hidden="true"
-          />
-          Cancel queue
-        </Button>
-        <Button
-          :disabled="!saveEnabled"
-          @click="saveEncoded"
-        >
-          <Save
-            class="size-4 shrink-0"
-            aria-hidden="true"
-          />
-          Save…
-        </Button>
-        <Button
-          :disabled="!saveAllEnabled"
-          @click="saveAllEncoded"
-        >
-          <SaveAll
-            class="size-4 shrink-0"
-            aria-hidden="true"
-          />
-          Save all…
-        </Button>
-        <span
-          v-if="!queueActive && selectedStageLabel"
-          class="text-xs text-ink-muted"
-        >{{ selectedStageLabel }}</span>
-      </div>
-
+  <div
+    class="panel flex w-full flex-wrap items-center gap-3 px-2.5 py-1.5"
+    role="group"
+    aria-label="Encode"
+  >
+    <div class="min-w-0 flex-1">
       <ProgressBar
         v-if="queueActive"
         :value="
@@ -136,6 +82,54 @@ onUnmounted(() => {
             : 'Working…'
         "
       />
+      <span
+        v-else-if="selectedStageLabel"
+        class="text-xs text-ink-muted"
+      >{{ selectedStageLabel }}</span>
     </div>
-  </section>
+
+    <div class="flex shrink-0 flex-wrap items-center justify-end gap-2">
+      <Button
+        variant="primary"
+        :disabled="!encodeEnabled"
+        @click="encode"
+      >
+        <CirclePlay
+          class="size-4 shrink-0"
+          aria-hidden="true"
+        />
+        Encode all
+      </Button>
+      <Button
+        :disabled="!cancelEnabled"
+        @click="cancelEncode"
+      >
+        <CircleStop
+          class="size-4 shrink-0"
+          aria-hidden="true"
+        />
+        Cancel queue
+      </Button>
+      <Button
+        :disabled="!saveEnabled"
+        @click="saveEncoded"
+      >
+        <Save
+          class="size-4 shrink-0"
+          aria-hidden="true"
+        />
+        Save…
+      </Button>
+      <Button
+        :disabled="!saveAllEnabled"
+        @click="saveAllEncoded"
+      >
+        <SaveAll
+          class="size-4 shrink-0"
+          aria-hidden="true"
+        />
+        Save all…
+      </Button>
+    </div>
+  </div>
 </template>
