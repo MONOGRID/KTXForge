@@ -3,58 +3,19 @@ import { call } from "../api/commands";
 import type { EncodeResult } from "../bindings/EncodeResult";
 import type { ImageSelection } from "../bindings/ImageSelection";
 import type { InputRole } from "../bindings/InputRole";
-import { createScrubGate } from "../shared/scrubGate";
 import { composeCubemapCross } from "../shared/cubemapCross";
 import { selectedOutput, selectedRole, type OutputSlot } from "./store";
+import {
+  bytesToUrl,
+  createPreviewHalf,
+  pickListUrl,
+  replaceUrl,
+  replaceUrlList,
+  skipDepthScrub,
+  type PreviewHalf,
+} from "./previewHalf";
 
 type PackAxis = "layer" | "mip" | "depth" | null;
-
-function revoke(url: string | null): void {
-  if (url !== null) {
-    URL.revokeObjectURL(url);
-  }
-}
-
-function revokeFaceList(urls: Array<string | null>): void {
-  for (const url of urls) {
-    revoke(url);
-  }
-}
-
-function revokeUrlList(urls: ReadonlyArray<string | null>): void {
-  for (const url of urls) {
-    revoke(url);
-  }
-}
-
-function replaceUrl(
-  target: { value: string | null },
-  next: string,
-): void {
-  const prev = target.value;
-  target.value = next;
-  if (prev !== null && prev !== next) {
-    revoke(prev);
-  }
-}
-
-function replaceFaceList(
-  target: { value: Array<string | null> },
-  next: Array<string | null>,
-): void {
-  const prev = target.value;
-  target.value = next;
-  revokeFaceList(prev);
-}
-
-function replaceUrlList(
-  target: { value: Array<string | null> },
-  next: Array<string | null>,
-): void {
-  const prev = target.value;
-  target.value = next;
-  revokeUrlList(prev);
-}
 
 function clampIndex(index: number, max: number): number {
   if (max < 0) {
@@ -63,47 +24,98 @@ function clampIndex(index: number, max: number): number {
   return Math.min(Math.max(0, index), max);
 }
 
-function bytesToUrl(bytes: ArrayBuffer): string {
-  return URL.createObjectURL(new Blob([bytes], { type: "image/png" }));
-}
+type FaceFetcher = (face: number) => Promise<string | null>;
+type SliceFetcher = (index: number) => Promise<string | null>;
 
-function emptyFaces(): Array<string | null> {
-  return [null, null, null, null, null, null];
-}
-
-function pickListUrl(
-  urls: ReadonlyArray<string | null>,
-  index: number,
-): string | null {
-  if (index < 0 || index >= urls.length) {
-    return null;
+async function loadCubemapHalf(
+  half: PreviewHalf,
+  gen: number,
+  fetchFace: FaceFetcher,
+  onComposed: (width: number, height: number) => void,
+): Promise<void> {
+  const urls: Array<string | null> = await Promise.all(
+    Array.from({ length: 6 }, async (_, face) => {
+      try {
+        return await fetchFace(face);
+      } catch {
+        return null;
+      }
+    }),
+  );
+  if (half.revokeIfStale(gen, urls)) {
+    return;
   }
-  return urls[index] ?? null;
+  replaceUrlList(half.faceUrls, urls);
+  const composed = await composeCubemapCross(urls);
+  if (half.revokeUrlIfStale(gen, composed.url)) {
+    return;
+  }
+  replaceUrl(half.url, composed.url);
+  onComposed(composed.width, composed.height);
+}
+
+async function loadDepthHalf(
+  half: PreviewHalf,
+  gen: number,
+  count: number,
+  fetchSlice: SliceFetcher,
+): Promise<void> {
+  const urls: Array<string | null> = await Promise.all(
+    Array.from({ length: count }, async (_, index) => {
+      try {
+        return await fetchSlice(index);
+      } catch {
+        return null;
+      }
+    }),
+  );
+  if (half.revokeIfStale(gen, urls)) {
+    return;
+  }
+  replaceUrlList(half.depthUrls, urls);
+}
+
+async function loadFlatHalf(
+  half: PreviewHalf,
+  gen: number,
+  fetchUrl: () => Promise<string>,
+): Promise<void> {
+  const url = await fetchUrl();
+  if (half.revokeUrlIfStale(gen, url)) {
+    return;
+  }
+  replaceUrl(half.url, url);
+}
+
+async function fetchHalfPreview(
+  half: PreviewHalf,
+  currentRole: InputRole,
+  gen: number,
+  load: () => Promise<void>,
+): Promise<void> {
+  if (!half.isCurrent(gen)) {
+    return;
+  }
+  half.loading.value = half.needsLoading(currentRole);
+  try {
+    await load();
+  } catch {
+    // Keep whatever was already on screen.
+  } finally {
+    if (half.isCurrent(gen)) {
+      half.loading.value = false;
+    }
+  }
 }
 
 export function usePreviewPane() {
   const previewIndex = ref(0);
   const encodedMip = ref(0);
-
-  const sourceUrl = ref<string | null>(null);
-  const encodedUrl = ref<string | null>(null);
   const contentWidth = ref<number | null>(null);
   const contentHeight = ref<number | null>(null);
-  const sourceLoading = ref(false);
-  const encodedLoading = ref(false);
-  const faceSourceUrls = ref<Array<string | null>>(emptyFaces());
-  const faceEncodedUrls = ref<Array<string | null>>(emptyFaces());
-  /** Owned blob URLs for DepthSlices volume (source side). */
-  const depthSourceUrls = ref<Array<string | null>>([]);
-  /** Owned blob URLs for DepthSlices volume / wipe (encoded side). */
-  const depthEncodedUrls = ref<Array<string | null>>([]);
 
-  let sourceGen = 0;
-  let encodedGen = 0;
-  /** One in-flight source decode; slider ticks coalesce to the latest index. */
-  const sourceGate = createScrubGate();
-  /** One in-flight encoded extract; prevents UASTC/Zstd stampede on scrub. */
-  const encodedGate = createScrubGate();
+  const source = createPreviewHalf();
+  const encoded = createPreviewHalf();
 
   const role = computed((): InputRole => selectedRole.value);
 
@@ -182,16 +194,16 @@ export function usePreviewPane() {
 
   const activeSourceUrl = computed((): string | null => {
     if (isDepthVolume.value) {
-      return pickListUrl(depthSourceUrls.value, previewIndex.value);
+      return pickListUrl(source.depthUrls.value, previewIndex.value);
     }
-    return sourceUrl.value;
+    return source.url.value;
   });
 
   const activeEncodedUrl = computed((): string | null => {
     if (isDepthVolume.value) {
-      return pickListUrl(depthEncodedUrls.value, previewIndex.value);
+      return pickListUrl(encoded.depthUrls.value, previewIndex.value);
     }
-    return encodedUrl.value;
+    return encoded.url.value;
   });
 
   const comparing = computed(
@@ -214,14 +226,14 @@ export function usePreviewPane() {
     if (viewportSrc.value !== null) {
       return false;
     }
-    return sourceLoading.value || encodedLoading.value;
+    return source.loading.value || encoded.loading.value;
   });
 
   const volumeLoading = computed(
     (): boolean =>
       isDepthVolume.value &&
-      depthSourceUrls.value.every((url) => url === null) &&
-      sourceLoading.value,
+      source.depthUrls.value.every((url) => url === null) &&
+      source.loading.value,
   );
 
   const packSliderLabel = computed((): string => {
@@ -286,6 +298,21 @@ export function usePreviewPane() {
     encodedMip.value = Number(el.value);
   }
 
+  function resetContentSize(): void {
+    contentWidth.value = null;
+    contentHeight.value = null;
+  }
+
+  function applyEncodedDimensions(): void {
+    const res = result.value;
+    if (res === null) {
+      return;
+    }
+    const level = currentEncodedLevel();
+    contentWidth.value = Math.max(1, res.width >> level);
+    contentHeight.value = Math.max(1, res.height >> level);
+  }
+
   watch(
     [role, inputCount, () => result.value?.levels ?? 1],
     () => {
@@ -300,102 +327,26 @@ export function usePreviewPane() {
     () => {
       previewIndex.value = 0;
       encodedMip.value = 0;
+      resetContentSize();
     },
   );
 
-  function wipeSourcePreview(): void {
-    sourceGen += 1;
-    sourceGate.clearPending();
-    revoke(sourceUrl.value);
-    sourceUrl.value = null;
-    revokeFaceList(faceSourceUrls.value);
-    faceSourceUrls.value = emptyFaces();
-    revokeUrlList(depthSourceUrls.value);
-    depthSourceUrls.value = [];
-    contentWidth.value = null;
-    contentHeight.value = null;
-    sourceLoading.value = false;
+  function sourceFacePath(slot: OutputSlot, face: number): string | null {
+    if (face >= slot.inputs.length) {
+      return null;
+    }
+    return slot.inputs[face].path;
   }
 
-  async function loadSourceCubemap(
-    slot: OutputSlot,
-    gen: number,
-  ): Promise<void> {
-    const urls: Array<string | null> = await Promise.all(
-      Array.from({ length: 6 }, async (_, face) => {
-        if (face >= slot.inputs.length) {
-          return null;
-        }
-        try {
-          return await loadSourcePreview(slot.inputs[face].path);
-        } catch {
-          return null;
-        }
-      }),
-    );
-    if (gen !== sourceGen) {
-      revokeFaceList(urls);
-      return;
-    }
-    replaceFaceList(faceSourceUrls, urls);
-    const composed = await composeCubemapCross(urls);
-    if (gen !== sourceGen) {
-      revoke(composed.url);
-      return;
-    }
-    replaceUrl(sourceUrl, composed.url);
-    contentWidth.value = composed.width;
-    contentHeight.value = composed.height;
-  }
-
-  async function loadSourceDepth(
-    slot: OutputSlot,
-    gen: number,
-  ): Promise<void> {
-    const urls: Array<string | null> = await Promise.all(
-      slot.inputs.map(async (input) => {
-        try {
-          return await loadSourcePreview(input.path);
-        } catch {
-          return null;
-        }
-      }),
-    );
-    if (gen !== sourceGen) {
-      revokeUrlList(urls);
-      return;
-    }
-    replaceUrlList(depthSourceUrls, urls);
-  }
-
-  async function loadSourceFlat(slot: OutputSlot, gen: number): Promise<void> {
+  function flatSourceIndex(slot: OutputSlot): number | null {
     const index =
       packAxis.value === null
         ? 0
         : clampIndex(previewIndex.value, packMax.value);
     if (index >= slot.inputs.length) {
-      return;
+      return null;
     }
-    const url = await loadSourcePreview(slot.inputs[index].path);
-    if (gen !== sourceGen) {
-      revoke(url);
-      return;
-    }
-    replaceUrl(sourceUrl, url);
-  }
-
-  function depthStackReady(
-    urls: ReadonlyArray<string | null>,
-    expected: number,
-  ): boolean {
-    return urls.length === expected && urls.some((url) => url !== null);
-  }
-
-  function sourceNeedsLoading(currentRole: InputRole): boolean {
-    if (currentRole === "depthSlices") {
-      return !depthSourceUrls.value.some((url) => url !== null);
-    }
-    return sourceUrl.value === null;
+    return index;
   }
 
   async function loadSourceByRole(
@@ -404,63 +355,40 @@ export function usePreviewPane() {
     gen: number,
   ): Promise<void> {
     if (currentRole === "cubemapFaces") {
-      await loadSourceCubemap(slot, gen);
+      await loadCubemapHalf(
+        source,
+        gen,
+        async (face) => {
+          const path = sourceFacePath(slot, face);
+          return path === null ? null : loadSourcePreview(path);
+        },
+        (width, height) => {
+          contentWidth.value = width;
+          contentHeight.value = height;
+        },
+      );
       return;
     }
     if (currentRole === "depthSlices") {
-      await loadSourceDepth(slot, gen);
+      await loadDepthHalf(source, gen, slot.inputs.length, async (index) =>
+        loadSourcePreview(slot.inputs[index].path),
+      );
       return;
     }
-    await loadSourceFlat(slot, gen);
-  }
-
-  async function fetchSourcePreview(
-    slot: OutputSlot,
-    currentRole: InputRole,
-    gen: number,
-  ): Promise<void> {
-    if (gen !== sourceGen) {
+    const index = flatSourceIndex(slot);
+    if (index === null) {
       return;
     }
-    // Keep the previous frame while scrubbing; only flash loading on first paint.
-    sourceLoading.value = sourceNeedsLoading(currentRole);
-    try {
-      await loadSourceByRole(slot, currentRole, gen);
-    } catch {
-      // Keep whatever was already on screen.
-    } finally {
-      if (gen === sourceGen) {
-        sourceLoading.value = false;
-      }
-    }
-  }
-
-  function clearSourceSurfaces(): void {
-    revoke(sourceUrl.value);
-    sourceUrl.value = null;
-    revokeFaceList(faceSourceUrls.value);
-    faceSourceUrls.value = emptyFaces();
-    revokeUrlList(depthSourceUrls.value);
-    depthSourceUrls.value = [];
-  }
-
-  function skipDepthScrub(
-    mode: "replace" | "scrub",
-    currentRole: InputRole,
-    urls: ReadonlyArray<string | null>,
-    expected: number,
-  ): boolean {
-    return (
-      mode === "scrub" &&
-      currentRole === "depthSlices" &&
-      depthStackReady(urls, expected)
+    await loadFlatHalf(source, gen, () =>
+      loadSourcePreview(slot.inputs[index].path),
     );
   }
 
   function selectedSlotOrWipe(): OutputSlot | null {
     const slot = selectedOutput.value;
     if (slot === null || slot.inputs.length === 0) {
-      wipeSourcePreview();
+      source.wipe();
+      resetContentSize();
       return null;
     }
     return slot;
@@ -473,130 +401,34 @@ export function usePreviewPane() {
     }
 
     const currentRole = role.value;
-    // Depth stack is fully cached; scrubbing only changes the highlight / wipe slice.
     if (
       skipDepthScrub(
         mode,
         currentRole,
-        depthSourceUrls.value,
+        source.depthUrls.value,
         slot.inputs.length,
       )
     ) {
       return;
     }
 
-    // Output/role/input changes must not keep showing the previous slot.
-    if (mode === "replace") {
-      sourceGen += 1;
-      sourceGate.clearPending();
-      clearSourceSurfaces();
-    }
-
-    const gen = sourceGen;
+    const gen =
+      mode === "replace" ? source.beginReplace() : source.generation();
     const slotId = slot.id;
     const gateKey = `src:${slotId}:${currentRole}:${String(previewIndex.value)}`;
-    sourceGate.schedule(gateKey, async () => {
+    source.gate.schedule(gateKey, async () => {
       const live = selectedOutput.value;
-      if (live === null || live.id !== slotId || gen !== sourceGen) {
+      if (
+        live === null ||
+        live.id !== slotId ||
+        !source.isCurrent(gen)
+      ) {
         return;
       }
-      await fetchSourcePreview(live, role.value, gen);
+      await fetchHalfPreview(source, role.value, gen, () =>
+        loadSourceByRole(live, role.value, gen),
+      );
     });
-  }
-
-  function wipeEncodedPreview(): void {
-    encodedGen += 1;
-    encodedGate.clearPending();
-    revoke(encodedUrl.value);
-    encodedUrl.value = null;
-    revokeFaceList(faceEncodedUrls.value);
-    faceEncodedUrls.value = emptyFaces();
-    revokeUrlList(depthEncodedUrls.value);
-    depthEncodedUrls.value = [];
-    encodedLoading.value = false;
-  }
-
-  async function loadEncodedCubemap(jobId: string, gen: number): Promise<void> {
-    const urls: Array<string | null> = await Promise.all(
-      Array.from({ length: 6 }, async (_, face) => {
-        try {
-          const bytes = await call("encoded_preview", {
-            jobId,
-            selection: selectionForEncode(face),
-          });
-          return bytesToUrl(bytes);
-        } catch {
-          return null;
-        }
-      }),
-    );
-    if (gen !== encodedGen) {
-      revokeFaceList(urls);
-      return;
-    }
-    replaceFaceList(faceEncodedUrls, urls);
-    const composed = await composeCubemapCross(urls);
-    if (gen !== encodedGen) {
-      revoke(composed.url);
-      return;
-    }
-    replaceUrl(encodedUrl, composed.url);
-    contentWidth.value = composed.width;
-    contentHeight.value = composed.height;
-  }
-
-  function applyEncodedDimensions(): void {
-    const res = result.value;
-    if (res === null) {
-      return;
-    }
-    const level = currentEncodedLevel();
-    contentWidth.value = Math.max(1, res.width >> level);
-    contentHeight.value = Math.max(1, res.height >> level);
-  }
-
-  async function loadEncodedDepth(jobId: string, gen: number): Promise<void> {
-    const count = inputCount.value;
-    const urls: Array<string | null> = await Promise.all(
-      Array.from({ length: count }, async (_, depthSlice) => {
-        try {
-          const bytes = await call("encoded_preview", {
-            jobId,
-            selection: selectionForEncode(0, depthSlice),
-          });
-          return bytesToUrl(bytes);
-        } catch {
-          return null;
-        }
-      }),
-    );
-    if (gen !== encodedGen) {
-      revokeUrlList(urls);
-      return;
-    }
-    replaceUrlList(depthEncodedUrls, urls);
-    applyEncodedDimensions();
-  }
-
-  async function loadEncodedFlat(jobId: string, gen: number): Promise<void> {
-    const bytes = await call("encoded_preview", {
-      jobId,
-      selection: selectionForEncode(0),
-    });
-    const url = bytesToUrl(bytes);
-    if (gen !== encodedGen) {
-      revoke(url);
-      return;
-    }
-    replaceUrl(encodedUrl, url);
-    applyEncodedDimensions();
-  }
-
-  function encodedNeedsLoading(currentRole: InputRole): boolean {
-    if (currentRole === "depthSlices") {
-      return !depthEncodedUrls.value.some((url) => url !== null);
-    }
-    return encodedUrl.value === null;
   }
 
   async function loadEncodedByRole(
@@ -605,72 +437,65 @@ export function usePreviewPane() {
     gen: number,
   ): Promise<void> {
     if (currentRole === "cubemapFaces") {
-      await loadEncodedCubemap(jobId, gen);
+      await loadCubemapHalf(
+        encoded,
+        gen,
+        async (face) => {
+          const bytes = await call("encoded_preview", {
+            jobId,
+            selection: selectionForEncode(face),
+          });
+          return bytesToUrl(bytes);
+        },
+        (width, height) => {
+          contentWidth.value = width;
+          contentHeight.value = height;
+        },
+      );
       return;
     }
     if (currentRole === "depthSlices") {
-      await loadEncodedDepth(jobId, gen);
+      await loadDepthHalf(encoded, gen, inputCount.value, async (depthSlice) => {
+        const bytes = await call("encoded_preview", {
+          jobId,
+          selection: selectionForEncode(0, depthSlice),
+        });
+        return bytesToUrl(bytes);
+      });
+      applyEncodedDimensions();
       return;
     }
-    await loadEncodedFlat(jobId, gen);
-  }
-
-  async function fetchEncodedPreview(
-    jobId: string,
-    currentRole: InputRole,
-    gen: number,
-  ): Promise<void> {
-    if (gen !== encodedGen) {
-      return;
-    }
-    encodedLoading.value = encodedNeedsLoading(currentRole);
-    try {
-      await loadEncodedByRole(jobId, currentRole, gen);
-    } catch {
-      // Preview load failures stay in-pane (loading clears); no toast / notify.
-    } finally {
-      if (gen === encodedGen) {
-        encodedLoading.value = false;
-      }
-    }
-  }
-
-  function clearEncodedSurfaces(): void {
-    revoke(encodedUrl.value);
-    encodedUrl.value = null;
-    revokeFaceList(faceEncodedUrls.value);
-    faceEncodedUrls.value = emptyFaces();
-    revokeUrlList(depthEncodedUrls.value);
-    depthEncodedUrls.value = [];
+    await loadFlatHalf(encoded, gen, async () => {
+      const bytes = await call("encoded_preview", {
+        jobId,
+        selection: selectionForEncode(0),
+      });
+      return bytesToUrl(bytes);
+    });
+    applyEncodedDimensions();
   }
 
   function refreshEncodedPreview(mode: "replace" | "scrub"): void {
     const jobId = selectedJobId.value;
     if (jobId === null) {
-      wipeEncodedPreview();
+      encoded.wipe();
       return;
     }
 
     const currentRole = role.value;
-    // Depth extracts are cached per stack; scrubbing depth only rebinds the wipe.
     if (
       skipDepthScrub(
         mode,
         currentRole,
-        depthEncodedUrls.value,
+        encoded.depthUrls.value,
         inputCount.value,
       )
     ) {
       return;
     }
 
-    if (mode === "replace") {
-      encodedGen += 1;
-      encodedGate.clearPending();
-      clearEncodedSurfaces();
-    }
-
-    const gen = encodedGen;
+    const gen =
+      mode === "replace" ? encoded.beginReplace() : encoded.generation();
     const gateKey = [
       "enc",
       jobId,
@@ -678,11 +503,13 @@ export function usePreviewPane() {
       String(previewIndex.value),
       String(encodedMip.value),
     ].join(":");
-    encodedGate.schedule(gateKey, async () => {
-      if (selectedJobId.value !== jobId || gen !== encodedGen) {
+    encoded.gate.schedule(gateKey, async () => {
+      if (selectedJobId.value !== jobId || !encoded.isCurrent(gen)) {
         return;
       }
-      await fetchEncodedPreview(jobId, role.value, gen);
+      await fetchHalfPreview(encoded, role.value, gen, () =>
+        loadEncodedByRole(jobId, role.value, gen),
+      );
     });
   }
 
@@ -715,20 +542,8 @@ export function usePreviewPane() {
   });
 
   onUnmounted(() => {
-    sourceGen += 1;
-    encodedGen += 1;
-    sourceGate.clearPending();
-    encodedGate.clearPending();
-    revoke(sourceUrl.value);
-    revoke(encodedUrl.value);
-    revokeFaceList(faceSourceUrls.value);
-    revokeFaceList(faceEncodedUrls.value);
-    revokeUrlList(depthSourceUrls.value);
-    revokeUrlList(depthEncodedUrls.value);
-    sourceUrl.value = null;
-    encodedUrl.value = null;
-    depthSourceUrls.value = [];
-    depthEncodedUrls.value = [];
+    source.wipe();
+    encoded.wipe();
   });
 
   return {
@@ -739,7 +554,7 @@ export function usePreviewPane() {
     packAxis,
     isCubemap,
     isDepthVolume,
-    depthSourceUrls,
+    depthSourceUrls: source.depthUrls,
     result,
     packMax,
     showPackSlider,

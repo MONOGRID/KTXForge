@@ -11,6 +11,7 @@ import {
   type DropZone,
 } from "../dropTarget";
 
+let disposed = false;
 let unlisten: (() => void) | undefined;
 
 function zoneFromPoint(x: number, y: number): DropZone | null {
@@ -41,11 +42,16 @@ onMounted(() => {
       setFileDragActive(false);
     })
     .then((fn) => {
+      if (disposed) {
+        fn();
+        return;
+      }
       unlisten = fn;
     });
 });
 
 onUnmounted(() => {
+  disposed = true;
   unlisten?.();
 });
 </script>

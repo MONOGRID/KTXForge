@@ -27,7 +27,12 @@ pub async fn inspect(app: &AppHandle, path: &Path) -> Result<InspectReport, AppE
             ];
             let out =
                 sidecar::run_ktx_collect(app, args, |_| {}, CancellationHandle::new()).await?;
-            let mut info = parse_ktx2_info_json(&out.stdout)?;
+            let mut info = match parse_ktx2_info_json(&out.stdout) {
+                Ok(info) => info,
+                Err(parse_err) => {
+                    return Err(ktx_info_failure(out.code, &out.stderr, parse_err));
+                }
+            };
             info.normalize_other_keys();
             let preview = preview_kind_from_vk_format(&info.header.vk_format);
             Ok(InspectReport {
@@ -43,6 +48,9 @@ pub async fn inspect(app: &AppHandle, path: &Path) -> Result<InspectReport, AppE
             let args = vec!["info".to_owned(), path_str.clone()];
             let out =
                 sidecar::run_ktx_collect(app, args, |_| {}, CancellationHandle::new()).await?;
+            if out.code != 0 && out.stdout.trim().is_empty() {
+                return Err(AppError::ktx(out.code, out.stderr));
+            }
             let bytes = std::fs::read(path).map_err(|e| AppError::io(e.to_string()))?;
             let header = ktx1::read_header(&bytes)?;
             Ok(InspectReport {
@@ -58,6 +66,15 @@ pub async fn inspect(app: &AppHandle, path: &Path) -> Result<InspectReport, AppE
         other => Err(AppError::invalid_input(format!(
             "inspect expects a KTX file, got {other:?}"
         ))),
+    }
+}
+
+/// Prefer the sidecar exit/stderr when `ktx info` failed; otherwise keep the parse error.
+fn ktx_info_failure(code: i32, stderr: &str, parse_err: AppError) -> AppError {
+    if code != 0 {
+        AppError::ktx(code, stderr)
+    } else {
+        parse_err
     }
 }
 
@@ -127,6 +144,20 @@ mod tests {
             preview_kind_from_vk_format("R8_UINT"),
             PreviewKind::Unavailable { .. }
         ));
+    }
+
+    #[test]
+    fn failed_ktx_info_surfaces_sidecar_error_not_parse_noise() {
+        let parse_err = AppError::invalid_input("ktx info stdout has no JSON object");
+        let err = ktx_info_failure(1, "not a ktx file", parse_err);
+        assert!(matches!(err, AppError::Ktx { exit_code: 1, .. }));
+    }
+
+    #[test]
+    fn zero_exit_keeps_parse_error() {
+        let parse_err = AppError::invalid_input("ktx info stdout has no JSON object");
+        let err = ktx_info_failure(0, "", parse_err);
+        assert!(matches!(err, AppError::InvalidInput { .. }));
     }
 
     #[test]

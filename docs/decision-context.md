@@ -504,3 +504,9 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 **Decided:** `prepare_input` writes Radiance `.hdr` conversions with the `exr` crate as 32-bit float scanline EXR (ZIP16, increasing line order; RGB, or RGBA when the source has alpha) instead of `image`'s `save_with_format(OpenExr)`. Passthrough `.exr` inputs whose header is tiled are re-staged in the workdir as scanline (all layers, channels, sample types, and attributes kept; only the largest resolution level). Scanline EXRs still pass through untouched. The `hdr.exr` fixture is re-encoded as scanline with identical pixels. `convert.rs` tests run the staged `ktx create` on a converted `.hdr` and a re-staged tiled EXR.
 
 **Why:** The Linux v4.4.2 `ktx` segfaults (exit 139) on any tiled EXR, whatever the compression (RLE, ZIP, none), and reads scanline EXR fine. The `image` crate always writes tiled RLE, so every Radiance encode crashed on Linux. Re-staging is one header read for scanline files and a small rewrite for tiled ones, cheaper than documenting a limitation users cannot see coming.
+
+## 2026-10-12 — Encode job dirs require a UUID
+
+**Decided:** `Workspace::job_dir` / `remove_job` parse the frontend `job_id` as `uuid::Uuid` and join only the hyphenated form under the temp root. Non-UUID strings (including absolute paths and `..` segments) are rejected before any filesystem join.
+
+**Why:** `job_id` is attacker-controlled from the webview. A plain `root.join(job_id)` lets an absolute path escape the temp workspace.

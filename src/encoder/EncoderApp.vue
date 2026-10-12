@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { on } from "../api/events";
+import { subscribe } from "../api/events";
 import { toAppError } from "../api/guards";
 import {
   alertAppError,
@@ -42,7 +42,7 @@ const versionLabel = computed((): string => {
 
 let unbindMenu: (() => void) | undefined;
 let unbindShortcuts: (() => void) | undefined;
-const dropUnlisteners: Array<() => void> = [];
+const stopDrops: Array<() => void> = [];
 
 onMounted(() => {
   unbindMenu = bindEncoderMenu();
@@ -50,25 +50,25 @@ onMounted(() => {
   void initStore().catch((err: unknown) => {
     void alertAppError(toAppError(err));
   });
-  void on("encoder://sources-added", (sources) => {
-    void handleDroppedSources(sources, consumeCommittedDropZone());
-  }).then((unlisten) => {
-    dropUnlisteners.push(unlisten);
-  });
-  void on("encoder://drop-rejected", (payload) => {
-    const paths =
-      payload.paths.length > 0 ? ` (${payload.paths.join(", ")})` : "";
-    void alertInvalidInput(`${payload.reason}${paths}`);
-  }).then((unlisten) => {
-    dropUnlisteners.push(unlisten);
-  });
+  stopDrops.push(
+    subscribe("encoder://sources-added", (sources) => {
+      void handleDroppedSources(sources, consumeCommittedDropZone());
+    }),
+  );
+  stopDrops.push(
+    subscribe("encoder://drop-rejected", (payload) => {
+      const paths =
+        payload.paths.length > 0 ? ` (${payload.paths.join(", ")})` : "";
+      void alertInvalidInput(`${payload.reason}${paths}`);
+    }),
+  );
 });
 
 onUnmounted(() => {
   unbindMenu?.();
   unbindShortcuts?.();
-  for (const unlisten of dropUnlisteners) {
-    unlisten();
+  for (const stop of stopDrops) {
+    stop();
   }
 });
 </script>

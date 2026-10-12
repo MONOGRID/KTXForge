@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, watch, watchEffect } from "vue";
 import { call } from "../../api/commands";
-import { on } from "../../api/events";
+import { subscribe } from "../../api/events";
 import { toAppError } from "../../api/guards";
 import type { ExportFormat } from "../../bindings/ExportFormat";
 import type { ExportSelection } from "../../bindings/ExportSelection";
@@ -180,22 +180,18 @@ async function onExport(): Promise<void> {
   }
 }
 
-const unlisteners: Array<() => void> = [];
+let stopMenu: (() => void) | undefined;
 
 onMounted(() => {
-  void on("menu://action", (action) => {
+  stopMenu = subscribe("menu://action", (action) => {
     if (action === "export") {
       void onExport();
     }
-  }).then((unlisten) => {
-    unlisteners.push(unlisten);
   });
 });
 
 onUnmounted(() => {
-  for (const unlisten of unlisteners) {
-    unlisten();
-  }
+  stopMenu?.();
 });
 
 watchEffect(() => {

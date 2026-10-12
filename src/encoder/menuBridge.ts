@@ -1,6 +1,6 @@
 import { watchEffect } from "vue";
 import { call } from "../api/commands";
-import { on } from "../api/events";
+import { subscribe } from "../api/events";
 import type { MenuAction } from "../bindings/MenuAction";
 import { applyZoomMenuAction } from "../shared/menuZoom";
 import {
@@ -51,17 +51,8 @@ async function handleMenuAction(action: MenuAction): Promise<void> {
 
 /** Wire native File menu actions and enablement for the encoder window. */
 export function bindEncoderMenu(): () => void {
-  const unlisteners: Array<() => void> = [];
-  let disposed = false;
-
-  void on("menu://action", (action) => {
+  const stopMenu = subscribe("menu://action", (action) => {
     void handleMenuAction(action);
-  }).then((unlisten) => {
-    if (disposed) {
-      unlisten();
-      return;
-    }
-    unlisteners.push(unlisten);
   });
 
   const stopWatch = watchEffect(() => {
@@ -72,10 +63,7 @@ export function bindEncoderMenu(): () => void {
   });
 
   return () => {
-    disposed = true;
+    stopMenu();
     stopWatch();
-    for (const unlisten of unlisteners) {
-      unlisten();
-    }
   };
 }

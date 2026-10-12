@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { CirclePlay, CircleStop, Save, SaveAll } from "@lucide/vue";
 import { computed, onMounted, onUnmounted } from "vue";
-import { on } from "../../api/events";
+import { subscribe } from "../../api/events";
 import type { EncodeStage } from "../../bindings/EncodeStage";
 import Button from "../../shared/components/Button.vue";
 import ProgressBar from "../../shared/components/ProgressBar.vue";
@@ -41,24 +41,20 @@ const selectedStageLabel = computed((): string | null => {
   return STAGE_LABELS[slot.job.stage];
 });
 
-const unlisteners: Array<() => void> = [];
+let stopProgress: (() => void) | undefined;
 
 onMounted(() => {
-  void on("encode://progress", (payload) => {
+  stopProgress = subscribe("encode://progress", (payload) => {
     const slot = slotByJobId(payload.jobId);
     if (slot === undefined) {
       return;
     }
     slot.job.stage = payload.stage;
-  }).then((unlisten) => {
-    unlisteners.push(unlisten);
   });
 });
 
 onUnmounted(() => {
-  for (const unlisten of unlisteners) {
-    unlisten();
-  }
+  stopProgress?.();
 });
 </script>
 

@@ -34,8 +34,9 @@ pub async fn run_update_check<R: Runtime>(app: AppHandle<R>) -> Result<(), Strin
         Ok(u) => u,
         Err(e) => {
             let msg = e.to_string();
-            let lower = msg.to_ascii_lowercase();
-            if lower.contains("endpoint") || lower.contains("url") || lower.contains("pubkey") {
+            // Skip only missing updater config (empty endpoints / pubkey), not
+            // network failures whose messages happen to mention a request URL.
+            if is_missing_updater_config(&msg) {
                 return Ok(());
             }
             let _ = app.emit(
@@ -133,4 +134,28 @@ pub async fn download_and_install(app: &AppHandle) -> Result<(), AppError> {
 
     app.request_restart();
     Ok(())
+}
+
+/// True when the updater plugin has no endpoints or pubkey to work with.
+fn is_missing_updater_config(message: &str) -> bool {
+    let lower = message.to_ascii_lowercase();
+    lower.contains("endpoint") || lower.contains("pubkey")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn network_errors_that_mention_url_are_not_treated_as_missing_config() {
+        assert!(!is_missing_updater_config(
+            "error sending request for url (https://example.com/latest.json)"
+        ));
+    }
+
+    #[test]
+    fn missing_endpoint_or_pubkey_is_config() {
+        assert!(is_missing_updater_config("No endpoints configured"));
+        assert!(is_missing_updater_config("invalid pubkey"));
+    }
 }

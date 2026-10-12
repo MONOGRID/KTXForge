@@ -2,7 +2,7 @@
 import { Download } from "@lucide/vue";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { call } from "../../api/commands";
-import { on } from "../../api/events";
+import { subscribe } from "../../api/events";
 import type { UpdateStatusPayload } from "../../bindings/UpdateStatusPayload";
 import Button from "./Button.vue";
 import ProgressBar from "./ProgressBar.vue";
@@ -12,7 +12,7 @@ const retainedVersion = ref<string | null>(null);
 const retainedNotes = ref<string | null>(null);
 const installing = ref(false);
 
-let unlisten: (() => void) | undefined;
+let stopStatus: (() => void) | undefined;
 
 const visible = computed((): boolean => {
   const current = status.value;
@@ -67,13 +67,11 @@ function applyStatus(payload: UpdateStatusPayload): void {
 }
 
 onMounted(() => {
-  void on("update://status", applyStatus).then((fn) => {
-    unlisten = fn;
-  });
+  stopStatus = subscribe("update://status", applyStatus);
 });
 
 onUnmounted(() => {
-  unlisten?.();
+  stopStatus?.();
 });
 
 async function onInstall(): Promise<void> {

@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use tempfile::TempDir;
+use uuid::Uuid;
 
 use crate::error::AppError;
 
@@ -28,15 +29,22 @@ impl Workspace {
         self.root.path()
     }
 
+    /// Job ids come from the webview and name a directory: accept only a UUID.
+    fn job_path(&self, job_id: &str) -> Result<PathBuf, AppError> {
+        let id = Uuid::parse_str(job_id)
+            .map_err(|_| AppError::invalid_input(format!("job id is not a UUID: {job_id}")))?;
+        Ok(self.root.path().join(id.hyphenated().to_string()))
+    }
+
     /// Create (or reuse) a subdirectory for one encode job.
     pub fn job_dir(&self, job_id: &str) -> Result<PathBuf, AppError> {
-        let dir = self.root.path().join(job_id);
+        let dir = self.job_path(job_id)?;
         std::fs::create_dir_all(&dir).map_err(|e| AppError::io(e.to_string()))?;
         Ok(dir)
     }
 
     pub fn remove_job(&self, job_id: &str) -> Result<(), AppError> {
-        let dir = self.root.path().join(job_id);
+        let dir = self.job_path(job_id)?;
         if dir.exists() {
             std::fs::remove_dir_all(&dir).map_err(|e| AppError::io(e.to_string()))?;
         }
@@ -59,22 +67,24 @@ impl Workspace {
 mod tests {
     use super::*;
 
+    const JOB_A: &str = "6f1c2c2e-6f0b-4c43-9a43-0d6f2b1f3a10";
+
     #[test]
     fn creates_reuses_and_removes_job_dirs() {
         let ws = Workspace::new().unwrap();
         let root = ws.root().to_path_buf();
         assert!(root.exists());
 
-        let a = ws.job_dir("job-a").unwrap();
+        let a = ws.job_dir(JOB_A).unwrap();
         assert!(a.is_dir());
-        let a2 = ws.job_dir("job-a").unwrap();
+        let a2 = ws.job_dir(JOB_A).unwrap();
         assert_eq!(a, a2);
 
         let marker = a.join("marker.txt");
         std::fs::write(&marker, b"x").unwrap();
         assert!(marker.is_file());
 
-        ws.remove_job("job-a").unwrap();
+        ws.remove_job(JOB_A).unwrap();
         assert!(!a.exists());
 
         let cache = ws
@@ -88,5 +98,14 @@ mod tests {
 
         drop(ws);
         assert!(!root.exists());
+    }
+
+    #[test]
+    fn job_ids_that_are_not_uuids_never_reach_the_filesystem() {
+        let ws = Workspace::new().unwrap();
+        for bad in ["../escape", "job-a", "", "/etc"] {
+            assert!(ws.job_dir(bad).is_err(), "{bad:?} accepted");
+            assert!(ws.remove_job(bad).is_err(), "{bad:?} accepted");
+        }
     }
 }

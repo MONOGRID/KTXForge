@@ -23,3 +23,26 @@ export async function on<K extends keyof Events>(
     handler(event.payload);
   });
 }
+
+/**
+ * Subscribe and return a dispose that is safe if the component unmounts
+ * before `listen` resolves (avoids leaking the Tauri listener).
+ */
+export function subscribe<K extends keyof Events>(
+  name: K,
+  handler: (payload: Events[K]) => void,
+): () => void {
+  let disposed = false;
+  let unlisten: UnlistenFn | undefined;
+  void on(name, handler).then((fn) => {
+    if (disposed) {
+      fn();
+      return;
+    }
+    unlisten = fn;
+  });
+  return () => {
+    disposed = true;
+    unlisten?.();
+  };
+}
