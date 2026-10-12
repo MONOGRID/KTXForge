@@ -40,7 +40,10 @@ pub struct SourceInfo {
 #[ts(export)]
 #[serde(rename_all = "camelCase")]
 pub struct EncodeRequest {
+    /// UUID naming this encode's temp directory.
     pub job_id: String,
+    /// Queue output being encoded; its previous job is discarded.
+    pub output_id: String,
     pub sources: Vec<String>,
     pub options: CreateOptions,
     pub animation: Option<AnimationOptions>,

@@ -1,9 +1,11 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use tauri::{AppHandle, Emitter, State};
 use tauri_plugin_dialog::DialogExt;
 
-use crate::commands::{EncodeRequest, EncodeResult};
+use crate::blocking::run_blocking;
+use crate::commands::{EncodeRequest, EncodeResult, SourceInfo};
+use crate::dialog;
 use crate::error::AppError;
 use crate::events::{EncodeProgressPayload, EncodeStage, ENCODE_PROGRESS};
 use crate::image::convert::{prepare_input, read_source_info};
@@ -15,7 +17,7 @@ use crate::ktx::input_role::InputRole;
 use crate::ktx::metrics::parse_metrics;
 use crate::ktx::options::{CreateOptions, EncodeCodec};
 use crate::ktx::rules;
-use crate::ktx::sidecar::{self, CancellationHandle};
+use crate::ktx::sidecar::{self, CancellationHandle, Sidecar};
 use crate::state::{AppState, Job};
 
 #[tauri::command]
@@ -37,63 +39,50 @@ pub async fn run_encode(
             "encode requires at least one source",
         ));
     }
-
-    let job_dir = state.job_dir(&request.job_id)?;
-    let convert_dir = job_dir.join("inputs");
-    std::fs::create_dir_all(&convert_dir).map_err(|e| AppError::io(e.to_string()))?;
-
-    let cancel = CancellationHandle::new();
-    {
-        let mut jobs = state
-            .jobs
-            .lock()
-            .map_err(|_| AppError::io("jobs lock poisoned"))?;
-        jobs.insert(
-            request.job_id.clone(),
-            Job {
-                dir: job_dir.clone(),
-                output_path: job_dir.join("output.ktx2"),
-                preview_png: job_dir.join("preview.png"),
-                preview_kind: PreviewKind::Png,
-                meta: None,
-                cancel: cancel.clone(),
-                default_save_name: default_save_name(&request.sources),
-            },
-        );
-    }
-
-    emit_stage(app, &request.job_id, EncodeStage::Converting, None);
-
-    let mut source_infos = Vec::new();
-    let mut prepared_paths = Vec::new();
-    for src in &request.sources {
-        if cancel.is_cancelled() {
-            return Err(AppError::cancelled());
-        }
-        let path = Path::new(src);
-        source_infos.push(read_source_info(path)?);
-        let prepared = prepare_input(path, &convert_dir)?;
-        prepared_paths.push(prepared.path);
-    }
-
     if request.animation.is_some() {
         if request.input_role != InputRole::ArrayLayers {
             return Err(AppError::invalid_input(
                 "animation requires Input role = Array layers",
             ));
         }
-        if prepared_paths.len() < 2 {
+        if request.sources.len() < 2 {
             return Err(AppError::invalid_input(
                 "animation requires at least two layer images",
             ));
         }
     }
 
+    // A newer encode of an output replaces its previous job and temp files.
+    state.discard_output_jobs(std::slice::from_ref(&request.output_id))?;
+    let job_dir = state.job_dir(&request.job_id)?;
+    let output_path = job_dir.join("output.ktx2");
+    let preview_cache = job_dir.join("preview-cache");
+    let cancel = CancellationHandle::new();
+    state.insert_job(
+        request.job_id.clone(),
+        Job {
+            output_id: request.output_id.clone(),
+            dir: job_dir.clone(),
+            output_path: output_path.clone(),
+            meta: None,
+            cancel: cancel.clone(),
+            default_save_name: default_save_name(&request.sources),
+        },
+    )?;
+
+    emit_stage(app, &request.job_id, EncodeStage::Converting, None);
+
+    let (source_infos, prepared_paths) = prepare_sources(
+        request.sources.clone(),
+        job_dir.join("inputs"),
+        cancel.clone(),
+    )
+    .await?;
+
     let resolved = rules::resolve_for_encode(&request.options, &source_infos, request.input_role)
         .map_err(|errors| AppError::invalid_input(errors.join("; ")))?;
     let options = resolved.options();
 
-    let output_path = job_dir.join("output.ktx2");
     let mut args = vec!["create".to_owned()];
     args.extend(build_create_args(&resolved, &prepared_paths, &output_path));
 
@@ -101,8 +90,9 @@ pub async fn run_encode(
 
     let job_id_for_cb = request.job_id.clone();
     let app_for_cb = app.clone();
-    let out = sidecar::run_ktx(
+    let out = sidecar::run(
         app,
+        Sidecar::Ktx,
         args,
         move |line| {
             let _ = app_for_cb.emit(
@@ -118,40 +108,31 @@ pub async fn run_encode(
     )
     .await?;
 
-    if let Some(anim) = &request.animation {
+    if let Some(anim) = request.animation.clone() {
         emit_stage(app, &request.job_id, EncodeStage::WritingAnim, None);
-        write_anim_data(&output_path, anim)?;
+        let path = output_path.clone();
+        run_blocking(move || write_anim_data(&path, &anim)).await?;
     }
 
     emit_stage(app, &request.job_id, EncodeStage::Previewing, None);
 
-    let meta = read_texture_meta(&output_path)?;
-    let preview_kind = preview_kind_for_options(options, &meta.preview);
-    let mut meta = meta;
-    meta.preview = preview_kind.clone();
+    let mut meta = read_texture_meta(&output_path).await?;
+    meta.preview = preview_kind_for_options(options, &meta.preview);
     meta.needs_transcode = options.encode.is_some() || meta.needs_transcode;
 
-    let selection = ImageSelection {
-        level: 0,
-        face: 0,
-        layer: 0,
-        depth_slice: 0,
-    };
-    let cache = job_dir.join("preview-cache");
-    std::fs::create_dir_all(&cache).map_err(|e| AppError::io(e.to_string()))?;
-    let (png_bytes, resolved_preview) = extract_preview_png(
+    // Warms the level-0 tile in the preview cache for `encoded_preview`.
+    let (_, resolved_preview) = extract_preview_png(
         app,
         &output_path,
-        &selection,
+        &ImageSelection::default(),
         &meta,
-        &cache,
+        &preview_cache,
         CancellationHandle::new(),
     )
     .await?;
-    let preview_png = job_dir.join("preview.png");
-    std::fs::write(&preview_png, &png_bytes).map_err(|e| AppError::io(e.to_string()))?;
 
-    let output_bytes = std::fs::metadata(&output_path)
+    let output_bytes = tokio::fs::metadata(&output_path)
+        .await
         .map(|m| m.len())
         .unwrap_or(0);
 
@@ -172,18 +153,8 @@ pub async fn run_encode(
         .map(|l| l.to_owned())
         .collect();
 
-    {
-        let mut jobs = state
-            .jobs
-            .lock()
-            .map_err(|_| AppError::io("jobs lock poisoned"))?;
-        if let Some(job) = jobs.get_mut(&request.job_id) {
-            job.output_path = output_path;
-            job.preview_png = preview_png;
-            job.preview_kind = resolved_preview.clone();
-            job.meta = Some(meta.clone());
-        }
-    }
+    let finished = meta.clone();
+    state.update_job(&request.job_id, |job| job.meta = Some(finished))?;
 
     emit_stage(app, &request.job_id, EncodeStage::Done, None);
 
@@ -201,6 +172,28 @@ pub async fn run_encode(
         warnings,
         preview: resolved_preview,
     })
+}
+
+/// Read and stage every source on the blocking pool (image decode, EXR rewrite).
+async fn prepare_sources(
+    sources: Vec<String>,
+    convert_dir: PathBuf,
+    cancel: CancellationHandle,
+) -> Result<(Vec<SourceInfo>, Vec<PathBuf>), AppError> {
+    run_blocking(move || {
+        let mut infos = Vec::with_capacity(sources.len());
+        let mut prepared = Vec::with_capacity(sources.len());
+        for src in &sources {
+            if cancel.is_cancelled() {
+                return Err(AppError::cancelled());
+            }
+            let path = Path::new(src);
+            infos.push(read_source_info(path)?);
+            prepared.push(prepare_input(path, &convert_dir)?);
+        }
+        Ok((infos, prepared))
+    })
+    .await
 }
 
 fn preview_kind_for_options(options: &CreateOptions, fallback: &PreviewKind) -> PreviewKind {
@@ -245,16 +238,16 @@ fn emit_stage(app: &AppHandle, job_id: &str, stage: EncodeStage, stderr_line: Op
 
 #[tauri::command]
 pub async fn cancel_encode(state: State<'_, AppState>, job_id: String) -> Result<(), AppError> {
-    let jobs = state
-        .jobs
-        .lock()
-        .map_err(|_| AppError::io("jobs lock poisoned"))?;
-    if let Some(job) = jobs.get(&job_id) {
-        job.cancel.cancel();
-        Ok(())
-    } else {
-        Err(AppError::invalid_input(format!("unknown job: {job_id}")))
-    }
+    state.with_job(&job_id, |job| job.cancel.cancel())
+}
+
+/// Outputs removed from the queue: cancel their encodes and delete their temp files.
+#[tauri::command]
+pub async fn discard_outputs(
+    state: State<'_, AppState>,
+    output_ids: Vec<String>,
+) -> Result<(), AppError> {
+    state.discard_output_jobs(&output_ids)
 }
 
 #[tauri::command]
@@ -264,42 +257,21 @@ pub async fn encoded_preview(
     job_id: String,
     selection: ImageSelection,
 ) -> Result<tauri::ipc::Response, AppError> {
-    let (output_path, cache, meta, preview_png) = {
-        let jobs = state
-            .jobs
-            .lock()
-            .map_err(|_| AppError::io("jobs lock poisoned"))?;
-        let job = jobs
-            .get(&job_id)
-            .ok_or_else(|| AppError::invalid_input(format!("unknown job: {job_id}")))?;
+    let (output_path, cache, meta) = state.with_job(&job_id, |job| {
         (
             job.output_path.clone(),
             job.dir.join("preview-cache"),
             job.meta.clone(),
-            job.preview_png.clone(),
         )
-    };
+    })?;
 
-    std::fs::create_dir_all(&cache).map_err(|e| AppError::io(e.to_string()))?;
-
-    if let Some(bytes) = cached_preview_png(&cache, &selection) {
-        return Ok(tauri::ipc::Response::new(bytes));
-    }
-
-    // Fast path for the warm L0 extract written at encode finish.
-    if selection.level == 0
-        && selection.face == 0
-        && selection.layer == 0
-        && selection.depth_slice == 0
-        && preview_png.is_file()
-    {
-        let bytes = std::fs::read(&preview_png).map_err(|e| AppError::io(e.to_string()))?;
+    if let Some(bytes) = cached_preview_png(&cache, &selection).await {
         return Ok(tauri::ipc::Response::new(bytes));
     }
 
     let meta = match meta {
         Some(m) => m,
-        None => read_texture_meta(&output_path)?,
+        None => read_texture_meta(&output_path).await?,
     };
 
     let (bytes, _) = extract_preview_png(
@@ -315,37 +287,32 @@ pub async fn encoded_preview(
     Ok(tauri::ipc::Response::new(bytes))
 }
 
+async fn copy_output(src: &Path, dest: &Path) -> Result<(), AppError> {
+    tokio::fs::copy(src, dest)
+        .await
+        .map(|_| ())
+        .map_err(|e| AppError::io(format!("{}: {e}", dest.display())))
+}
+
 #[tauri::command]
 pub async fn save_encoded(
     app: AppHandle,
     state: State<'_, AppState>,
     job_id: String,
 ) -> Result<Option<String>, AppError> {
-    let (output_path, default_name) = {
-        let jobs = state
-            .jobs
-            .lock()
-            .map_err(|_| AppError::io("jobs lock poisoned"))?;
-        let job = jobs
-            .get(&job_id)
-            .ok_or_else(|| AppError::invalid_input(format!("unknown job: {job_id}")))?;
+    let (output_path, default_name) = state.with_job(&job_id, |job| {
         (job.output_path.clone(), job.default_save_name.clone())
-    };
+    })?;
 
-    let picked = app
+    let picker = app
         .dialog()
         .file()
         .add_filter("KTX2", &["ktx2"])
-        .set_file_name(&default_name)
-        .blocking_save_file();
-
-    let Some(file) = picked else {
+        .set_file_name(&default_name);
+    let Some(dest) = dialog::save_file(picker).await? else {
         return Ok(None);
     };
-    let dest = file
-        .into_path()
-        .map_err(|e| AppError::io(format!("dialog path: {e}")))?;
-    std::fs::copy(&output_path, &dest).map_err(|e| AppError::io(e.to_string()))?;
+    copy_output(&output_path, &dest).await?;
     Ok(Some(dest.to_string_lossy().into_owned()))
 }
 
@@ -360,28 +327,16 @@ pub async fn save_encoded_batch(
         return Ok(None);
     }
 
-    let picked = app.dialog().file().blocking_pick_folder();
-    let Some(folder) = picked else {
+    let Some(dir) = dialog::pick_folder(app.dialog().file()).await? else {
         return Ok(None);
     };
-    let dir = folder
-        .into_path()
-        .map_err(|e| AppError::io(format!("dialog path: {e}")))?;
 
     let mut saved = 0u32;
     for job_id in &job_ids {
-        let (output_path, default_name) = {
-            let jobs = state
-                .jobs
-                .lock()
-                .map_err(|_| AppError::io("jobs lock poisoned"))?;
-            let job = jobs
-                .get(job_id)
-                .ok_or_else(|| AppError::invalid_input(format!("unknown job: {job_id}")))?;
+        let (output_path, default_name) = state.with_job(job_id, |job| {
             (job.output_path.clone(), job.default_save_name.clone())
-        };
-        let dest = dir.join(&default_name);
-        std::fs::copy(&output_path, &dest).map_err(|e| AppError::io(e.to_string()))?;
+        })?;
+        copy_output(&output_path, &dir.join(&default_name)).await?;
         saved += 1;
     }
     Ok(Some(saved))
@@ -391,30 +346,8 @@ pub async fn save_encoded_batch(
 mod tests {
     use super::*;
     use crate::ktx::options::AnimationOptions;
-    use crate::ktx::options::CreateOptions;
-    use std::path::PathBuf;
+    use crate::test_support::{fixtures, staged_ktx};
     use std::process::Command;
-
-    fn fixtures() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
-    }
-
-    fn staged_ktx() -> Option<PathBuf> {
-        let binaries = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("binaries");
-        let exe = binaries.join("ktx-x86_64-pc-windows-msvc.exe");
-        if exe.is_file() {
-            return Some(exe);
-        }
-        std::fs::read_dir(&binaries).ok()?.flatten().find_map(|e| {
-            let name = e.file_name();
-            let name = name.to_string_lossy();
-            if name.starts_with("ktx-") && (name.ends_with(".exe") || !name.contains('.')) {
-                Some(e.path())
-            } else {
-                None
-            }
-        })
-    }
 
     /// Run argv from the real resolve → build path through the staged `ktx create`.
     /// Each case keeps a value the UI hides; the tool must accept what we emit.
@@ -424,9 +357,7 @@ mod tests {
             AstcQuality, EncodeCodec, Supercompression, TexcoordOrigin, VkFormat,
         };
 
-        let Some(ktx) = staged_ktx() else {
-            return;
-        };
+        let ktx = staged_ktx();
         let root = fixtures();
         let rgba = vec![root.join("rgba.png")];
         let frames: Vec<_> = (1..=4)
@@ -435,8 +366,7 @@ mod tests {
         let faces: Vec<_> = (0..6)
             .map(|i| root.join(format!("cube/face_{i}.png")))
             .collect();
-        // Scanline EXR: the tiled `hdr.exr` fixture crashes the Linux v4.4.2 binary.
-        let hdr = vec![root.join("hdr_scanline.exr")];
+        let hdr = vec![root.join("hdr.exr")];
 
         let mut ssim_no_encode = CreateOptions::default();
         ssim_no_encode.encoder.compare_ssim = true;
@@ -519,11 +449,7 @@ mod tests {
             let sources: Vec<_> = paths.iter().map(|p| read_source_info(p).unwrap()).collect();
             let prepared: Vec<_> = paths
                 .iter()
-                .map(|p| {
-                    prepare_input(p, &dir.path().join(format!("in{i}")))
-                        .unwrap()
-                        .path
-                })
+                .map(|p| prepare_input(p, &dir.path().join(format!("in{i}"))).unwrap())
                 .collect();
             let resolved = rules::resolve_for_encode(&options, &sources, role)
                 .unwrap_or_else(|e| panic!("{name}: {e:?}"));
@@ -541,9 +467,7 @@ mod tests {
 
     #[test]
     fn encode_defaults_and_basis_lz_via_staged_binary() {
-        let Some(ktx) = staged_ktx() else {
-            return;
-        };
+        let ktx = staged_ktx();
         let root = fixtures();
         let dir = tempfile::tempdir().unwrap();
         let out_default = dir.path().join("default.ktx2");
@@ -579,9 +503,7 @@ mod tests {
 
     #[test]
     fn encode_animation_frames_writes_anim_key() {
-        let Some(ktx) = staged_ktx() else {
-            return;
-        };
+        let ktx = staged_ktx();
         let frames = fixtures().join("frames");
         let inputs: Vec<PathBuf> = (1..=4)
             .map(|i| frames.join(format!("frame_00{i}.png")))

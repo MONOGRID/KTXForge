@@ -3,8 +3,6 @@
 use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
-use crate::commands::SourceInfo;
-
 pub const ENCODER_SOURCES_ADDED: &str = "encoder://sources-added";
 pub const ENCODER_DROP_REJECTED: &str = "encoder://drop-rejected";
 pub const ENCODE_PROGRESS: &str = "encode://progress";
@@ -70,9 +68,6 @@ pub struct UpdateStatusPayload {
     pub total: Option<u64>,
     pub message: Option<String>,
 }
-
-/// Typed payload for `encoder://sources-added` (exported for the frontend).
-pub type SourcesAddedPayload = Vec<SourceInfo>;
 
 /// Native menu command that needs frontend state (encode job, sources, export UI, viewer zoom).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, TS)]

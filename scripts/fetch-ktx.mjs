@@ -81,8 +81,18 @@ async function download(url, dest) {
   await pipeline(Readable.fromWeb(res.body), createWriteStream(dest));
 }
 
-function stagedKtxPath(triple, isWindows) {
-  return join(binariesDir, isWindows ? `ktx-${triple}.exe` : `ktx-${triple}`);
+/**
+ * Sidecars listed in `bundle.externalBin`. `ktx2ktx2` (legacy KTX1 → KTX2) ships
+ * in the same release directory as `ktx`, so its archive path follows `ktxPath`.
+ */
+const SIDECARS = ["ktx", "ktx2ktx2"];
+
+function stagedToolPath(tool, triple, isWindows) {
+  return join(binariesDir, isWindows ? `${tool}-${triple}.exe` : `${tool}-${triple}`);
+}
+
+function archiveToolPath(ktxPath, tool) {
+  return ktxPath.replace(/ktx(\.exe)?$/, `${tool}$1`);
 }
 
 function extractArchive(extract, assetPath, outDir) {
@@ -151,13 +161,19 @@ function findInTree(rootDir, relativeHint) {
   return found;
 }
 
-function alreadyStaged(outKtx, version) {
-  if (!existsSync(outKtx)) {
-    return false;
-  }
-  const ver = spawnSync(outKtx, ["--version"], { encoding: "utf8" });
-  const reported = `${ver.stdout || ""}${ver.stderr || ""}`;
-  return ver.status === 0 && reported.includes(`v${version}`);
+function reportedVersion(bin) {
+  const ver = spawnSync(bin, ["--version"], { encoding: "utf8" });
+  return { ok: ver.status === 0, text: `${ver.stdout || ""}${ver.stderr || ""}`.trim() };
+}
+
+function alreadyStaged(outPaths, version) {
+  return outPaths.every((bin) => {
+    if (!existsSync(bin)) {
+      return false;
+    }
+    const { ok, text } = reportedVersion(bin);
+    return ok && text.includes(`v${version}`);
+  });
 }
 
 async function ensureAssetCached(cfg, version) {
@@ -195,11 +211,11 @@ function stageLibs(extractDir, libs, isWindows) {
   }
 }
 
-function maybePatchelf(outKtx, enabled) {
+function maybePatchelf(bin, enabled) {
   if (!enabled) {
     return;
   }
-  const r = spawnSync("patchelf", ["--set-rpath", "$ORIGIN", outKtx], {
+  const r = spawnSync("patchelf", ["--set-rpath", "$ORIGIN", bin], {
     encoding: "utf8",
   });
   if (r.status !== 0) {
@@ -209,32 +225,28 @@ function maybePatchelf(outKtx, enabled) {
   }
 }
 
-function verifyStaged(outKtx) {
-  const ver = spawnSync(outKtx, ["--version"], { encoding: "utf8" });
-  if (ver.status !== 0) {
-    throw new Error(`staged ktx failed --version: ${ver.stderr || ver.stdout}`);
+function verifyStaged(bin) {
+  const { ok, text } = reportedVersion(bin);
+  if (!ok) {
+    throw new Error(`staged ${bin} failed --version: ${text}`);
   }
-  console.log(`staged ${outKtx}`);
-  console.log((ver.stdout || ver.stderr || "").trim());
+  console.log(`staged ${bin}`);
+  console.log(text);
 }
 
-function logAlreadyStaged(outKtx) {
-  const ver = spawnSync(outKtx, ["--version"], { encoding: "utf8" });
-  console.log(
-    `already staged: ${outKtx} (${`${ver.stdout || ""}${ver.stderr || ""}`.trim()})`,
-  );
-}
-
-async function extractAndStage(triple, cfg, version, outKtx, isWindows) {
+async function extractAndStage(triple, cfg, version, isWindows) {
   const assetPath = await ensureAssetCached(cfg, version);
   const extractDir = join(cacheDir, `extract-${triple}`);
   rmSync(extractDir, { recursive: true, force: true });
   extractArchive(cfg.extract, assetPath, extractDir);
 
-  copyExecutable(findInTree(extractDir, cfg.ktxPath), outKtx, isWindows);
   stageLibs(extractDir, cfg.libs || [], isWindows);
-  maybePatchelf(outKtx, Boolean(cfg.patchelf));
-  verifyStaged(outKtx);
+  for (const tool of SIDECARS) {
+    const out = stagedToolPath(tool, triple, isWindows);
+    copyExecutable(findInTree(extractDir, archiveToolPath(cfg.ktxPath, tool)), out, isWindows);
+    maybePatchelf(out, Boolean(cfg.patchelf));
+    verifyStaged(out);
+  }
 }
 
 async function stageTarget(triple) {
@@ -245,16 +257,18 @@ async function stageTarget(triple) {
   }
 
   const isWindows = triple.includes("windows");
-  const outKtx = stagedKtxPath(triple, isWindows);
+  const outPaths = SIDECARS.map((tool) => stagedToolPath(tool, triple, isWindows));
   mkdirSync(binariesDir, { recursive: true });
   mkdirSync(cacheDir, { recursive: true });
 
-  if (alreadyStaged(outKtx, manifest.version)) {
-    logAlreadyStaged(outKtx);
+  if (alreadyStaged(outPaths, manifest.version)) {
+    for (const bin of outPaths) {
+      console.log(`already staged: ${bin} (${reportedVersion(bin).text})`);
+    }
     return;
   }
 
-  await extractAndStage(triple, cfg, manifest.version, outKtx, isWindows);
+  await extractAndStage(triple, cfg, manifest.version, isWindows);
 }
 
 async function main() {

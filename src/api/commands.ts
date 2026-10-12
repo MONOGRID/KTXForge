@@ -38,6 +38,7 @@ export type Commands = {
   source_preview: { args: { path: string }; result: ArrayBuffer };
   encode: { args: { request: EncodeRequest }; result: EncodeResult };
   cancel_encode: { args: { jobId: string }; result: null };
+  discard_outputs: { args: { outputIds: string[] }; result: null };
   encoded_preview: {
     args: { jobId: string; selection: ImageSelection };
     result: ArrayBuffer;

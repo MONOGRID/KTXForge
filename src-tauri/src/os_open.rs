@@ -18,6 +18,7 @@ where
 }
 
 /// Open the first KTX path from `RunEvent::Opened` URLs (macOS).
+#[cfg(target_os = "macos")]
 pub fn open_from_urls(app: &AppHandle, urls: &[Url]) {
     let paths = urls
         .iter()

@@ -2,21 +2,7 @@
 
 use std::path::Path;
 
-/// Selection for one extract, or every slice.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum ExtractSpec {
-    All,
-    /// Every layer at one mip level (`--level N --layer all`).
-    AllLayers {
-        level: u32,
-    },
-    One {
-        level: u32,
-        face: u32,
-        layer: u32,
-        depth: u32,
-    },
-}
+use crate::ktx::info_types::ImageSelection;
 
 /// Unpacked transcode targets available in v4.4.2 `ktx extract`.
 /// Half-float targets are deferred (not in v4.4.2 help).
@@ -67,7 +53,7 @@ impl Dims {
 pub fn build_extract_args(
     input: &Path,
     output: &Path,
-    selection: &ExtractSpec,
+    selection: &ImageSelection,
     dims: Dims,
     transcode: Option<TranscodeTarget>,
 ) -> Vec<String> {
@@ -76,44 +62,36 @@ pub fn build_extract_args(
         args.push("--transcode".to_owned());
         args.push(t.cli().to_owned());
     }
-    match selection {
-        ExtractSpec::All => {
-            args.push("--all".to_owned());
-        }
-        ExtractSpec::AllLayers { level } => {
-            args.push("--level".to_owned());
-            args.push(level.to_string());
-            args.push("--layer".to_owned());
-            args.push("all".to_owned());
-        }
-        ExtractSpec::One {
-            level,
-            face,
-            layer,
-            depth,
-        } => {
-            // Explicit `--layer 0` on a non-array texture fails; omit unit dimensions.
-            if dims.levels > 1 || *level > 0 {
-                args.push("--level".to_owned());
-                args.push(level.to_string());
-            }
-            if dims.faces > 1 {
-                args.push("--face".to_owned());
-                args.push(face.to_string());
-            }
-            if dims.layers > 1 {
-                args.push("--layer".to_owned());
-                args.push(layer.to_string());
-            }
-            if dims.depth > 1 {
-                args.push("--depth".to_owned());
-                args.push(depth.to_string());
-            }
-        }
+    // Explicit `--layer 0` on a non-array texture fails; omit unit dimensions.
+    if dims.levels > 1 || selection.level > 0 {
+        args.push("--level".to_owned());
+        args.push(selection.level.to_string());
+    }
+    if dims.faces > 1 {
+        args.push("--face".to_owned());
+        args.push(selection.face.to_string());
+    }
+    if dims.layers > 1 {
+        args.push("--layer".to_owned());
+        args.push(selection.layer.to_string());
+    }
+    if dims.depth > 1 {
+        args.push("--depth".to_owned());
+        args.push(selection.depth_slice.to_string());
     }
     args.push(input.to_string_lossy().into_owned());
     args.push(output.to_string_lossy().into_owned());
     args
+}
+
+/// `ktx2ktx2` argv: KTX1 `input` → KTX2 `output`, replacing any existing file.
+pub fn ktx2ktx2_args(input: &Path, output: &Path) -> Vec<String> {
+    vec![
+        "-f".to_owned(),
+        "-o".to_owned(),
+        output.to_string_lossy().into_owned(),
+        input.to_string_lossy().into_owned(),
+    ]
 }
 
 /// Choose an unpacked target from channel count. HDR half-float targets deferred on v4.4.2.
@@ -209,12 +187,7 @@ mod tests {
         let args = build_extract_args(
             Path::new("in.ktx2"),
             Path::new("out.png"),
-            &ExtractSpec::One {
-                level: 0,
-                face: 0,
-                layer: 0,
-                depth: 0,
-            },
+            &ImageSelection::default(),
             dims,
             None,
         );
@@ -232,11 +205,11 @@ mod tests {
         let args = build_extract_args(
             Path::new("in.ktx2"),
             Path::new("out.png"),
-            &ExtractSpec::One {
+            &ImageSelection {
                 level: 1,
                 face: 3,
                 layer: 0,
-                depth: 0,
+                depth_slice: 0,
             },
             dims,
             None,
@@ -248,7 +221,7 @@ mod tests {
     }
 
     #[test]
-    fn all_flag_and_transcode() {
+    fn transcode_precedes_selectors() {
         let dims = Dims {
             levels: 1,
             faces: 1,
@@ -258,20 +231,13 @@ mod tests {
         let args = build_extract_args(
             Path::new("a.ktx2"),
             Path::new("b.png"),
-            &ExtractSpec::All,
+            &ImageSelection::default(),
             dims,
             Some(TranscodeTarget::Rgba8),
         );
         assert_eq!(
             args,
-            vec![
-                "extract",
-                "--transcode",
-                "rgba8",
-                "--all",
-                "a.ktx2",
-                "b.png",
-            ]
+            vec!["extract", "--transcode", "rgba8", "a.ktx2", "b.png"]
         );
     }
 

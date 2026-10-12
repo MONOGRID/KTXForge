@@ -3,7 +3,7 @@ use tauri::AppHandle;
 use crate::commands::KtxVersion;
 use crate::error::AppError;
 use crate::ktx::extract_ops::extract_slot_count;
-use crate::ktx::sidecar::{self, CancellationHandle};
+use crate::ktx::sidecar::{self, CancellationHandle, Sidecar};
 
 const KTX_VERSION_JSON: &str = include_str!("../../../ktx-version.json");
 
@@ -16,8 +16,9 @@ pub fn extract_concurrency() -> u32 {
 #[tauri::command]
 pub async fn ktx_version(app: AppHandle) -> Result<KtxVersion, AppError> {
     let pinned = pinned_version()?;
-    let out = sidecar::run_ktx(
+    let out = sidecar::run(
         &app,
+        Sidecar::Ktx,
         vec!["--version".to_owned()],
         |_| {},
         CancellationHandle::new(),
