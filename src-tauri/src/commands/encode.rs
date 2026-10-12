@@ -85,6 +85,11 @@ pub async fn run_encode(
 
     let mut args = vec!["create".to_owned()];
     args.extend(build_create_args(&resolved, &prepared_paths, &output_path));
+    eprintln!(
+        "ktxforge: encode job {} → ktx {}",
+        request.job_id,
+        shell_join(&args)
+    );
 
     emit_stage(app, &request.job_id, EncodeStage::Encoding, None);
 
@@ -201,6 +206,23 @@ fn preview_kind_for_options(options: &CreateOptions, fallback: &PreviewKind) -> 
         return PreviewKind::TonemappedFromExr;
     }
     fallback.clone()
+}
+
+/// Quote argv for a copy-pasteable log line (spaces / quotes in paths).
+fn shell_join(args: &[String]) -> String {
+    args.iter()
+        .map(|arg| {
+            if arg.is_empty()
+                || arg.contains(|c: char| c.is_whitespace() || c == '"' || c == '\\' || c == '\'')
+            {
+                let escaped = arg.replace('\\', "\\\\").replace('"', "\\\"");
+                format!("\"{escaped}\"")
+            } else {
+                arg.clone()
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 fn codec_label(options: &CreateOptions) -> String {

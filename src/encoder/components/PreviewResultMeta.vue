@@ -1,10 +1,15 @@
 <script setup lang="ts">
+import { computed } from "vue";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { EncodeResult } from "../../bindings/EncodeResult";
 
-defineProps<{
+const props = defineProps<{
   result: EncodeResult | null;
 }>();
+
+/** Present only after encode when that metric was computed for the job. */
+const ssimValue = computed((): number | null => props.result?.ssim ?? null);
+const psnrValue = computed((): number | null => props.result?.psnr ?? null);
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) {
@@ -16,10 +21,7 @@ function formatBytes(bytes: number): string {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-function formatMetric(value: number | null): string {
-  if (value === null) {
-    return "—";
-  }
+function formatMetric(value: number): string {
   return value.toFixed(4);
 }
 </script>
@@ -64,18 +66,22 @@ function formatMetric(value: number | null): string {
         <dd class="m-0 font-mono">
           {{ result ? String(result.faces) : "—" }}
         </dd>
-        <dt class="text-ink-muted">
-          SSIM
-        </dt>
-        <dd class="m-0 font-mono">
-          {{ result ? formatMetric(result.ssim) : "—" }}
-        </dd>
-        <dt class="text-ink-muted">
-          PSNR
-        </dt>
-        <dd class="m-0 font-mono">
-          {{ result ? formatMetric(result.psnr) : "—" }}
-        </dd>
+        <template v-if="ssimValue !== null">
+          <dt class="text-ink-muted">
+            SSIM
+          </dt>
+          <dd class="m-0 font-mono">
+            {{ formatMetric(ssimValue) }}
+          </dd>
+        </template>
+        <template v-if="psnrValue !== null">
+          <dt class="text-ink-muted">
+            PSNR
+          </dt>
+          <dd class="m-0 font-mono">
+            {{ formatMetric(psnrValue) }}
+          </dd>
+        </template>
       </dl>
 
       <ul
