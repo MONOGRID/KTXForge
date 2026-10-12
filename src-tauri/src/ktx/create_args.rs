@@ -411,7 +411,11 @@ mod tests {
         o.filter.mipmap_wrap = Some(MipmapWrap::Clamp);
         note(emit_role(&o, InputRole::ArrayLayers, 2));
 
-        let mut o = CreateOptions::default();
+        // Uncompressed only: encode/ASTC drop --runtime-mipmap in resolve_for_encode.
+        let mut o = CreateOptions {
+            encode: None,
+            ..Default::default()
+        };
         o.container.runtime_mipmap = true;
         note(emit(&o));
 
