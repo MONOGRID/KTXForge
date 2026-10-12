@@ -217,7 +217,7 @@ watchEffect(() => {
           v-model="scopeModel"
           :options="scopeOptions"
           :empty-label="false"
-          class="h-8 w-[13.5rem] max-w-[40vw]"
+          class="w-[13.5rem] max-w-[40vw]"
         />
       </label>
 
@@ -227,7 +227,7 @@ watchEffect(() => {
           v-model="formatModel"
           :options="formatOptions"
           :empty-label="false"
-          class="h-8 w-[5.5rem]"
+          class="w-[5.5rem]"
         />
       </label>
 
@@ -241,7 +241,7 @@ watchEffect(() => {
           min="1"
           max="100"
           step="1"
-          class="h-8 w-14 px-1.5 text-center font-mono tabular-nums"
+          class="w-14 px-1.5 text-center font-mono tabular-nums"
           aria-label="JPEG quality"
           :model-value="String(jpegQuality)"
           @update:model-value="onJpegQualityUpdate"

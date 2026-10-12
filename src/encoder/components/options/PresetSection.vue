@@ -36,17 +36,17 @@ const helpText =
       :text="helpText"
       class="shrink-0"
     >
-      <span class="text-sm text-ink-muted">Preset</span>
+      <span class="text-xs text-ink-muted">Preset</span>
     </HelpTooltip>
     <DropdownMenu>
       <DropdownMenuTrigger as-child>
         <Button
           variant="outline"
-          class="h-8 min-w-0 max-w-md justify-between gap-2 px-2 font-normal"
+          class="min-w-0 max-w-md justify-between gap-1.5 px-2 font-normal"
           :disabled="!store.ready"
         >
           <span class="min-w-0 truncate text-left">{{ label }}</span>
-          <ChevronRight class="size-4 shrink-0 rotate-90 text-ink-muted" />
+          <ChevronRight class="size-3 shrink-0 rotate-90 text-ink-muted" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent
@@ -58,10 +58,10 @@ const helpText =
           :key="group.category"
         >
           <DropdownMenuSubTrigger
-            class="flex w-full cursor-default select-none items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-sm outline-none focus:bg-accent data-[state=open]:bg-accent"
+            class="flex w-full cursor-default select-none items-center justify-between gap-1.5 rounded-sm px-2 py-1 text-xs outline-none focus:bg-accent data-[state=open]:bg-accent"
           >
             <span class="min-w-0 truncate">{{ group.category }}</span>
-            <ChevronRight class="size-4 shrink-0 text-ink-muted" />
+            <ChevronRight class="size-3 shrink-0 text-ink-muted" />
           </DropdownMenuSubTrigger>
           <DropdownMenuPortal>
             <DropdownMenuSubContent
@@ -78,7 +78,7 @@ const helpText =
                   side="right"
                   class="w-full"
                 >
-                  <span class="block w-full px-2 py-1.5">
+                  <span class="block w-full px-2 py-1">
                     {{ preset.path[1] ?? preset.id }}
                   </span>
                 </HelpTooltip>

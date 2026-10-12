@@ -15,7 +15,7 @@ import UastcLdrSection from "./UastcLdrSection.vue";
 <template>
   <div
     v-if="store.ready"
-    class="flex flex-col gap-2"
+    class="flex flex-col gap-1"
   >
     <FormatSection />
     <ContainerSection />

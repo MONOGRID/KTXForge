@@ -74,7 +74,7 @@ function onUpdate(value: unknown): void {
   >
     <SelectTrigger
       :id="controlId"
-      :class="cn('h-8 w-full font-mono text-sm', props.class)"
+      :class="cn('w-full font-mono', props.class)"
     >
       <SelectValue :placeholder="placeholder" />
     </SelectTrigger>
@@ -101,11 +101,11 @@ function onUpdate(value: unknown): void {
           side="right"
           class="w-full"
         >
-          <span class="flex w-full min-w-0 items-center gap-2">
+          <span class="flex w-full min-w-0 items-center gap-1.5">
             <component
               :is="option.icon"
               v-if="option.icon"
-              class="size-4 shrink-0"
+              class="size-3 shrink-0"
               aria-hidden="true"
             />
             <span class="min-w-0 truncate">{{ option.label }}</span>
@@ -127,11 +127,11 @@ function onUpdate(value: unknown): void {
             side="right"
             class="w-full"
           >
-            <span class="flex w-full min-w-0 items-center gap-2">
+            <span class="flex w-full min-w-0 items-center gap-1.5">
               <component
                 :is="option.icon"
                 v-if="option.icon"
-                class="size-4 shrink-0"
+                class="size-3 shrink-0"
                 aria-hidden="true"
               />
               <span class="min-w-0 truncate">{{ option.label }}</span>

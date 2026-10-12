@@ -74,9 +74,9 @@ export default defineConfig({
       "btn border-transparent bg-brand text-brand-fg shadow-sm hover:opacity-90",
     panel: "rounded-lg border border-transparent bg-surface-raised text-ink shadow-sm",
     "field-row":
-      "grid grid-cols-[minmax(0,42%)_minmax(0,1fr)] items-start gap-x-2 py-1.5",
+      "grid grid-cols-[minmax(0,42%)_minmax(0,1fr)] items-start gap-x-2 py-0.5",
     label:
-      "min-w-0 cursor-pointer truncate pt-1 text-sm text-ink-muted select-none",
+      "min-w-0 cursor-pointer truncate pt-0.5 text-xs text-ink-muted select-none",
     hint: "mt-0.5 text-xs text-ink-faint",
     badge:
       "inline-flex items-center rounded-md px-1.5 py-0.5 text-xs font-medium bg-surface-sunken text-ink-muted",

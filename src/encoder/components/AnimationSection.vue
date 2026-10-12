@@ -134,7 +134,7 @@ function writeU32(
             type="number"
             min="0"
             step="1"
-            class="h-8 min-w-0 font-mono"
+            class="min-w-0 font-mono"
             :model-value="anim.duration"
             @update:model-value="writeU32('duration', $event)"
           />
@@ -156,7 +156,7 @@ function writeU32(
             type="number"
             min="1"
             step="1"
-            class="h-8 min-w-0 font-mono"
+            class="min-w-0 font-mono"
             :model-value="anim.timescale"
             @update:model-value="writeU32('timescale', $event)"
           />
@@ -178,7 +178,7 @@ function writeU32(
             type="number"
             min="0"
             step="1"
-            class="h-8 min-w-0 font-mono"
+            class="min-w-0 font-mono"
             :model-value="anim.loopCount"
             @update:model-value="writeU32('loopCount', $event)"
           />

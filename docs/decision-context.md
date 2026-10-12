@@ -558,3 +558,9 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 **Decided:** VueUse `useColorMode` uses `initialValue: "dark"`, and both `index.html` / `inspector.html` ship with `class="dark"` on `<html>` so first paint matches. Light and System remain available in the theme menu; a stored preference still wins over the default.
 
 **Why:** Desktop encode/inspect tooling is typically used in a dark chrome; light as the unset default flashed the wrong surface before the toggle mounted.
+
+## 2026-10-12 — Compact shadcn density (~2/3)
+
+**Decided:** Scale all shadcn-vue control defaults to about two-thirds of stock New York sizes: control height `h-9`→`h-6`, body text `text-sm`→`text-xs`, switches `h-5 w-9`→`h-3.5 w-6`, icons `size-4`→`size-3`, `--radius` `0.5rem`→`0.333rem`. Tighten shared `field-row` / `label` shortcuts (`py-1.5`→`py-0.5`, label `text-xs`) so options-rail and inspector report rows pack denser. Drop call-site `h-8` overrides that previously shrank stock `h-9` inputs; the new defaults are smaller.
+
+**Why:** The options rail and inspector field lists are dense settings UIs; stock shadcn heights waste vertical space and force scrolling for routine encode work.

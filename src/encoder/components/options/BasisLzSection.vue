@@ -59,7 +59,7 @@ function shown(value: number | null): string {
     >
       <Input
         :id="controlId"
-        class="h-8 font-mono"
+        class="font-mono"
         type="number"
         min="1"
         max="255"
@@ -76,7 +76,7 @@ function shown(value: number | null): string {
     >
       <Input
         :id="controlId"
-        class="h-8 font-mono"
+        class="font-mono"
         type="number"
         min="0"
         max="6"
@@ -93,7 +93,7 @@ function shown(value: number | null): string {
     >
       <Input
         :id="controlId"
-        class="h-8 font-mono"
+        class="font-mono"
         type="number"
         min="1"
         max="16128"
@@ -110,7 +110,7 @@ function shown(value: number | null): string {
     >
       <Input
         :id="controlId"
-        class="h-8 font-mono"
+        class="font-mono"
         type="number"
         min="1"
         max="16128"
@@ -127,7 +127,7 @@ function shown(value: number | null): string {
     >
       <Input
         :id="controlId"
-        class="h-8 font-mono"
+        class="font-mono"
         type="number"
         min="1"
         max="3"
@@ -144,7 +144,7 @@ function shown(value: number | null): string {
     >
       <Input
         :id="controlId"
-        class="h-8 font-mono"
+        class="font-mono"
         type="number"
         min="1"
         max="3"

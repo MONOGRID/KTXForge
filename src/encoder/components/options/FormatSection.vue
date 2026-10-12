@@ -256,7 +256,7 @@ const astcColorGroups = computed(() => [
       />
       <div
         v-else
-        class="flex flex-col gap-2"
+        class="flex flex-col gap-1"
       >
         <EnumSelect
           :model-value="astcParts.block"

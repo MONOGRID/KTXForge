@@ -62,7 +62,7 @@ function textOrEmpty(value: number | null): string {
     >
       <Input
         :id="controlId"
-        class="h-8 font-mono"
+        class="font-mono"
         type="number"
         min="0"
         max="4"
@@ -92,7 +92,7 @@ function textOrEmpty(value: number | null): string {
     >
       <Input
         :id="controlId"
-        class="h-8 font-mono"
+        class="font-mono"
         type="number"
         min="0.001"
         max="10"
@@ -109,7 +109,7 @@ function textOrEmpty(value: number | null): string {
     >
       <Input
         :id="controlId"
-        class="h-8 font-mono"
+        class="font-mono"
         type="number"
         min="64"
         max="65536"
@@ -126,7 +126,7 @@ function textOrEmpty(value: number | null): string {
     >
       <Input
         :id="controlId"
-        class="h-8 font-mono"
+        class="font-mono"
         type="number"
         min="1"
         max="300"
@@ -143,7 +143,7 @@ function textOrEmpty(value: number | null): string {
     >
       <Input
         :id="controlId"
-        class="h-8 font-mono"
+        class="font-mono"
         type="number"
         min="0.01"
         max="65536"

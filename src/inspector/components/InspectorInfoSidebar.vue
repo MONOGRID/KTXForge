@@ -49,7 +49,7 @@ const ktx1HeaderValue = computed(() => ktx1Header.value);
     aria-label="File details"
   >
     <ScrollArea class="min-h-0 flex-1">
-      <div class="flex flex-col gap-3 pr-3">
+      <div class="flex flex-col gap-2 pr-3">
         <StatusPanel
           :valid="statusValid"
           :messages="statusMessages"

@@ -50,7 +50,7 @@ function writeThreads(value: string | number): void {
     >
       <Input
         :id="controlId"
-        class="h-8 font-mono"
+        class="font-mono"
         type="number"
         min="1"
         step="1"

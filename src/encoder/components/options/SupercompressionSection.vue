@@ -143,7 +143,7 @@ function changeZlib(value: string | number): void {
     >
       <Input
         :id="controlId"
-        class="h-8 font-mono"
+        class="font-mono"
         type="number"
         min="1"
         max="22"
@@ -161,7 +161,7 @@ function changeZlib(value: string | number): void {
     >
       <Input
         :id="controlId"
-        class="h-8 font-mono"
+        class="font-mono"
         type="number"
         min="1"
         max="9"
