@@ -26,6 +26,7 @@ const root = resolve(__dirname, "..");
 const versionPath = join(root, "ktx-version.json");
 const cacheDir = join(root, "src-tauri", "target", "ktx-cache");
 const binariesDir = join(root, "src-tauri", "binaries");
+const tauriConfPath = join(root, "src-tauri", "tauri.conf.json");
 
 function parseArgs(argv) {
   const idx = argv.indexOf("--target");
@@ -166,7 +167,14 @@ function reportedVersion(bin) {
   return { ok: ver.status === 0, text: `${ver.stdout || ""}${ver.stderr || ""}`.trim() };
 }
 
-function alreadyStaged(outPaths, version) {
+function libName(libRel) {
+  return libRel.split(/[/\\]/).pop();
+}
+
+function alreadyStaged(outPaths, libs, version) {
+  if (!libs.every((libRel) => existsSync(join(binariesDir, libName(libRel))))) {
+    return false;
+  }
   return outPaths.every((bin) => {
     if (!existsSync(bin)) {
       return false;
@@ -206,23 +214,64 @@ function copyExecutable(src, dest, isWindows) {
 function stageLibs(extractDir, libs, isWindows) {
   for (const libRel of libs) {
     const libSrc = findInTree(extractDir, libRel);
-    const libName = libRel.split(/[/\\]/).pop();
-    copyExecutable(libSrc, join(binariesDir, libName), isWindows);
+    copyExecutable(libSrc, join(binariesDir, libName(libRel)), isWindows);
   }
 }
 
-function maybePatchelf(bin, enabled) {
-  if (!enabled) {
-    return;
+/**
+ * Where the installed app puts the shared library, relative to the sidecar.
+ * Linux: `bundle.resources` lands in `/usr/lib/<productName>/` (deb, rpm,
+ * AppImage) while sidecars sit in `/usr/bin/`; `$ORIGIN` covers `binaries/`
+ * and `target/<profile>/`. macOS: `bundle.macOS.frameworks` lands in
+ * `Contents/Frameworks` (and `target/Frameworks` for dev); the release binary
+ * already has `@executable_path`. Windows loads `ktx.dll` from the exe
+ * directory, where `bundle.resources` puts it.
+ */
+function loaderRpaths(triple) {
+  if (triple.includes("linux")) {
+    const conf = JSON.parse(readFileSync(tauriConfPath, "utf8"));
+    return ["$ORIGIN", `$ORIGIN/../lib/${conf.productName}`];
   }
-  const r = spawnSync("patchelf", ["--set-rpath", "$ORIGIN", bin], {
-    encoding: "utf8",
-  });
-  if (r.status !== 0) {
-    console.warn(
-      `patchelf skipped or failed (ok if binary already has $ORIGIN): ${r.stderr || r.stdout}`,
-    );
+  if (triple.includes("apple-darwin")) {
+    return ["@executable_path", "@executable_path/../Frameworks"];
   }
+  return [];
+}
+
+function patchelfRpath(bin, rpaths) {
+  const want = rpaths.join(":");
+  const r = spawnSync("patchelf", ["--print-rpath", bin], { encoding: "utf8" });
+  if (r.error) {
+    throw new Error("patchelf not found on PATH (needed to set the sidecar rpath)");
+  }
+  if ((r.stdout || "").trim() === want) {
+    return false;
+  }
+  run("patchelf", ["--set-rpath", want, bin]);
+  return true;
+}
+
+function machoRpath(bin, rpaths) {
+  const loadCommands = run("otool", ["-l", bin]).stdout;
+  const missing = rpaths.filter((p) => !loadCommands.includes(` path ${p} `));
+  if (missing.length === 0) {
+    return false;
+  }
+  for (const p of missing) {
+    run("install_name_tool", ["-add_rpath", p, bin]);
+  }
+  // install_name_tool invalidates the signature; arm64 refuses unsigned code.
+  run("codesign", ["--force", "--sign", "-", bin]);
+  return true;
+}
+
+/** Point the sidecar at the bundled library. Idempotent; true when it changed `bin`. */
+function fixLoaderPath(bin, triple) {
+  const rpaths = loaderRpaths(triple);
+  if (rpaths.length === 0) {
+    return false;
+  }
+  return triple.includes("linux") ? patchelfRpath(bin, rpaths) : machoRpath(bin, rpaths);
 }
 
 function verifyStaged(bin) {
@@ -244,8 +293,18 @@ async function extractAndStage(triple, cfg, version, isWindows) {
   for (const tool of SIDECARS) {
     const out = stagedToolPath(tool, triple, isWindows);
     copyExecutable(findInTree(extractDir, archiveToolPath(cfg.ktxPath, tool)), out, isWindows);
-    maybePatchelf(out, Boolean(cfg.patchelf));
+    fixLoaderPath(out, triple);
     verifyStaged(out);
+  }
+}
+
+/** Binaries staged before a loader-path change keep the old rpath. */
+function refreshStaged(outPaths, triple) {
+  for (const bin of outPaths) {
+    if (fixLoaderPath(bin, triple)) {
+      verifyStaged(bin);
+    }
+    console.log(`already staged: ${bin} (${reportedVersion(bin).text})`);
   }
 }
 
@@ -261,10 +320,8 @@ async function stageTarget(triple) {
   mkdirSync(binariesDir, { recursive: true });
   mkdirSync(cacheDir, { recursive: true });
 
-  if (alreadyStaged(outPaths, manifest.version)) {
-    for (const bin of outPaths) {
-      console.log(`already staged: ${bin} (${reportedVersion(bin).text})`);
-    }
+  if (alreadyStaged(outPaths, cfg.libs || [], manifest.version)) {
+    refreshStaged(outPaths, triple);
     return;
   }
 
