@@ -1,4 +1,4 @@
-# KTXForge
+# 🔥 KTXForge
 
 Desktop GUI for [KTX](https://www.khronos.org/ktx/) textures — encode ordinary images to KTX2 and inspect `.ktx` / `.ktx2` files without installing Khronos tools separately.
 
@@ -6,31 +6,29 @@ KTXForge embeds the official [KTX-Software](https://github.com/KhronosGroup/KTX-
 
 Local-only: nothing is uploaded. Runs on Windows, macOS, and Linux.
 
-## Screenshots
+## 📸 Highlights
 
-Replace the SVGs under [`docs/screenshots/`](docs/screenshots/) with real captures when ready. Each image below is a placeholder; the caption is what the final shot should show.
+### Encode with a wipe preview
 
-### Encoder — main window
+Batch KTX outputs on the left, original vs encoded wipe in the center, and the full `ktx create` options rail on the right.
 
-![Encoder main window: outputs queue, wipe preview, and encode options rail](docs/screenshots/encoder-main.svg)
+![Encoder: outputs queue, original vs encoded wipe preview, and format / mipmap options](docs/screenshots/encoder-main.png)
 
-*Placeholder for `docs/screenshots/encoder-main.png`.* Full encoder layout: **KTX outputs** queue (top-left), optional **Inputs** packing list (bottom-left), center **source ↔ encoded wipe** preview with mip/layer/face/depth controls when relevant, and the right **shared encode options** rail (format, codec, mips, color, Basis/UASTC/ASTC panels).
+### Codec and option help in place
 
-### Encoder — options and batch queue
+Every encode choice carries a tooltip from the tool docs — here UASTC vs BasisLZ — so you pick a codec without leaving the rail.
 
-![Encoder options rail and batch encode progress](docs/screenshots/encoder-options.svg)
+![Format rail: Encode dropdown open on UASTC with an inline codec tooltip](docs/screenshots/encoder-options.png)
 
-*Placeholder for `docs/screenshots/encoder-options.png`.* Close-up of the options rail with a codec panel expanded (e.g. BasisLZ or UASTC), tooltips visible if useful, plus the batch **Done i / N** queue modal or Encode bar showing parallel progress and Cancel.
+### Inspect KTX1 / KTX2 in a dedicated window
 
-### Inspector — report and viewport
+Drop a `.ktx` / `.ktx2` to browse mips, layers, and faces while the sidebar shows validation status and the full header / level-index report.
 
-![Inspector with image viewport and full KTX info report](docs/screenshots/inspector-main.svg)
+![Inspector: image viewport with mip and layer scrubbers, plus status and KTX header panels](docs/screenshots/inspector-main.png)
 
-*Placeholder for `docs/screenshots/inspector-main.png`.* Inspector window: left **mip / layer / face / depth** selectors and pan-zoom viewport (cubemap cross or depth volume when applicable); right scrollable **info report** (header, DFD, key/value metadata, validation messages) and **Export** to PNG/JPEG.
+## ✨ Features
 
-## Features
-
-### Encoder
+### 🖼️ Encoder
 
 - Drag-and-drop ordinary images onto the main window (panel-aware drops: outputs, inputs, or preview).
 - **Batch of KTX outputs** — one encode job per output, shared options, limited-parallel queue with Cancel.
@@ -44,7 +42,7 @@ Replace the SVGs under [`docs/screenshots/`](docs/screenshots/) with real captur
 - Animation packing with **`KTXanimData`** written after a successful create.
 - Save selected or all completed results; native alert + OS notification on encode failure.
 
-### Inspector
+### 🔍 Inspector
 
 - Drop `.ktx` / `.ktx2` to open a dedicated inspector window.
 - Full **`ktx info`** report (JSON for KTX2, text + best-effort header for KTX1), including validation messages.
@@ -53,13 +51,13 @@ Replace the SVGs under [`docs/screenshots/`](docs/screenshots/) with real captur
 - Export the selected subresource as **PNG** or **JPEG**.
 - Cubemap cross and CSS3D depth-volume views when the file has faces or depth.
 
-### Platform
+### 💻 Platform
 
 - Embedded, pinned `ktx` sidecar — no system install required.
 - Auto-update from GitHub Releases (when configured).
 - Heavy work in Rust; Vue is visualization and controls only.
 
-## Development
+## 🛠️ Development
 
 ```bash
 npm ci
@@ -90,7 +88,7 @@ Local release-style builds that produce updater signatures need the private key 
 npm run tauri:build:signed
 ```
 
-### Commits and releases
+### 📦 Commits and releases
 
 Commits follow [Conventional Commits](https://www.conventionalcommits.org/). On `main` / `beta`, [semantic-release](https://semantic-release.gitbook.io/) derives the version (`feat` → minor, `fix` / `perf` → patch, `!` or `BREAKING CHANGE:` → major; other types do not release), updates [`CHANGELOG.md`](CHANGELOG.md), tags, and publishes GitHub Release artifacts via Actions.
 
@@ -104,6 +102,6 @@ Releases run only in CI (`npm run release` / the Release workflow). To bump the 
 
 Product requirements live in [`docs/requirements.md`](docs/requirements.md). Decision log: [`docs/decision-context.md`](docs/decision-context.md).
 
-## License
+## 📄 License
 
 See repository license files. The embedded KTX-Software binary ships under its own Khronos license terms.
