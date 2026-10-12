@@ -58,7 +58,7 @@ jobs:
         if: ${{ env.RELEASE_APP_ID != '' }}
         env:
           RELEASE_APP_ID: ${{ secrets.RELEASE_APP_ID }}
-        uses: actions/create-github-app-token@v1
+        uses: actions/create-github-app-token@v3
         with:
           app-id: ${{ secrets.RELEASE_APP_ID }}
           private-key: ${{ secrets.RELEASE_APP_PRIVATE_KEY }}
@@ -143,7 +143,7 @@ jobs:
         run: npm run fetch-ktx -- --target ${{ matrix.target }}
 
       - name: Build and upload
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -151,7 +151,7 @@ jobs:
           APPLE_SIGNING_IDENTITY: ${{ runner.os == 'macOS' && '-' || '' }}
         with:
           releaseId: ${{ needs.release.outputs.release_id }}
-          includeUpdaterJson: true
+          uploadUpdaterJson: true
           args: --target ${{ matrix.target }}
 
   publish:
