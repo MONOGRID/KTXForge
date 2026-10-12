@@ -104,4 +104,4 @@ Product requirements live in [`docs/requirements.md`](docs/requirements.md). Dec
 
 ## 📄 License
 
-See repository license files. The embedded KTX-Software binary ships under its own Khronos license terms.
+KTXForge is [MIT](LICENSE). The embedded [KTX-Software](https://github.com/KhronosGroup/KTX-Software) `ktx` sidecar ships under its own terms (primarily Apache-2.0); see [`src-tauri/licenses/KTX-Software-LICENSE.md`](src-tauri/licenses/KTX-Software-LICENSE.md).
