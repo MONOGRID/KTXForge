@@ -9,7 +9,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-const mode = useColorMode();
+const mode = useColorMode({ initialValue: "dark" });
 </script>
 
 <template>

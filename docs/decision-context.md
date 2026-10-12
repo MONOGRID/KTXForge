@@ -552,3 +552,9 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 **Decided:** Preset breadcrumbs and menu paths are `Category > Leaf` only (e.g. `Color > UASTC RGBA`). Do not show an `Official` root in the selector; the catalog is Official-only until user-saved presets exist.
 
 **Why:** A single-root tree that always says Official adds noise without choice.
+
+## 2026-10-12 — Dark theme is the default
+
+**Decided:** VueUse `useColorMode` uses `initialValue: "dark"`, and both `index.html` / `inspector.html` ship with `class="dark"` on `<html>` so first paint matches. Light and System remain available in the theme menu; a stored preference still wins over the default.
+
+**Why:** Desktop encode/inspect tooling is typically used in a dark chrome; light as the unset default flashed the wrong surface before the toggle mounted.
