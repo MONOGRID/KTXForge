@@ -374,7 +374,8 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 
 ## 2026-10-12 — Git LFS for binaries; SVGs stay in Git
 
-**Decided:** Brand/Tauri icons and test-fixture binaries (*.png / *.jpg / *.ktx / *.ktx2, plus other binary patterns in .gitattributes) are Git LFS. *.svg is not LFS-tracked. Every ctions/checkout in ci.yml and elease.yml sets `lfs: true`. After converting blobs to pointers, push LFS objects with `git lfs push --all origin` if a normal push skipped them.
+**Decided:** Brand/Tauri icons and test-fixture binaries (*.png / *.jpg / *.ktx / *.ktx2, plus other binary patterns in .gitattributes) are Git LFS. *.svg is not LFS-tracked. Every ctions/checkout in ci.yml and 
+elease.yml sets `lfs: true`. After converting blobs to pointers, push LFS objects with `git lfs push --all origin` if a normal push skipped them.
 
 **Why:** Icon LFS blobs never reached GitHub (clone 404). Without `lfs: true`, CI saw pointer text and failed with Invalid PNG signature. Fixtures were committed as raw blobs while LFS rules applied (`should have been pointers`). Docs SVG placeholders are small text and do not belong in LFS.
 

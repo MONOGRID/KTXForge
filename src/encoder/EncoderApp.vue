@@ -27,7 +27,8 @@ import QueueModal from "./components/QueueModal.vue";
 import OptionsPanel from "./components/options/OptionsPanel.vue";
 import PresetSection from "./components/options/PresetSection.vue";
 import { consumeCommittedDropZone } from "./dropTarget";
-import { bindWindowsMenuShortcuts } from "../shared/menuShortcuts";
+import { bindMenuShortcuts } from "../shared/menuShortcuts";
+import { bindMenuZoomFocusGate } from "../shared/menuZoomFocus";
 import { bindEncoderMenu } from "./menuBridge";
 import { initStore, showInputsPanel, store } from "./store";
 
@@ -43,11 +44,13 @@ const versionLabel = computed((): string => {
 
 let unbindMenu: (() => void) | undefined;
 let unbindShortcuts: (() => void) | undefined;
+let unbindZoomFocus: (() => void) | undefined;
 const stopDrops: Array<() => void> = [];
 
 onMounted(() => {
   unbindMenu = bindEncoderMenu();
-  unbindShortcuts = bindWindowsMenuShortcuts();
+  unbindShortcuts = bindMenuShortcuts();
+  unbindZoomFocus = bindMenuZoomFocusGate();
   void initStore().catch((err: unknown) => {
     void alertAppError(toAppError(err));
   });
@@ -68,6 +71,7 @@ onMounted(() => {
 onUnmounted(() => {
   unbindMenu?.();
   unbindShortcuts?.();
+  unbindZoomFocus?.();
   for (const stop of stopDrops) {
     stop();
   }

@@ -1,4 +1,5 @@
 import type { MenuAction } from "../bindings/MenuAction";
+import { isMenuZoomWindowFocused } from "./menuZoomFocus";
 import { getViewerControls, type ViewerControls } from "./viewerControls";
 
 const ZOOM_BY_ACTION = {
@@ -23,14 +24,14 @@ function isZoomMenuAction(action: MenuAction): action is ZoomMenuAction {
 }
 
 /**
- * Handle View-menu zoom actions when the window is focused.
+ * Handle View-menu zoom actions when this window is OS-focused.
  * Returns true when `action` was a zoom command (handled or ignored).
  */
 export function applyZoomMenuAction(action: MenuAction): boolean {
   if (!isZoomMenuAction(action)) {
     return false;
   }
-  if (!document.hasFocus()) {
+  if (!isMenuZoomWindowFocused()) {
     return true;
   }
   const viewer = getViewerControls();

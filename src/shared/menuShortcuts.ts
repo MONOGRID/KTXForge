@@ -34,11 +34,37 @@ const SHORTCUT_LOOKUP = new Map<string, AcceleratedMenuId>([
   ["Minus:any", "zoom-out"],
   ["NumpadSubtract:any", "zoom-out"],
   ["Digit1:0", "zoom-actual"],
+  ["Numpad1:0", "zoom-actual"],
   ["Digit0:0", "zoom-fit"],
+  ["Numpad0:0", "zoom-fit"],
 ]);
 
-function isCtrlOnlyShortcut(event: ShortcutEvent): boolean {
-  return event.ctrlKey && !event.metaKey && !event.altKey;
+function isMacHost(): boolean {
+  return navigator.userAgent.includes("Mac");
+}
+
+function isWindowsHost(): boolean {
+  return navigator.userAgent.includes("Windows");
+}
+
+function isZoomShortcutId(id: AcceleratedMenuId): boolean {
+  return (
+    id === "zoom-in" ||
+    id === "zoom-out" ||
+    id === "zoom-actual" ||
+    id === "zoom-fit"
+  );
+}
+
+/** Cmd-only on macOS, Ctrl-only elsewhere (matches CmdOrCtrl menu accelerators). */
+function isPrimaryModOnlyShortcut(event: ShortcutEvent): boolean {
+  if (event.altKey) {
+    return false;
+  }
+  if (isMacHost()) {
+    return event.metaKey && !event.ctrlKey;
+  }
+  return event.ctrlKey && !event.metaKey;
 }
 
 function resolveShortcutId(
@@ -54,32 +80,28 @@ function resolveShortcutId(
 }
 
 /**
- * Map a Ctrl-chord keydown to the menu item id declared in `menu.rs`.
- * Used as the Windows fallback when native muda accelerators do not fire
- * under WebView2 (wry#451).
+ * Map a primary-mod chord keydown to the menu item id declared in `menu.rs`.
+ * Used when native muda accelerators do not fire (WebView2; some Linux zoom
+ * chords) or as a reliable path alongside OS-focused menu clicks.
  */
 export function matchMenuShortcut(
   event: ShortcutEvent,
 ): AcceleratedMenuId | null {
-  if (!isCtrlOnlyShortcut(event)) {
+  if (!isPrimaryModOnlyShortcut(event)) {
     return null;
   }
   return resolveShortcutId(event.code, event.shiftKey);
 }
 
-function isWindowsHost(): boolean {
-  return navigator.userAgent.includes("Windows");
-}
-
 /**
- * On Windows only, listen for the same Ctrl chords the native menu shows and
- * dispatch them through Rust so enablement and handlers stay shared.
- * No-op on macOS/Linux where AppKit/GTK accelerators already work.
+ * Capture-phase keydown → `dispatch_menu_action` so enablement and handlers
+ * stay shared with native menu activation.
+ *
+ * - Windows: all File/View chords (WebView2 drops native accelerators, wry#451).
+ * - Linux / macOS: View zoom chords only — File accelerators usually work via
+ *   GTK/AppKit; synthesizing them too would double-fire Open/Encode/etc.
  */
-export function bindWindowsMenuShortcuts(): () => void {
-  if (!isWindowsHost()) {
-    return () => {};
-  }
+export function bindMenuShortcuts(): () => void {
   return useEventListener(
     window,
     "keydown",
@@ -89,6 +111,9 @@ export function bindWindowsMenuShortcuts(): () => void {
       }
       const id = matchMenuShortcut(event);
       if (id === null) {
+        return;
+      }
+      if (!isWindowsHost() && !isZoomShortcutId(id)) {
         return;
       }
       event.preventDefault();

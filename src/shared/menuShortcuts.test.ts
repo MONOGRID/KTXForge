@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { matchMenuShortcut } from "./menuShortcuts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
@@ -12,7 +12,12 @@ function read(rel: string): string {
 
 function chord(
   code: string,
-  opts: { shift?: boolean; meta?: boolean; alt?: boolean; ctrl?: boolean } = {},
+  opts: {
+    shift?: boolean;
+    meta?: boolean;
+    alt?: boolean;
+    ctrl?: boolean;
+  } = {},
 ): Parameters<typeof matchMenuShortcut>[0] {
   return {
     code,
@@ -24,6 +29,10 @@ function chord(
 }
 
 describe("matchMenuShortcut", () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it("maps Ctrl chords to menu ids", () => {
     expect(matchMenuShortcut(chord("KeyO"))).toBe("open");
     expect(matchMenuShortcut(chord("Enter"))).toBe("encode");
@@ -31,7 +40,9 @@ describe("matchMenuShortcut", () => {
     expect(matchMenuShortcut(chord("KeyS"))).toBe("save");
     expect(matchMenuShortcut(chord("KeyQ"))).toBe("exit");
     expect(matchMenuShortcut(chord("Digit1"))).toBe("zoom-actual");
+    expect(matchMenuShortcut(chord("Numpad1"))).toBe("zoom-actual");
     expect(matchMenuShortcut(chord("Digit0"))).toBe("zoom-fit");
+    expect(matchMenuShortcut(chord("Numpad0"))).toBe("zoom-fit");
   });
 
   it("requires Shift for export and ignores Shift for zoom", () => {
@@ -43,10 +54,27 @@ describe("matchMenuShortcut", () => {
     expect(matchMenuShortcut(chord("NumpadSubtract"))).toBe("zoom-out");
   });
 
-  it("ignores non-Ctrl-only modifiers", () => {
+  it("ignores non-primary-mod-only modifiers on non-Mac", () => {
     expect(matchMenuShortcut(chord("KeyO", { ctrl: false }))).toBeNull();
     expect(matchMenuShortcut(chord("KeyO", { meta: true }))).toBeNull();
     expect(matchMenuShortcut(chord("KeyO", { alt: true }))).toBeNull();
+  });
+
+  it("accepts Cmd-only chords on macOS user agents", () => {
+    vi.stubGlobal("navigator", { userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X)" });
+    expect(
+      matchMenuShortcut(
+        chord("Digit0", { ctrl: false, meta: true }),
+      ),
+    ).toBe("zoom-fit");
+    expect(
+      matchMenuShortcut(
+        chord("Equal", { ctrl: false, meta: true }),
+      ),
+    ).toBe("zoom-in");
+    expect(
+      matchMenuShortcut(chord("Digit0", { ctrl: true, meta: false })),
+    ).toBeNull();
   });
 });
 
@@ -65,13 +93,15 @@ describe("menu shortcut wiring", () => {
       '["Minus:any", "zoom-out"]',
       '["NumpadSubtract:any", "zoom-out"]',
       '["Digit1:0", "zoom-actual"]',
+      '["Numpad1:0", "zoom-actual"]',
       '["Digit0:0", "zoom-fit"]',
+      '["Numpad0:0", "zoom-fit"]',
     ];
     for (const entry of requiredEntries) {
       expect(shortcutTs, `missing ${entry}`).toContain(entry);
     }
     expect(shortcutTs).toContain("export function matchMenuShortcut");
-    expect(shortcutTs).toContain("export function bindWindowsMenuShortcuts");
+    expect(shortcutTs).toContain("export function bindMenuShortcuts");
 
     const menuRs = read("src-tauri/src/menu.rs");
     const accelerators = [
@@ -80,11 +110,19 @@ describe("menu shortcut wiring", () => {
     expect(accelerators.length).toBeGreaterThanOrEqual(8);
     expect(menuRs).toContain("dispatch_menu_action");
 
+    expect(read("src/encoder/EncoderApp.vue")).toContain("bindMenuShortcuts");
+    expect(read("src/inspector/InspectorApp.vue")).toContain(
+      "bindMenuShortcuts",
+    );
     expect(read("src/encoder/EncoderApp.vue")).toContain(
-      "bindWindowsMenuShortcuts",
+      "bindMenuZoomFocusGate",
     );
     expect(read("src/inspector/InspectorApp.vue")).toContain(
-      "bindWindowsMenuShortcuts",
+      "bindMenuZoomFocusGate",
     );
+    expect(read("src/shared/menuZoom.ts")).toContain(
+      "isMenuZoomWindowFocused",
+    );
+    expect(read("src/shared/menuZoom.ts")).not.toContain("document.hasFocus");
   });
 });
