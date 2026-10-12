@@ -53,3 +53,7 @@ strip = true
 
 [target.'cfg(any(target_os = "macos", windows, target_os = "linux"))'.dependencies]
 tauri-plugin-window-state = "2.5.0"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Same version tauri links; used for GTK content size on Wayland (window_bounds).
+gtk = "0.18"

@@ -59,9 +59,10 @@ pub async fn open_inspector_path(
     }
 
     let url = WebviewUrl::App("inspector.html".into());
-    let window = WebviewWindowBuilder::new(app, INSPECTOR_LABEL, url)
+    let builder = WebviewWindowBuilder::new(app, INSPECTOR_LABEL, url)
         .title(title)
-        .inner_size(1100.0, 760.0)
+        .inner_size(1100.0, 760.0);
+    let window = crate::window_bounds::with_saved_bounds(builder, app, INSPECTOR_LABEL)
         .build()
         .map_err(|e| AppError::io(format!("create inspector window: {e}")))?;
 

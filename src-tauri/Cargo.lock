@@ -2144,6 +2144,7 @@ name = "ktxforge"
 version = "0.0.0"
 dependencies = [
  "exr",
+ "gtk",
  "image",
  "ktx2",
  "serde",

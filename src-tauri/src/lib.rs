@@ -10,6 +10,7 @@ mod ktx;
 mod menu;
 mod state;
 mod updater;
+mod window_bounds;
 mod workspace;
 
 use state::{AppState, PendingUpdate};
@@ -26,21 +27,25 @@ pub fn run() {
         .manage(PendingUpdate::default())
         .on_window_event(|window, event| {
             drop::on_window_event(window, event);
+            window_bounds::on_window_event(window, event);
         });
 
     #[cfg(desktop)]
     {
         use tauri_plugin_window_state::{Builder as WindowStateBuilder, StateFlags};
 
+        // Wayland: VISIBLE only — POSITION unsupported; SIZE/MAXIMIZED owned by
+        // window_bounds (GTK content size). X11 / macOS / Windows: full plugin flags.
+        let flags = if window_bounds::is_wayland() {
+            StateFlags::VISIBLE
+        } else {
+            StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED | StateFlags::VISIBLE
+        };
+
         builder = builder
             .plugin(
                 WindowStateBuilder::default()
-                    .with_state_flags(
-                        StateFlags::SIZE
-                            | StateFlags::POSITION
-                            | StateFlags::MAXIMIZED
-                            | StateFlags::VISIBLE,
-                    )
+                    .with_state_flags(flags)
                     .build(),
             )
             .menu(menu::app_menu)
@@ -51,6 +56,8 @@ pub fn run() {
 
     builder
         .setup(|app| {
+            window_bounds::init(app.handle());
+            window_bounds::restore_open_windows(app.handle());
             drop::register_drop_handler(app.handle());
             updater::setup_updater(app.handle());
             Ok(())
