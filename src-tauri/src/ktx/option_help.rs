@@ -28,7 +28,7 @@ pub fn help_for(key: OptionKey) -> &'static str {
             "Generate the mipmap chain during create. Full chain if levels is omitted. Not valid for SINT, UINT, 3D, or raw."
         }
         OptionKey::RuntimeMipmap => {
-            "Mark the texture for client-side mipmap generation later. Mutually exclusive with generate-mipmap."
+            "Mark the texture for client-side mipmap generation later. Mutually exclusive with generate-mipmap. Not valid with BasisLZ, UASTC, or ASTC encoding."
         }
         OptionKey::Width => {
             "Base level width. Required for raw; otherwise resamples the image and enables mipmap filter options."

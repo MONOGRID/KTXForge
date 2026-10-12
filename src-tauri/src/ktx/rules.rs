@@ -412,6 +412,8 @@ const BASIS_OR_UASTC_ANY: Pred = Pred::Any(BASIS_OR_UASTC);
 
 const ENCODE_OR_ASTC: &[Pred] = &[Pred::EncodeSet, Pred::AstcFormat];
 const ENCODE_OR_ASTC_ANY: Pred = Pred::Any(ENCODE_OR_ASTC);
+/// libktx refuses CompressBasis / UASTC / ASTC when the texture is marked for runtime mipmaps.
+const NOT_ENCODE_OR_ASTC: Pred = Pred::Not(&ENCODE_OR_ASTC_ANY);
 
 /// SINT / UINT formats (also invalid with `--generate-mipmap`) are not in [`VkFormat`].
 fn gates(key: OptionKey) -> &'static [Gate] {
@@ -434,10 +436,16 @@ fn gates(key: OptionKey) -> &'static [Gate] {
                 reason: "mutually exclusive with --runtime-mipmap",
             },
         ],
-        OptionKey::RuntimeMipmap => &[Gate {
-            pred: NOT_GENERATE_MIPMAP,
-            reason: "mutually exclusive with --generate-mipmap",
-        }],
+        OptionKey::RuntimeMipmap => &[
+            Gate {
+                pred: NOT_GENERATE_MIPMAP,
+                reason: "mutually exclusive with --generate-mipmap",
+            },
+            Gate {
+                pred: NOT_ENCODE_OR_ASTC,
+                reason: "not valid with BasisLZ, UASTC, or ASTC encoding",
+            },
+        ],
         OptionKey::Scale => &[Gate {
             pred: NOT_RAW,
             reason: "cannot be used with raw",
@@ -935,6 +943,32 @@ mod tests {
         o.container.runtime_mipmap = true;
         let c = check(&o).unwrap().container;
         assert!(!(c.generate_mipmap && c.runtime_mipmap));
+    }
+
+    #[test]
+    fn runtime_mipmap_dropped_with_encode_or_astc() {
+        // libktx: "Failed to encode … Operation not allowed in the current state"
+        let mut o = opts();
+        o.container.runtime_mipmap = true;
+        o.encode = None;
+        o.format = VkFormat::R8G8B8A8Srgb;
+        assert!(field(&report(&o), OptionKey::RuntimeMipmap).enabled);
+        assert!(check(&o).unwrap().container.runtime_mipmap);
+
+        o.encode = Some(EncodeCodec::BasisLz);
+        assert!(!field(&report(&o), OptionKey::RuntimeMipmap).enabled);
+        assert!(!check(&o).unwrap().container.runtime_mipmap);
+
+        let mut o = opts();
+        o.container.runtime_mipmap = true;
+        o.encode = Some(EncodeCodec::Uastc);
+        assert!(!check(&o).unwrap().container.runtime_mipmap);
+
+        let mut o = opts();
+        o.container.runtime_mipmap = true;
+        o.format = VkFormat::Astc4x4SrgbBlock;
+        assert!(!field(&report(&o), OptionKey::RuntimeMipmap).enabled);
+        assert!(!check(&o).unwrap().container.runtime_mipmap);
     }
 
     #[test]

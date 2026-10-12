@@ -1,6 +1,4 @@
 <script setup lang="ts">
-import RangeTickLabels from "../../shared/components/RangeTickLabels.vue";
-
 defineProps<{
   showPackSlider: boolean;
   showGeneratedMipSlider: boolean;
@@ -17,65 +15,63 @@ const emit = defineEmits<{
   packInput: [event: Event];
   generatedMipInput: [event: Event];
 }>();
-
-function formatMipTick(level: number): string {
-  return `L${String(level)}`;
-}
 </script>
 
 <template>
   <div
     v-if="showPackSlider || showGeneratedMipSlider"
-    class="flex shrink-0 flex-col gap-2"
+    class="flex shrink-0 flex-col gap-1"
   >
     <div
       v-if="showPackSlider"
-      class="flex flex-col gap-1"
+      class="flex items-center gap-2"
     >
       <label
-        class="text-sm text-ink-muted"
+        class="shrink-0 whitespace-nowrap text-xs text-ink-muted"
         for="preview-pack"
       >{{ packSliderLabel }}</label>
       <input
         id="preview-pack"
         type="range"
-        class="w-full accent-brand"
+        class="h-4 min-w-0 flex-1 accent-brand"
         min="0"
         :max="packMax"
         step="1"
         :value="previewIndex"
+        :aria-valuemin="0"
+        :aria-valuemax="packMax"
+        :aria-valuenow="previewIndex"
         @input="emit('packInput', $event)"
       >
-      <RangeTickLabels
-        :min="0"
-        :max="packMax"
-        :format="packAxisIsMip ? formatMipTick : undefined"
-      />
+      <span class="w-7 shrink-0 text-right font-mono text-[10px] tabular-nums text-ink-faint">
+        {{ packAxisIsMip ? `L${String(packMax)}` : String(packMax) }}
+      </span>
     </div>
 
     <div
       v-if="showGeneratedMipSlider"
-      class="flex flex-col gap-1"
+      class="flex items-center gap-2"
     >
       <label
-        class="text-sm text-ink-muted"
+        class="shrink-0 whitespace-nowrap text-xs text-ink-muted"
         for="preview-gen-mip"
       >{{ generatedMipLabel }}</label>
       <input
         id="preview-gen-mip"
         type="range"
-        class="w-full accent-brand"
+        class="h-4 min-w-0 flex-1 accent-brand"
         min="0"
         :max="generatedMipMax"
         step="1"
         :value="encodedMip"
+        :aria-valuemin="0"
+        :aria-valuemax="generatedMipMax"
+        :aria-valuenow="encodedMip"
         @input="emit('generatedMipInput', $event)"
       >
-      <RangeTickLabels
-        :min="0"
-        :max="generatedMipMax"
-        :format="formatMipTick"
-      />
+      <span class="w-7 shrink-0 text-right font-mono text-[10px] tabular-nums text-ink-faint">
+        L{{ generatedMipMax }}
+      </span>
     </div>
   </div>
 </template>

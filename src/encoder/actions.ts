@@ -147,7 +147,9 @@ function applyEncodeFailure(slot: OutputSlot, jobId: string, err: unknown): void
   }
   slot.job.status = "error";
   slot.job.result = null;
-  slot.job.errorMessage = formatAppError(appError);
+  const message = formatAppError(appError);
+  slot.job.errorMessage = message;
+  console.error(`[ktxforge] encode failed (${outputLabel(slot)}):\n${message}`);
 }
 
 async function encodeOne(slot: OutputSlot): Promise<void> {

@@ -1,5 +1,15 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import {
+  Activity,
+  Binary,
+  Cuboid,
+  Gauge,
+  HardDrive,
+  Layers,
+  Pyramid,
+  Scaling,
+} from "@lucide/vue";
+import { computed, type Component } from "vue";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import type { EncodeResult } from "../../bindings/EncodeResult";
 
@@ -7,9 +17,12 @@ const props = defineProps<{
   result: EncodeResult | null;
 }>();
 
-/** Present only after encode when that metric was computed for the job. */
-const ssimValue = computed((): number | null => props.result?.ssim ?? null);
-const psnrValue = computed((): number | null => props.result?.psnr ?? null);
+type MetaChip = {
+  key: string;
+  label: string;
+  value: string;
+  icon: Component;
+};
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) {
@@ -24,65 +37,92 @@ function formatBytes(bytes: number): string {
 function formatMetric(value: number): string {
   return value.toFixed(4);
 }
+
+const chips = computed((): MetaChip[] => {
+  const result = props.result;
+  const items: MetaChip[] = [
+    {
+      key: "size",
+      label: "Size",
+      value: result ? formatBytes(result.outputBytes) : "—",
+      icon: HardDrive,
+    },
+    {
+      key: "dimensions",
+      label: "Dimensions",
+      value: result ? `${String(result.width)}×${String(result.height)}` : "—",
+      icon: Scaling,
+    },
+    {
+      key: "codec",
+      label: "Codec",
+      value: result?.codec ?? "—",
+      icon: Binary,
+    },
+    {
+      key: "levels",
+      label: "Levels",
+      value: result ? String(result.levels) : "—",
+      icon: Pyramid,
+    },
+    {
+      key: "layers",
+      label: "Layers",
+      value: result ? String(result.layers) : "—",
+      icon: Layers,
+    },
+    {
+      key: "faces",
+      label: "Faces",
+      value: result ? String(result.faces) : "—",
+      icon: Cuboid,
+    },
+  ];
+
+  if (result !== null && result.ssim !== null) {
+    items.push({
+      key: "ssim",
+      label: "SSIM",
+      value: formatMetric(result.ssim),
+      icon: Gauge,
+    });
+  }
+
+  if (result !== null && result.psnr !== null) {
+    items.push({
+      key: "psnr",
+      label: "PSNR",
+      value: formatMetric(result.psnr),
+      icon: Activity,
+    });
+  }
+
+  return items;
+});
 </script>
 
 <template>
   <ScrollArea class="max-h-40 shrink-0">
     <div class="flex flex-col gap-2 pr-2">
-      <dl class="m-0 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-        <dt class="text-ink-muted">
-          Size
-        </dt>
-        <dd class="m-0 font-mono">
-          {{ result ? formatBytes(result.outputBytes) : "—" }}
-        </dd>
-        <dt class="text-ink-muted">
-          Dimensions
-        </dt>
-        <dd class="m-0 font-mono">
-          {{ result ? `${String(result.width)}×${String(result.height)}` : "—" }}
-        </dd>
-        <dt class="text-ink-muted">
-          Codec
-        </dt>
-        <dd class="m-0 font-mono">
-          {{ result?.codec ?? "—" }}
-        </dd>
-        <dt class="text-ink-muted">
-          Levels
-        </dt>
-        <dd class="m-0 font-mono">
-          {{ result ? String(result.levels) : "—" }}
-        </dd>
-        <dt class="text-ink-muted">
-          Layers
-        </dt>
-        <dd class="m-0 font-mono">
-          {{ result ? String(result.layers) : "—" }}
-        </dd>
-        <dt class="text-ink-muted">
-          Faces
-        </dt>
-        <dd class="m-0 font-mono">
-          {{ result ? String(result.faces) : "—" }}
-        </dd>
-        <template v-if="ssimValue !== null">
-          <dt class="text-ink-muted">
-            SSIM
-          </dt>
-          <dd class="m-0 font-mono">
-            {{ formatMetric(ssimValue) }}
-          </dd>
-        </template>
-        <template v-if="psnrValue !== null">
-          <dt class="text-ink-muted">
-            PSNR
-          </dt>
-          <dd class="m-0 font-mono">
-            {{ formatMetric(psnrValue) }}
-          </dd>
-        </template>
-      </dl>
+      <ul class="m-0 flex list-none flex-wrap gap-1.5 p-0">
+        <li
+          v-for="chip in chips"
+          :key="chip.key"
+          class="inline-flex items-center gap-1.5 rounded-md border border-transparent bg-surface-sunken px-2 py-1 text-xs shadow-sm"
+        >
+          <component
+            :is="chip.icon"
+            class="size-3.5 shrink-0 text-ink-muted"
+            aria-hidden="true"
+          />
+          <span class="text-ink-muted">
+            {{ chip.label }}
+          </span>
+          <span class="font-mono">
+            {{ chip.value }}
+          </span>
+        </li>
+      </ul>
 
       <ul
         v-if="result && result.warnings.length > 0"

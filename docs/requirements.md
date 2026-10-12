@@ -159,7 +159,7 @@ The UI must never offer a combination of inputs and options that the app already
 | `--depth` | 3D texture. Requires a front/back texture-coordinate origin |
 | `--levels` | Mip count. With generate-mipmap, this many levels are built. Otherwise this many input images are required |
 | `--generate-mipmap` | Full chain if `--levels` is omitted. Not valid for SINT, UINT, 3D, or raw |
-| `--runtime-mipmap` | Client generates mips later. Mutually exclusive with `--generate-mipmap` |
+| `--runtime-mipmap` | Client generates mips later. Mutually exclusive with `--generate-mipmap`. Not valid with BasisLZ, UASTC, or ASTC encoding (uncompressed only) |
 | `--width`, `--height` | Required for raw. Otherwise resamples. Enables the mipmap filter options |
 | `--scale` | Scale on load. Not valid with raw |
 | `--raw` | Raw input. Width and height required |

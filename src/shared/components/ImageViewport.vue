@@ -282,104 +282,96 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <div class="flex h-full min-h-0 flex-col gap-1">
-    <div class="flex shrink-0 items-center justify-between gap-2 px-0.5">
-      <p
-        v-if="hint"
-        class="hint m-0"
-      >
-        {{ hint }}
-      </p>
-      <span
-        v-else
-        class="text-xs text-ink-faint"
-      />
-      <span
-        v-if="sizeLabel !== null"
-        class="font-mono text-xs text-ink-faint"
-      >
-        {{ sizeLabel }}
-      </span>
+  <div
+    ref="frameRef"
+    class="viewer-frame relative h-full min-h-0 flex-1 overflow-hidden rounded-lg border border-transparent bg-surface-sunken shadow-sm"
+    :style="{ cursor: frameCursor }"
+    aria-label="Image preview"
+    @pointerdown="onPointerDown"
+    @pointermove="onPointerMove"
+    @pointerup="onPointerUp"
+    @pointercancel="onPointerUp"
+  >
+    <div
+      v-if="unavailableLabel !== null"
+      class="absolute inset-0 flex items-center justify-center p-4 text-sm text-ink-muted"
+    >
+      {{ unavailableLabel }}
+    </div>
+    <div
+      v-else-if="errorLabel !== null"
+      class="absolute inset-0 flex items-center justify-center p-4 text-sm text-ink-muted"
+    >
+      {{ errorLabel }}
+    </div>
+    <div
+      v-else-if="src === null && loading"
+      class="absolute inset-0 flex items-center justify-center text-sm text-ink-muted"
+    >
+      Loading…
+    </div>
+    <div
+      v-else-if="src === null"
+      class="absolute inset-0 flex items-center justify-center p-4 text-sm text-ink-faint"
+    >
+      {{ emptyLabel }}
     </div>
 
+    <!-- Single image: transform lives on the image stack -->
     <div
-      ref="frameRef"
-      class="viewer-frame relative min-h-0 flex-1 overflow-hidden rounded-lg border border-transparent bg-surface-sunken shadow-sm"
-      :style="{ cursor: frameCursor }"
-      aria-label="Image preview"
-      @pointerdown="onPointerDown"
-      @pointermove="onPointerMove"
-      @pointerup="onPointerUp"
-      @pointercancel="onPointerUp"
+      v-else-if="!comparing || !compareSrc"
+      class="absolute inset-0 flex items-center justify-center"
+      :class="{ 'opacity-0': !imageSized }"
     >
       <div
-        v-if="unavailableLabel !== null"
-        class="absolute inset-0 flex items-center justify-center p-4 text-sm text-ink-muted"
+        class="will-change-transform"
+        :style="transformStyle"
       >
-        {{ unavailableLabel }}
-      </div>
-      <div
-        v-else-if="errorLabel !== null"
-        class="absolute inset-0 flex items-center justify-center p-4 text-sm text-ink-muted"
-      >
-        {{ errorLabel }}
-      </div>
-      <div
-        v-else-if="src === null && loading"
-        class="absolute inset-0 flex items-center justify-center text-sm text-ink-muted"
-      >
-        Loading…
-      </div>
-      <div
-        v-else-if="src === null"
-        class="absolute inset-0 flex items-center justify-center p-4 text-sm text-ink-faint"
-      >
-        {{ emptyLabel }}
-      </div>
-
-      <!-- Single image: transform lives on the image stack -->
-      <div
-        v-else-if="!comparing || !compareSrc"
-        class="absolute inset-0 flex items-center justify-center"
-        :class="{ 'opacity-0': !imageSized }"
-      >
-        <div
-          class="will-change-transform"
-          :style="transformStyle"
-        >
-          <div class="checkerboard inline-block">
-            <img
-              :src="src"
-              :alt="alt"
-              class="viewer-img block max-w-none"
-              draggable="false"
-              @load="onPrimaryLoad"
-              @dragstart.prevent
-            >
-          </div>
+        <div class="checkerboard inline-block">
+          <img
+            :src="src"
+            :alt="alt"
+            class="viewer-img block max-w-none"
+            draggable="false"
+            @load="onPrimaryLoad"
+            @dragstart.prevent
+          >
         </div>
       </div>
-
-      <ImageCompareLayers
-        v-else-if="compareSrc !== null && compareSrc !== ''"
-        :src="src"
-        :compare-src="compareSrc"
-        :alt="alt"
-        :compare-alt="compareAlt"
-        :split-pct="splitPct"
-        :transform-style="transformStyle"
-        :canvas-style="canvasStyle"
-        :reveal-inner-style="revealInnerStyle"
-        :original-label="originalLabel"
-        :result-label="resultLabel"
-        :show-chrome="!loading && errorLabel === null"
-        @primary-load="onPrimaryLoad"
-        @compare-load="onCompareLoad"
-        @split-pointer-down="onSplitPointerDown"
-        @split-pointer-move="onSplitPointerMove"
-        @split-pointer-up="onSplitPointerUp"
-      />
     </div>
+
+    <ImageCompareLayers
+      v-else-if="compareSrc !== null && compareSrc !== ''"
+      :src="src"
+      :compare-src="compareSrc"
+      :alt="alt"
+      :compare-alt="compareAlt"
+      :split-pct="splitPct"
+      :transform-style="transformStyle"
+      :canvas-style="canvasStyle"
+      :reveal-inner-style="revealInnerStyle"
+      :original-label="originalLabel"
+      :result-label="resultLabel"
+      :show-chrome="!loading && errorLabel === null"
+      @primary-load="onPrimaryLoad"
+      @compare-load="onCompareLoad"
+      @split-pointer-down="onSplitPointerDown"
+      @split-pointer-move="onSplitPointerMove"
+      @split-pointer-up="onSplitPointerUp"
+    />
+
+    <p
+      v-if="hint"
+      class="pointer-events-none absolute top-2 left-2 z-10 m-0 max-w-[min(100%-1rem,20rem)] rounded bg-black/55 px-1.5 py-0.5 text-[10px] leading-snug text-white"
+    >
+      {{ hint }}
+    </p>
+    <span
+      v-if="sizeLabel !== null"
+      class="pointer-events-none absolute top-2 right-2 z-10 rounded bg-black/55 px-1.5 py-0.5 font-mono text-[10px] tabular-nums text-white"
+    >
+      {{ sizeLabel }}
+    </span>
   </div>
 </template>
 

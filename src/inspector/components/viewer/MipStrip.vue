@@ -1,11 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
 import { report, selection } from "../../store";
-import RangeTickLabels from "../../../shared/components/RangeTickLabels.vue";
-
-function formatMipTick(level: number): string {
-  return `L${String(level)}`;
-}
 
 type MipEntry = {
   level: number;
@@ -78,27 +73,28 @@ function onLevelInput(event: Event): void {
 <template>
   <div
     v-if="entries.length > 0"
-    class="flex flex-col gap-1"
+    class="flex items-center gap-2"
   >
     <label
-      class="text-sm text-ink-muted"
+      class="shrink-0 whitespace-nowrap text-xs text-ink-muted"
       for="inspector-mip"
     >{{ label }}</label>
     <input
       id="inspector-mip"
       type="range"
-      class="w-full accent-brand"
+      class="h-4 min-w-0 flex-1 accent-brand"
       min="0"
       :max="maxLevel"
       step="1"
       :value="selection.level"
       :disabled="maxLevel === 0"
+      :aria-valuemin="0"
+      :aria-valuemax="maxLevel"
+      :aria-valuenow="selection.level"
       @input="onLevelInput"
     >
-    <RangeTickLabels
-      :min="0"
-      :max="maxLevel"
-      :format="formatMipTick"
-    />
+    <span class="w-7 shrink-0 text-right font-mono text-[10px] tabular-nums text-ink-faint">
+      L{{ maxLevel }}
+    </span>
   </div>
 </template>

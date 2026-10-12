@@ -183,6 +183,21 @@ pub async fn run(
 ) -> Result<KtxOutput, AppError> {
     let out = run_collect(app, tool, args, on_stderr, cancel).await?;
     if out.code != 0 {
+        let name = tool.name();
+        let stderr = out.stderr.trim();
+        if stderr.is_empty() {
+            eprintln!(
+                "ktxforge: {name} failed (exit {} — {})",
+                out.code,
+                AppError::exit_meaning(out.code)
+            );
+        } else {
+            eprintln!(
+                "ktxforge: {name} failed (exit {} — {}):\n{stderr}",
+                out.code,
+                AppError::exit_meaning(out.code)
+            );
+        }
         return Err(AppError::ktx(out.code, out.stderr));
     }
     Ok(out)

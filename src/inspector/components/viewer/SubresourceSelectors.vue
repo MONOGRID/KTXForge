@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, watch } from "vue";
-import RangeTickLabels from "../../../shared/components/RangeTickLabels.vue";
 import { report, selection } from "../../store";
 
 const FACE_LABELS = [
@@ -112,16 +111,16 @@ watch(
 <template>
   <div
     v-if="visible"
-    class="flex flex-col gap-2"
+    class="flex flex-col gap-1"
   >
     <div
       v-if="showFaces"
-      class="flex flex-col gap-1"
+      class="flex items-center gap-2"
     >
-      <div class="text-sm text-ink-muted">
+      <span class="shrink-0 whitespace-nowrap text-xs text-ink-muted">
         Face
-      </div>
-      <div class="flex flex-wrap gap-1">
+      </span>
+      <div class="flex min-w-0 flex-wrap gap-1">
         <button
           v-for="(label, index) in FACE_LABELS"
           :key="label"
@@ -139,50 +138,54 @@ watch(
 
     <div
       v-if="showLayers"
-      class="flex flex-col gap-1"
+      class="flex items-center gap-2"
     >
       <label
-        class="text-sm text-ink-muted"
+        class="shrink-0 whitespace-nowrap text-xs text-ink-muted"
         for="inspector-layer"
       >Layer {{ selection.layer }}</label>
       <input
         id="inspector-layer"
         type="range"
-        class="w-full accent-brand"
+        class="h-4 min-w-0 flex-1 accent-brand"
         min="0"
         :max="layerMax"
         step="1"
         :value="selection.layer"
+        :aria-valuemin="0"
+        :aria-valuemax="layerMax"
+        :aria-valuenow="selection.layer"
         @input="onLayerInput"
       >
-      <RangeTickLabels
-        :min="0"
-        :max="layerMax"
-      />
+      <span class="w-7 shrink-0 text-right font-mono text-[10px] tabular-nums text-ink-faint">
+        {{ layerMax }}
+      </span>
     </div>
 
     <div
       v-if="showDepth"
-      class="flex flex-col gap-1"
+      class="flex items-center gap-2"
     >
       <label
-        class="text-sm text-ink-muted"
+        class="shrink-0 whitespace-nowrap text-xs text-ink-muted"
         for="inspector-depth"
       >Depth {{ selection.depthSlice }}</label>
       <input
         id="inspector-depth"
         type="range"
-        class="w-full accent-brand"
+        class="h-4 min-w-0 flex-1 accent-brand"
         min="0"
         :max="depthMax"
         step="1"
         :value="selection.depthSlice"
+        :aria-valuemin="0"
+        :aria-valuemax="depthMax"
+        :aria-valuenow="selection.depthSlice"
         @input="onDepthInput"
       >
-      <RangeTickLabels
-        :min="0"
-        :max="depthMax"
-      />
+      <span class="w-7 shrink-0 text-right font-mono text-[10px] tabular-nums text-ink-faint">
+        {{ depthMax }}
+      </span>
     </div>
   </div>
 </template>
