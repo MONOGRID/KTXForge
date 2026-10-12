@@ -24,7 +24,7 @@ Read [AGENTS.md](../AGENTS.md) and [decision-context.md](decision-context.md) fi
 | 1 | `build` |
 | 2–5 | `feat` (`build` for tooling-only tasks) |
 | 6 | `ci` |
-| 7 | `docs` or `test` |
+| 7 | `test` (T7.0 Vitest), then `docs` (T7.1–T7.3) |
 
 A change that breaks a previously released behavior or file format adds `!` after the type and a `BREAKING CHANGE:` footer. Before the first release there is nothing to break, so no task in this plan uses it.
 
@@ -57,7 +57,7 @@ One command runs every check, in the same order locally, in each sub-agent's wor
 | Script | Runs | Catches |
 | --- | --- | --- |
 | `check:rust` | `cargo fmt --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`, `cargo machete` (all with `--manifest-path src-tauri/Cargo.toml`) | Rust format, lints, dead code (`dead_code` is denied by `-D warnings`), failing tests, unused crates |
-| `check:web` | `npm run build` (vue-tsc + vite), `npm run lint`, `npm run lint:style` | Type errors, ESLint, Stylelint |
+| `check:web` | `npm run build` (vue-tsc + vite), `npm run lint`, `npm run lint:style`, `npm run test` (Vitest, added in T7.0) | Type errors, ESLint, Stylelint, frontend unit tests |
 | `check:fallow` | `fallow dead-code --fail-on-issues`, `fallow dupes --threshold 3`, `fallow health --min-score 85 --min-severity high` | Unused files, exports, types, dependencies, Vue props and emits, stale suppressions; duplicated code above 3% of the codebase; health score below 85 or any high-severity complexity finding |
 | `check` | `check:rust`, then `check:web`, then `check:fallow`, stopping at the first failure | Everything above |
 
@@ -82,7 +82,7 @@ Every sub-agent follows these. They restate AGENTS.md and add the conventions th
 - **TypeScript.** `strict`, no `any`, no casts, no `@ts-ignore`. Prefer `satisfies`.
 - **Styles.** UnoCSS utilities and the shortcuts in `uno.config.ts`. SCSS only for what utilities cannot express, local to the component.
 - **Reuse.** VueUse before a hand-written composable.
-- **Tests.** Rust engine code has unit tests next to it (`#[cfg(test)] mod tests`). Tests that need the real `ktx` binary are marked `#[ignore]` and run in CI with `cargo test -- --include-ignored` after `npm run fetch-ktx`.
+- **Tests.** Rust engine code has unit tests next to it (`#[cfg(test)] mod tests`). Tests that need the real `ktx` binary are marked `#[ignore]` and run in CI with `cargo test -- --include-ignored` after `npm run fetch-ktx`. Frontend pure logic (scrub gate, menu shortcut matching, image-cache LRU, and similar) has Vitest unit tests next to the module or under `src/**/*.test.ts` (T7.0). Do not reintroduce `scripts/*-selftest.mjs` once Vitest is in place.
 - **Fixtures** live in `src-tauri/tests/fixtures/` and are read-only for every task except T0.3.
 - **Code written ahead of its consumer.** Scaffold and Wave 2 tasks create TypeScript exports and Vue components that nothing uses until Wave 5, which fallow reports as unused. Mark each export with a `/** @expected-unused consumed by T5.1 */` JSDoc tag, and each component file nothing imports yet with `// fallow-ignore-file unused-file` plus a `// consumed by T5.4` comment on the line above, in its `<script setup>`. The consuming task deletes the marker. Both forms are tracked by fallow 3.33 (`fallow explain stale-suppression`). Fallow reports a marker that no longer matches a finding as a stale suppression, so a forgotten marker fails `check:fallow`. Wave 7 requires zero markers left (`fallow suppressions` lists them).
 - **Duplication.** When `fallow dupes` flags repeated blocks, extract a shared component, composable, or Rust helper. In the option sections (T5.2, T5.3), repeated field markup means `OptionField` should be driven by data, not copied.
@@ -169,14 +169,14 @@ Logged in [decision-context.md](decision-context.md).
 | `ktx` version | v4.4.2. **Settled:** stay on 4.4.2; defer missing CLI options (see [ktx-cli/README.md](ktx-cli/README.md)). |
 | Repository | `https://github.com/MONOGRID/KTXForge` |
 | Product | name `KTXForge`, identifier `com.monogrid.ktxforge` |
-| Updater signing key | The user generates it (`npx tauri signer generate`), stores the private key and password as GitHub secrets, and provides the public key for T6.3. |
-| Quality | fallow dead code, duplication, and health run in `npm run check` next to lint and typecheck, at every task and wave gate and in CI. |
+| Updater signing key | Settled: pubkey in `tauri.conf.json`; private key in 1Password Tech vault + GitHub secret `TAURI_SIGNING_PRIVATE_KEY` (see [updater-signing.md](updater-signing.md)). |
+| Quality | fallow dead code, duplication, and health run in `npm run check` next to lint and typecheck, at every task and wave gate and in CI. Vitest joins `check:web` in T7.0. |
 | Releases | semantic-release on `main`: version from commit messages, `CHANGELOG.md`, tag, GitHub Release, Tauri artifacts, published automatically. |
+| UI (Wave 7) | Accepted as shipped on `dev`; Wave 7 audits and tests, does not redesign. |
 
 ## Still open
 
-1. **Public key** for the updater (blocks T6.3 only).
-2. **Branch protection on `main`.** If `main` requires pull requests, the release bot cannot push the version commit with the default `GITHUB_TOKEN`. Either allow `github-actions[bot]` to bypass, or create a GitHub App and use its token (T6.2 supports both).
+1. **Branch protection on `main`.** If `main` requires pull requests, the release bot cannot push the version commit with the default `GITHUB_TOKEN`. Either allow `github-actions[bot]` to bypass, or create a GitHub App and use its token (T6.2 supports both). Updater pubkey and signing private key are settled (see decision-context 2026-10-11 / 2026-10-12).
 
 ---
 
@@ -224,7 +224,7 @@ Facts later tasks depend on. Run by **one capable agent or a human**, not a low-
 
 ## Wave 1 — Scaffold
 
-Status: **in progress** (2026-10-10). T1.1 scaffold is in place and `npm run check` passes. Remaining for the wave gate: manual `npm run tauri dev` (window title KTX-GUI) and rename local `master` → `dev` when pushing to GitHub.
+Status: **complete** (2026-10-10; product later renamed to KTXForge). T1.1 scaffold landed; `npm run check` green. Integration branch is `dev` on `MONOGRID/KTXForge`.
 
 **One agent, sequential.** This wave creates every file in the target layout with compiling stubs, all dependencies, and all command registrations. After it, later tasks only fill in bodies inside files they own. This is what lets Waves 2–5 run in parallel.
 
@@ -467,9 +467,11 @@ Parallel. Each task fills one command file (registered already in T1.1).
 
 ## Wave 5 — Frontend
 
-Status: **complete** (2026-10-10). T5.1–T5.8 merged; `npm run check` green on integration branch `master` (rename to `dev` still pending).
+Status: **complete** (2026-10-10); **UI accepted** after extensive post-wave iteration (through 2026-10-12). T5.1–T5.8 merged; later work (batch encoder, shadcn-vue, theme, scrub concurrency, notifications, shortcuts, etc.) is logged in [decision-context.md](decision-context.md). Wave 7 does not reopen UI design — see Wave 7 "Settled".
 
-Parallel. Vue only renders and calls `src/api`. Each task owns its own folder or files.
+Historical task text below describes the first Vue pass. Current layout and component names may differ; implementers of Wave 7 acceptance use the live tree and requirements.md, not these file lists as a redesign checklist.
+
+Parallel (historical). Vue only renders and calls `src/api`.
 
 ### T5.1 Encoder state and shell
 
@@ -605,27 +607,61 @@ This replaces the manual "publish the draft" step in requirements.md. The change
 
 ---
 
-## Wave 7 — Integration and acceptance
+## Wave 7 — Vitest, acceptance, and ship prep
 
-Sequential. A capable agent or a human.
+Status: **complete** (2026-10-12). T7.0–T7.3 done; see [acceptance.md](acceptance.md). Waves 0–6 were already done. UI remains accepted — no redesign in this wave. macOS/Windows interactive installer smoke is pending hardware (Linux recorded); updater smoke N/A until first `main` publish.
 
-### T7.1 Spec coverage audit
+Sequential unless noted. A capable agent or a human for T7.1–T7.3; T7.0 can be a focused sub-agent.
+
+### Settled for Wave 7 (2026-10-12)
+
+| Topic | Answer |
+| --- | --- |
+| UI | Accepted. `docs/acceptance.md` records where each requirement lives and how it was verified; it does not invent new chrome. Screenshots under `docs/screenshots/` (if present) are reference only. |
+| Frontend tests | **Vitest** replaces the ad-hoc Node selftests (`scripts/*-selftest.mjs`, `npm run test:scrub-gate` / `test:menu-shortcuts` / `test:image-cache-lru`). Those scripts exist because Vitest was not in the repo yet; T7.0 removes them. |
+| What stays manual | OS installer smoke and real drag-drop / dialog / updater paths (T7.2). Pure logic that those selftests already covered must not stay manual. |
+| Quality gate | After T7.0, `check:web` runs `npm run test` (`vitest run`) so CI and every commit gate get the same suite. |
+
+### T7.0 Vitest — migrate selftests, wire into `check` ✅
+
+- **Owns:** `package.json`, `package-lock.json`, `vite.config.ts` (or `vitest.config.ts` if kept separate), `src/**/*.test.ts` (new), `src/shared/menuShortcuts.ts` (export pure matcher only), `src/inspector/imageCache.ts` (extract pure LRU / slot helpers only if tests cannot import them cleanly), delete `scripts/scrub-gate-selftest.mjs`, `scripts/menu-shortcuts-selftest.mjs`, `scripts/image-cache-lru-selftest.mjs`, `docs/decision-context.md` (append only)
+- **Read:** the three selftest scripts (behavior to preserve), `src/shared/scrubGate.ts`, `src/shared/menuShortcuts.ts`, `src/inspector/imageCache.ts`, this wave's "Settled" table
+- **Do:**
+  1. Add `vitest` as a `devDependency`. Prefer configuring `test` inside the existing Vite config (`/// <reference types="vitest/config" />` + `test: { environment: "node", include: ["src/**/*.test.ts"] }`), or a small `vitest.config.ts` that reuses the `@` alias. Default environment is **`node`** — these suites are pure logic, not component mounts. Do **not** add `@vue/test-utils` / happy-dom / jsdom unless a later follow-up needs component tests (out of scope here).
+  2. Scripts: `"test": "vitest run"`, `"test:watch": "vitest"`. Remove `test:scrub-gate`, `test:menu-shortcuts`, `test:image-cache-lru`. Extend `check:web` to `npm run build && npm run lint && npm run lint:style && npm run test`.
+  3. Migrate each selftest 1:1 into Vitest (same assertions, same edge cases):
+     - **`src/shared/scrubGate.test.ts`** — stampede / latest-only coalesce from `scrub-gate-selftest.mjs` (import `createScrubGate`).
+     - **`src/shared/menuShortcuts.test.ts`** — export `matchMenuShortcut` (or an equivalent pure function) from `menuShortcuts.ts` for direct cases (Ctrl chords, shift-sensitive export, zoom `any`-shift). Keep a thin file-sync check that `menu.rs` still declares the same `CmdOrCtrl+…` accelerators and that Encoder/Inspector still call `bindWindowsMenuShortcuts` (read files with `node:fs` in the test, or keep a tiny helper — do not shell out to the deleted selftest).
+     - **`src/inspector/imageCache.test.ts`** — LRU soft cap + pin survival. Prefer testing real module exports (`retainInspectorImage` / `releaseInspectorImage` / remember path) with `URL.createObjectURL` / `revokeObjectURL` stubbed; if the module's Tauri `call("extract_concurrency")` side effect gets in the way, extract the LRU + `extractSlotsForCores` helpers into a small pure module co-located under `src/inspector/` and test that. Cap under test must match production (`MAX_MEMORY_ENTRIES` is 32, not the stale 16 inlined in the selftest).
+  4. Optional same-PR extras only if cheap and already pure: `extractSlotsForCores` core→slot table; any other tiny pure helper the selftests forced you to extract. No Vue SFC snapshot suite.
+  5. Delete the three `scripts/*-selftest.mjs` files. Grep the repo for `selftest` / `test:scrub-gate` / `test:menu-shortcuts` / `test:image-cache-lru` and update docs/comments (including the decision-context Windows-menu entry's "locked by `npm run test:menu-shortcuts`" line → `npm run test` / the Vitest file).
+  6. Append a dated decision-context entry: Vitest for frontend unit tests; selftests removed; UI accepted for Wave 7 (no redesign).
+- **Done when:** `npm run test` passes; the three selftest scripts are gone; `npm run check` runs Vitest via `check:web`; `grep -r selftest scripts` is empty; decision-context has the entry.
+
+### T7.1 Spec coverage audit ✅
 
 - **Owns:** `docs/acceptance.md`
-- **Do:** One row per numbered product requirement and per option in the requirements tables: where it is implemented (Rust file, Vue component), how it was verified (test name or manual step), status. Any gap becomes a follow-up task appended to this plan.
+- **Do:** One row per numbered product requirement and per option in the requirements tables: where it is implemented (Rust file, Vue component — use the **current** UI names/paths, not the obsolete Wave 5 three-column source-list wording), how it was verified (`cargo test` name, Vitest file/`it` name, or T7.2 smoke step), status (`pass` / `deferred` with pointer to [ktx-cli/README.md](ktx-cli/README.md) / follow-up task). Treat UI chrome as accepted: do not file gaps for "looks different from Wave 5 task text" when the requirement is met. Any real functional gap becomes a follow-up task appended to this plan.
 - **Done when:** no row says "missing" without a follow-up task; `fallow suppressions` lists no "consumed by" marker; `npm run check` passes with no baseline.
 
-### T7.2 Smoke test on every OS
+### T7.2 Smoke test on every OS ✅
 
 - **Owns:** `docs/acceptance.md` (smoke section)
-- **Do:** Install the draft release artifacts on Windows x64, macOS arm64, and Linux x64 (and the others when hardware exists). On each: app starts with no KTX tools installed; encode PNG, JPEG, and EXR; encode a 4-frame animation; open each fixture in the inspector; browse mips; play the animation; export PNG and JPEG; install the previous release, merge a `fix:` commit to `main`, let the pipeline publish, and confirm the installed app offers and installs the update.
-- **Done when:** every step is recorded as pass or fail with notes.
+- **Do:** Install release (or local `tauri build`) artifacts on Windows x64, macOS arm64, and Linux x64 (and the others when hardware exists). On each, record pass/fail only — no UI redesign notes:
+  1. App starts with no system KTX tools installed; window title/product is KTXForge.
+  2. Encode PNG, JPEG, and EXR through the current batch encoder; encode a multi-input animation (or array) path the UI exposes.
+  3. Open representative fixtures in the inspector (including `truncated.ktx2` validation); browse mips; scrub layers/frames if present; play anim when `KTXanimData` exists.
+  4. Export PNG and JPEG from the inspector footer.
+  5. Updater path when a prior install exists: merge a `fix:` commit to `main`, let the pipeline publish, confirm the installed app offers and installs the update (skip on the very first public release; note "N/A — first release").
+- **Done when:** every step is recorded as pass, fail, or N/A with notes in the smoke section.
 
-### T7.3 Docs
+### T7.3 Docs ✅
 
 - **Owns:** `README.md`, `docs/decision-context.md` (append only)
-- **Do:** Replace the template README: what the app does; prerequisites (Node, Rust, `cargo install cargo-machete`); how to run it (`npm ci`, `npm run fetch-ktx`, `npm run tauri dev`); `npm run check`; the commit convention and how it drives releases (link `CHANGELOG.md`); how to bump the `ktx` version (a `feat:` or `fix:` commit editing `ktx-version.json`). Append decision entries for anything decided during implementation that is not yet logged.
-- **Done when:** a fresh clone following the README reaches a running app.
+- **Do:** Replace any remaining template README content: what KTXForge does; prerequisites (Node, Rust; `npm run setup` / `ensure-tools` for rustfmt, clippy, cargo-machete, fetch-ktx); how to run (`npm ci`, `npm run setup`, `npm run tauri dev`); `npm run check` and `npm run test`; commit convention and releases (link `CHANGELOG.md`); how to bump the `ktx` pin (`ktx-version.json`); pointer to [updater-signing.md](updater-signing.md) for signed local builds. Append decision entries for anything decided during Wave 7 that is not yet logged.
+- **Done when:** a fresh clone following the README reaches a running app; `npm run check` passes.
+
+**Wave 7 gate:** T7.0–T7.3 done; `npm run check` green on `dev`; orchestrator merges `dev` → `main` only when ready to publish the first release.
 
 ---
 
@@ -633,13 +669,13 @@ Sequential. A capable agent or a human.
 
 Every task ends with `npm run check` in its worktree; every wave ends with `npm run check` on the merged `dev` branch.
 
-| Wave | Tasks | Parallel | Who |
-| --- | --- | --- | --- |
-| 0 Spikes | T0.1–T0.3 | T0.1 first, then T0.2 and T0.3 | Capable agent or human |
-| 1 Scaffold | T1.1 | No | One agent |
-| 2 Contracts | T2.1–T2.5, then T2.6 | Yes | Sub-agents |
-| 3 Engines | T3.1–T3.10 | Yes | Sub-agents |
-| 4 Commands | T4.1–T4.6 | Yes | Sub-agents |
-| 5 Frontend | T5.1–T5.7, then T5.8 | Yes (T5.4 merges after T5.2/T5.3) | Sub-agents |
-| 6 CI/release | T6.1–T6.4 | Yes, from Wave 3 on | Sub-agents; T6.3 needs the public key |
-| 7 Acceptance | T7.1–T7.3 | No | Capable agent or human |
+| Wave | Tasks | Parallel | Who | Status |
+| --- | --- | --- | --- | --- |
+| 0 Spikes | T0.1–T0.3 | T0.1 first, then T0.2 and T0.3 | Capable agent or human | complete |
+| 1 Scaffold | T1.1 | No | One agent | complete |
+| 2 Contracts | T2.1–T2.5, then T2.6 | Yes | Sub-agents | complete |
+| 3 Engines | T3.1–T3.10 | Yes | Sub-agents | complete |
+| 4 Commands | T4.1–T4.6 | Yes | Sub-agents | complete |
+| 5 Frontend | T5.1–T5.8 (+ later accepted UI iteration) | Yes (historical) | Sub-agents / human | complete; UI accepted |
+| 6 CI/release | T6.1–T6.4 | Yes | Sub-agents | complete |
+| 7 Vitest + acceptance | T7.0–T7.3 | T7.0 first, then T7.1–T7.3 sequential | Capable agent or human | complete |

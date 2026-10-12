@@ -362,7 +362,7 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 
 ## 2026-10-11 — Windows menu accelerator fallback via keydown
 
-**Decided:** Keep native muda accelerators on the File/View menu items for display and for macOS/Linux. On Windows only, bind a capture-phase `keydown` listener (`bindWindowsMenuShortcuts`) that maps the same Ctrl chords to menu ids and invokes `dispatch_menu_action`. That command checks the live menu-item enabled flag, then runs the shared `handle_menu_id` path used by `on_menu_event`. Matcher coverage is locked by `npm run test:menu-shortcuts`.
+**Decided:** Keep native muda accelerators on the File/View menu items for display and for macOS/Linux. On Windows only, bind a capture-phase `keydown` listener (`bindWindowsMenuShortcuts`) that maps the same Ctrl chords to menu ids and invokes `dispatch_menu_action`. That command checks the live menu-item enabled flag, then runs the shared `handle_menu_id` path used by `on_menu_event`. Matcher coverage is locked by Vitest (`src/shared/menuShortcuts.test.ts` / `npm run test`).
 
 **Why:** WebView2 swallows keyboard input before Win32 `TranslateAcceleratorW`, so menu clicks work but the accelerators next to them do nothing (wry#451 / tauri#6365). A JS fallback is the established workaround; routing through Rust keeps enablement and Open/Exit/updater behavior in one place.
 
@@ -443,3 +443,15 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 **Decided:** (Replaces the three 2026-10-12 entries on export toolbar, Viewer card, and Encode footer.) Inspector Viewer is a `panel` card (`Eye` + “Viewer”). Encode and Export are titleless full-width footers below each window’s `ResizablePanelGroup`, controls right-aligned (progress left on Encode). Export uses Scope/Format `EnumSelect`s; HDR → EXR only.
 
 **Why:** Session actions aren’t column-local; footers match across apps and free column space.
+
+## 2026-10-12 — Wave 7: Vitest + accepted UI
+
+**Decided:** Finish [development-plan.md](development-plan.md) Wave 7 as Vitest + acceptance + ship prep. Encoder/inspector UI on `dev` is **accepted** after the post–Wave 5 iteration; Wave 7 does not redesign chrome. Replace the hand-run Node selftests (`scripts/scrub-gate-selftest.mjs`, `menu-shortcuts-selftest.mjs`, `image-cache-lru-selftest.mjs` and their `npm run test:*` scripts) with **Vitest** unit tests under `src/**/*.test.ts`, environment `node`, wired into `check:web` via `npm run test` (`vitest run`). Keep OS installer / drag-drop / dialog / updater checks as T7.2 smoke only. Spec audit (T7.1) maps requirements to the live tree and existing cargo/Vitest tests, not to obsolete Wave 5 file lists.
+
+**Why:** The selftests already document the contracts agents must not break; they explicitly noted “no vitest in this repo.” Putting the same cases in Vitest makes them part of the single quality gate and CI. Reopening UI in acceptance would fight settled decision-context entries (shadcn, batch encoder, theme, footers, scrub concurrency).
+
+## 2026-10-12 — Wave 7 implemented (T7.0–T7.3)
+
+**Decided:** Ship Wave 7 on `dev`: Vitest (`vite.config.ts` `test` block, `src/**/*.test.ts`), pure LRU helpers in `src/inspector/imageMemoryLru.ts`, exported `matchMenuShortcut`, selftest scripts removed, `check:web` runs `npm run test`. Acceptance recorded in [acceptance.md](acceptance.md). README documents `npm run test`. macOS/Windows interactive installer smoke stays pending hardware; updater smoke is N/A until the first `main` release. No follow-up tasks for deferred v4.4.2 gaps (already logged in ktx-cli README).
+
+**Why:** Completes the development-plan wave gate without blocking the first ship on every-OS manual installs that CI already covers for compile/test.

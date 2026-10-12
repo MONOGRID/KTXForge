@@ -69,11 +69,20 @@ npm run tauri dev
 
 Prerequisites: Node LTS and [Rust via rustup](https://rustup.rs) (stable). On Linux you also need the usual Tauri system packages (`libwebkit2gtk-4.1-dev`, `libappindicator3-dev`, `librsvg2-dev`, `patchelf`). `npm run setup` installs `rustfmt`, `clippy`, and `cargo-machete` when missing, then stages the `ktx` sidecar. The same tool install + fetch runs via `precheck:rust` before `npm run check`; `pretauri` only runs `fetch-ktx` (host triple) so release cross-builds stay fast.
 
-Quality gate before commit:
+Quality gate before commit (Rust fmt/clippy/tests/machete, Vue build/lint/style, Vitest, fallow):
 
 ```bash
 npm run check
 ```
+
+Frontend unit tests alone:
+
+```bash
+npm run test          # vitest run
+npm run test:watch    # vitest
+```
+
+Acceptance checklist: [`docs/acceptance.md`](docs/acceptance.md).
 
 Local release-style builds that produce updater signatures need the private key from 1Password (Tech vault), not a key file on disk. See [docs/updater-signing.md](docs/updater-signing.md):
 

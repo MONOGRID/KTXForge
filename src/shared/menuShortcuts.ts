@@ -58,7 +58,9 @@ function resolveShortcutId(
  * Used as the Windows fallback when native muda accelerators do not fire
  * under WebView2 (wry#451).
  */
-function matchMenuShortcut(event: ShortcutEvent): AcceleratedMenuId | null {
+export function matchMenuShortcut(
+  event: ShortcutEvent,
+): AcceleratedMenuId | null {
   if (!isCtrlOnlyShortcut(event)) {
     return null;
   }
