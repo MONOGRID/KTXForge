@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Boxes, ImagePlus, Plus, X } from "@lucide/vue";
 import { computed } from "vue";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { addInputsForOutput, openSourcesAsOutputs } from "../actions";
@@ -69,7 +70,11 @@ function canAddInputs(slot: OutputSlot): boolean {
     @pointerenter="onPointerEnter"
   >
     <header class="flex items-center justify-between gap-2 border-b border-line px-3 py-2">
-      <h2 class="m-0 text-sm font-semibold">
+      <h2 class="m-0 flex min-w-0 items-center gap-1.5 text-sm font-semibold">
+        <Boxes
+          class="size-4 shrink-0 text-ink-muted"
+          aria-hidden="true"
+        />
         KTX outputs
       </h2>
       <button
@@ -78,6 +83,10 @@ function canAddInputs(slot: OutputSlot): boolean {
         :disabled="store.queue !== null"
         @click="onAdd"
       >
+        <Plus
+          class="size-4 shrink-0"
+          aria-hidden="true"
+        />
         Add…
       </button>
     </header>
@@ -116,22 +125,28 @@ function canAddInputs(slot: OutputSlot): boolean {
           </button>
           <button
             type="button"
-            class="btn shrink-0 px-1.5 py-0.5 text-xs"
+            class="btn shrink-0 px-1.5 py-0.5"
             aria-label="Add inputs for this output"
             title="Add inputs"
             :disabled="!canAddInputs(slot)"
             @click="onAddInputs(slot)"
           >
-            +
+            <ImagePlus
+              class="size-3.5"
+              aria-hidden="true"
+            />
           </button>
           <button
             type="button"
-            class="btn shrink-0 px-1.5 py-0.5 text-xs"
+            class="btn shrink-0 px-1.5 py-0.5"
             aria-label="Remove output"
             :disabled="!canRemove(slot)"
             @click="removeOutput(slot.id)"
           >
-            ✕
+            <X
+              class="size-3.5"
+              aria-hidden="true"
+            />
           </button>
         </li>
       </ul>

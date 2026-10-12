@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Braces } from "@lucide/vue";
 import { computed } from "vue";
 import type { KeyValueEntry } from "../../../bindings/KeyValueEntry";
 import Panel from "../../../shared/components/Panel.vue";
@@ -12,7 +13,10 @@ const rows = computed((): KeyValueEntry[] => props.entries ?? []);
 </script>
 
 <template>
-  <Panel title="Other key/value pairs">
+  <Panel
+    title="Other key/value pairs"
+    :icon="Braces"
+  >
     <div
       v-if="rows.length === 0"
       class="py-1.5 text-sm text-ink-muted"

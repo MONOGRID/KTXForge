@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Grid2x2 } from "@lucide/vue";
 import { computed } from "vue";
 import type { AstcQuality } from "../../../bindings/AstcQuality";
 import type { OptionKey } from "../../../bindings/OptionKey";
@@ -51,6 +52,7 @@ function pickQuality(value: string | null): void {
   <Panel
     v-if="anyEnabled(KEYS)"
     title="ASTC"
+    :icon="Grid2x2"
   >
     <OptionField
       label="ASTC quality"

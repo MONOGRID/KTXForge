@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ChevronDown, ChevronUp, Images, Plus, X } from "@lucide/vue";
 import { useTimeoutFn } from "@vueuse/core";
 import { computed, onMounted, onUnmounted, reactive, watch } from "vue";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -10,6 +11,7 @@ import type { EnumSelectOption } from "../../shared/enumSelect";
 import { openSourcesAsInputs } from "../actions";
 import { isDropTarget, setDropZone } from "../dropTarget";
 import { INPUT_ROLE_OPTIONS, isPackRole } from "../inputRole";
+import { INPUT_ROLE_ICONS } from "../inputRoleIcons";
 import {
   moveInput,
   removeInput,
@@ -65,6 +67,7 @@ const roleOptions = computed((): EnumSelectOption[] =>
     value: opt.value,
     label: opt.label,
     help: opt.help,
+    icon: INPUT_ROLE_ICONS[opt.value],
   })),
 );
 
@@ -131,7 +134,11 @@ defineExpose({ showNotice });
   >
     <header class="flex flex-col gap-2 border-b border-line px-3 py-2">
       <div class="flex items-center justify-between gap-2">
-        <h2 class="m-0 text-sm font-semibold">
+        <h2 class="m-0 flex min-w-0 items-center gap-1.5 text-sm font-semibold">
+          <Images
+            class="size-4 shrink-0 text-ink-muted"
+            aria-hidden="true"
+          />
           Inputs
         </h2>
         <button
@@ -140,6 +147,10 @@ defineExpose({ showNotice });
           :disabled="selectedOutput === null || store.queue !== null"
           @click="onAdd"
         >
+          <Plus
+            class="size-4 shrink-0"
+            aria-hidden="true"
+          />
           Add…
         </button>
       </div>
@@ -200,31 +211,40 @@ defineExpose({ showNotice });
           <div class="flex shrink-0 flex-col gap-0.5">
             <button
               type="button"
-              class="btn px-1.5 py-0.5 text-xs"
+              class="btn px-1.5 py-0.5"
               :disabled="index === 0 || store.queue !== null"
               aria-label="Move up"
               @click="moveInput(index, -1)"
             >
-              ↑
+              <ChevronUp
+                class="size-3.5"
+                aria-hidden="true"
+              />
             </button>
             <button
               type="button"
-              class="btn px-1.5 py-0.5 text-xs"
+              class="btn px-1.5 py-0.5"
               :disabled="index === inputs.length - 1 || store.queue !== null"
               aria-label="Move down"
               @click="moveInput(index, 1)"
             >
-              ↓
+              <ChevronDown
+                class="size-3.5"
+                aria-hidden="true"
+              />
             </button>
           </div>
           <button
             type="button"
-            class="btn shrink-0 px-1.5 py-0.5 text-xs"
+            class="btn shrink-0 px-1.5 py-0.5"
             aria-label="Remove"
             :disabled="store.queue !== null"
             @click="removeInput(index)"
           >
-            ✕
+            <X
+              class="size-3.5"
+              aria-hidden="true"
+            />
           </button>
         </li>
       </ul>

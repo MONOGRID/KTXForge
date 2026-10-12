@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Sparkles } from "@lucide/vue";
 import { computed } from "vue";
 import type { OptionKey } from "../../../bindings/OptionKey";
 import { Input } from "@/components/ui/input";
@@ -51,6 +52,7 @@ function textOrEmpty(value: number | null): string {
   <Panel
     v-if="anyEnabled(UASTC_KEYS)"
     title="UASTC LDR"
+    :icon="Sparkles"
   >
     <OptionField
       v-slot="{ controlId }"

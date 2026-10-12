@@ -99,7 +99,15 @@ function onUpdate(value: unknown): void {
           :text="option.help ?? ''"
           side="right"
         >
-          <span class="block w-full truncate">{{ option.label }}</span>
+          <span class="flex min-w-0 items-center gap-2">
+            <component
+              :is="option.icon"
+              v-if="option.icon"
+              class="size-4 shrink-0"
+              aria-hidden="true"
+            />
+            <span class="min-w-0 truncate">{{ option.label }}</span>
+          </span>
         </HelpTooltip>
       </SelectItem>
       <SelectGroup
@@ -116,7 +124,15 @@ function onUpdate(value: unknown): void {
             :text="option.help ?? ''"
             side="right"
           >
-            <span class="block w-full truncate">{{ option.label }}</span>
+            <span class="flex min-w-0 items-center gap-2">
+              <component
+                :is="option.icon"
+                v-if="option.icon"
+                class="size-4 shrink-0"
+                aria-hidden="true"
+              />
+              <span class="min-w-0 truncate">{{ option.label }}</span>
+            </span>
           </HelpTooltip>
         </SelectItem>
       </SelectGroup>

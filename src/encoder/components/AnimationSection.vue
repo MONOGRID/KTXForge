@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Film } from "@lucide/vue";
 import { computed, useId, watch } from "vue";
 import type { AnimationOptions } from "../../bindings/AnimationOptions";
 import { Input } from "@/components/ui/input";
@@ -88,6 +89,7 @@ function writeU32(
   <Panel
     v-if="store.inputRole === 'arrayLayers'"
     title="Animation"
+    :icon="Film"
   >
     <div class="flex flex-col gap-2">
       <div class="field-row">

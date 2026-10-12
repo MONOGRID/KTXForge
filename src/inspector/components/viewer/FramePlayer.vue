@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ChevronLeft, ChevronRight, Pause, Play } from "@lucide/vue";
 import { computed, ref, watch } from "vue";
 import { useIntervalFn } from "@vueuse/core";
 import type { KtxAnimDataInfo } from "../../../bindings/KtxAnimDataInfo";
@@ -170,6 +171,10 @@ watch(visible, (isVisible) => {
         :disabled="selection.layer <= 0"
         @click="stepBy(-1)"
       >
+        <ChevronLeft
+          class="size-4 shrink-0"
+          aria-hidden="true"
+        />
         Prev
       </button>
       <button
@@ -177,6 +182,16 @@ watch(visible, (isVisible) => {
         class="btn btn-primary"
         @click="togglePlay"
       >
+        <Pause
+          v-if="isActive"
+          class="size-4 shrink-0"
+          aria-hidden="true"
+        />
+        <Play
+          v-else
+          class="size-4 shrink-0"
+          aria-hidden="true"
+        />
         {{ isActive ? "Pause" : "Play" }}
       </button>
       <button
@@ -186,6 +201,10 @@ watch(visible, (isVisible) => {
         @click="stepBy(1)"
       >
         Next
+        <ChevronRight
+          class="size-4 shrink-0"
+          aria-hidden="true"
+        />
       </button>
       <span class="text-sm font-mono text-ink-muted">
         {{ selection.layer + 1 }} / {{ frameCount }}

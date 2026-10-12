@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Archive } from "@lucide/vue";
 import { computed, useId, watch } from "vue";
 import type { OptionKey } from "../../../bindings/OptionKey";
 import type { Supercompression } from "../../../bindings/Supercompression";
@@ -118,6 +119,7 @@ function changeZlib(value: string | number): void {
   <Panel
     v-if="panelVisible"
     title="Supercompression"
+    :icon="Archive"
   >
     <div class="field-row">
       <HelpTooltip

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Box } from "@lucide/vue";
 import type { OptionKey } from "../../../bindings/OptionKey";
 import Panel from "../../../shared/components/Panel.vue";
 import { store } from "../../store";
@@ -81,6 +82,7 @@ const fields: OptionControlField[] = [
   <Panel
     v-if="anyEnabled(KEYS)"
     title="Container"
+    :icon="Box"
   >
     <OptionControls :fields="fields" />
   </Panel>

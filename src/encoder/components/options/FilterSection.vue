@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Pyramid } from "@lucide/vue";
 import type { MipmapFilter } from "../../../bindings/MipmapFilter";
 import type { MipmapWrap } from "../../../bindings/MipmapWrap";
 import type { OptionKey } from "../../../bindings/OptionKey";
@@ -114,6 +115,7 @@ const fields: OptionControlField[] = [
   <Panel
     v-if="anyEnabled(KEYS)"
     title="Mipmaps / resample"
+    :icon="Pyramid"
   >
     <OptionControls :fields="fields" />
   </Panel>

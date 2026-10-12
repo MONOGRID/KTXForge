@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Binary } from "@lucide/vue";
 import { computed } from "vue";
 import type { DataFormatDescriptor } from "../../../bindings/DataFormatDescriptor";
 import type { DfdBlock } from "../../../bindings/DfdBlock";
@@ -19,7 +20,10 @@ const blocks = computed((): DfdBlock[] => props.descriptor?.blocks ?? []);
 </script>
 
 <template>
-  <Panel title="Data format descriptor">
+  <Panel
+    title="Data format descriptor"
+    :icon="Binary"
+  >
     <template v-if="descriptor !== null">
       <ReportField
         label="totalSize"

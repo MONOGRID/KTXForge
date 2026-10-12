@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Settings2 } from "@lucide/vue";
 import { computed } from "vue";
 import type { OptionKey } from "../../../bindings/OptionKey";
 import { Input } from "@/components/ui/input";
@@ -39,6 +40,7 @@ function writeThreads(value: string | number): void {
   <Panel
     v-if="anyEnabled(KEYS)"
     title="Encoder flags"
+    :icon="Settings2"
   >
     <OptionField
       v-slot="{ controlId }"

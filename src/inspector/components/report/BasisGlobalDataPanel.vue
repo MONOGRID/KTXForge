@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Package } from "@lucide/vue";
 import { computed } from "vue";
 import type { BasisLzGlobalData } from "../../../bindings/BasisLzGlobalData";
 import type { BasisLzImageSlice } from "../../../bindings/BasisLzImageSlice";
@@ -14,7 +15,10 @@ const images = computed((): BasisLzImageSlice[] => props.data?.images ?? []);
 </script>
 
 <template>
-  <Panel title="BasisLZ global data">
+  <Panel
+    title="BasisLZ global data"
+    :icon="Package"
+  >
     <template v-if="data !== null">
       <ReportField
         label="type"

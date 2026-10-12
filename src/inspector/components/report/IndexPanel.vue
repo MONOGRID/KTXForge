@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Hash } from "@lucide/vue";
 import type { ByteRange } from "../../../bindings/ByteRange";
 import Panel from "../../../shared/components/Panel.vue";
 import { displayValue, MISSING } from "../../store";
@@ -12,7 +13,10 @@ defineProps<{
 </script>
 
 <template>
-  <Panel title="Index offsets">
+  <Panel
+    title="Index offsets"
+    :icon="Hash"
+  >
     <template v-if="dataFormatDescriptor !== null">
       <div class="mb-2 text-xs font-medium text-ink-muted">
         dataFormatDescriptor

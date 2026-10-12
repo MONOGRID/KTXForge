@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Binary } from "@lucide/vue";
 import { computed, useId } from "vue";
 import EnumSelect from "../../../shared/components/EnumSelect.vue";
 import HelpTooltip from "../../../shared/components/HelpTooltip.vue";
@@ -206,7 +207,10 @@ const astcColorGroups = [
 </script>
 
 <template>
-  <Panel title="Format">
+  <Panel
+    title="Format"
+    :icon="Binary"
+  >
     <div class="field-row">
       <HelpTooltip
         text="Uncompressed Vulkan format, ASTC block format, or uncompressed plus BasisLZ/UASTC encode."

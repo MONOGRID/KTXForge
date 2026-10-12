@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ListOrdered } from "@lucide/vue";
 import { computed } from "vue";
 import type { LevelIndexEntry } from "../../../bindings/LevelIndexEntry";
 import Panel from "../../../shared/components/Panel.vue";
@@ -12,7 +13,10 @@ const rows = computed((): LevelIndexEntry[] => props.levels ?? []);
 </script>
 
 <template>
-  <Panel title="Level index">
+  <Panel
+    title="Level index"
+    :icon="ListOrdered"
+  >
     <div
       v-if="rows.length === 0"
       class="py-1.5 text-sm text-ink-muted"

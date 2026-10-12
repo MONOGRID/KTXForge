@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { FileBox } from "@lucide/vue";
 import type { Ktx1Header } from "../../../bindings/Ktx1Header";
 import type { Ktx2Header } from "../../../bindings/Ktx2Header";
 import Panel from "../../../shared/components/Panel.vue";
@@ -12,7 +13,10 @@ defineProps<{
 </script>
 
 <template>
-  <Panel title="Header">
+  <Panel
+    title="Header"
+    :icon="FileBox"
+  >
     <template v-if="ktx2 !== null">
       <ReportField
         label="identifier"

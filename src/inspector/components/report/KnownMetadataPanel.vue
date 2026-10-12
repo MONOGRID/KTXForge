@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { BadgeInfo } from "@lucide/vue";
 import { computed } from "vue";
 import type { KeyValueData } from "../../../bindings/KeyValueData";
 import Panel from "../../../shared/components/Panel.vue";
@@ -30,7 +31,10 @@ const cubemapFaces = computed((): string => {
 </script>
 
 <template>
-  <Panel title="Known metadata">
+  <Panel
+    title="Known metadata"
+    :icon="BadgeInfo"
+  >
     <template v-if="keyValueData !== null">
       <ReportField
         label="KTXorientation"

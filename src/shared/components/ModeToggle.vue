@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Moon, Sun } from "@lucide/vue";
+import { Monitor, Moon, Sun } from "@lucide/vue";
 import { useColorMode } from "@vueuse/core";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,12 +27,15 @@ const mode = useColorMode();
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end">
       <DropdownMenuItem @click="mode = 'light'">
+        <Sun aria-hidden="true" />
         Light
       </DropdownMenuItem>
       <DropdownMenuItem @click="mode = 'dark'">
+        <Moon aria-hidden="true" />
         Dark
       </DropdownMenuItem>
       <DropdownMenuItem @click="mode = 'auto'">
+        <Monitor aria-hidden="true" />
         System
       </DropdownMenuItem>
     </DropdownMenuContent>

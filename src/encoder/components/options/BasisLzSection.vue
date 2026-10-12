@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Package } from "@lucide/vue";
 import { computed } from "vue";
 import type { OptionKey } from "../../../bindings/OptionKey";
 import { Input } from "@/components/ui/input";
@@ -48,6 +49,7 @@ function shown(value: number | null): string {
   <Panel
     v-if="anyEnabled(KEYS)"
     title="BasisLZ"
+    :icon="Package"
   >
     <OptionField
       v-slot="{ controlId }"

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { CircleStop, ListOrdered } from "@lucide/vue";
 import { computed } from "vue";
 import Button from "../../shared/components/Button.vue";
 import ProgressBar from "../../shared/components/ProgressBar.vue";
@@ -44,8 +45,12 @@ function onCancel(): void {
       <header class="border-b border-line px-4 py-3">
         <h2
           id="encode-queue-title"
-          class="m-0 text-base font-semibold"
+          class="m-0 flex items-center gap-2 text-base font-semibold"
         >
+          <ListOrdered
+            class="size-5 shrink-0 text-ink-muted"
+            aria-hidden="true"
+          />
           Encoding queue
         </h2>
       </header>
@@ -62,6 +67,10 @@ function onCancel(): void {
         </p>
         <div class="flex justify-end">
           <Button @click="onCancel">
+            <CircleStop
+              class="size-4 shrink-0"
+              aria-hidden="true"
+            />
             Cancel queue
           </Button>
         </div>

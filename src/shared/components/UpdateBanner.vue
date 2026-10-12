@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Download } from "@lucide/vue";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { call } from "../../api/commands";
 import { on } from "../../api/events";
@@ -124,6 +125,10 @@ async function onInstall(): Promise<void> {
         :disabled="installDisabled"
         @click="onInstall"
       >
+        <Download
+          class="size-4 shrink-0"
+          aria-hidden="true"
+        />
         Install and restart
       </Button>
     </div>

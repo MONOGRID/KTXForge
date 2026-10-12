@@ -401,3 +401,9 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 **Decided:** Remove all Sonner / `vue-sonner` toast usage (`toastAppError`, Toaster mounts, dependency). Encode job feedback uses OS native notifications only: **complete** → `sendNotification` alone; **failure** → OS notification **and** native `dialog.message` alert (existing `alertErrorText`). Soft / non-job failures (save, inspect, drop reject, invalid input) use a native alert only — no OS notification. In-pane preview load failures stay silent (viewer `loadFailed` / loading state).
 
 **Why:** Toasts duplicated encode failure surfaces and do not match desktop chrome; OS notifications are for batch encode outcomes when the window may be unfocused, while modals remain for errors that need acknowledgment.
+
+## 2026-10-12 — Lucide icons for panels and actions
+
+**Decided:** Use the existing `@lucide/vue` package (no lucide-lab / extra pack) for panel titles, action buttons, input-role options, drop-intent choices, theme menu items, and collapsible chevrons. Shared seams: optional `icon` on `Panel` and `EnumSelectOption`; role → icon map in `src/encoder/inputRoleIcons.ts`. Semantic picks: `Boxes` (KTX outputs), `Images` (inputs), `Layers` / `Cuboid` / `Pyramid` / `Cylinder` (roles), `ListOrdered` (encode queue), `ImageUp` (drop), `Split` / `Combine` / `PackagePlus` (drop intent), `CirclePlay` / `CircleStop` / `Save` / `SaveAll` (encode bar), `Download` (export / update), `Sun` / `Moon` / `Monitor` (theme).
+
+**Why:** Icons were missing across the encoder/inspector chrome. Lucide already matched `components.json` and UI primitives; the named set maps cleanly to texture roles and desktop actions without a second icon dependency.

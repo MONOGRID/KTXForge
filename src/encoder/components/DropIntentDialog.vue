@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Combine, ImageUp, PackagePlus, Split, X } from "@lucide/vue";
 import { computed, ref, watch } from "vue";
 import Button from "../../shared/components/Button.vue";
 import EnumSelect from "../../shared/components/EnumSelect.vue";
@@ -8,6 +9,7 @@ import {
   applyCenterDropAsPacked,
 } from "../actions";
 import { INPUT_ROLE_OPTIONS, type PackInputRole } from "../inputRole";
+import { INPUT_ROLE_ICONS } from "../inputRoleIcons";
 import { clearPendingCenterDrop, store } from "../store";
 
 const packRole = ref<PackInputRole>("arrayLayers");
@@ -21,6 +23,7 @@ const roleOptions = computed((): EnumSelectOption[] =>
     value: opt.value,
     label: opt.label,
     help: opt.help,
+    icon: INPUT_ROLE_ICONS[opt.value],
   })),
 );
 
@@ -67,8 +70,12 @@ function onPackOne(): void {
       <header class="border-b border-line px-4 py-3">
         <h2
           id="drop-intent-title"
-          class="m-0 text-base font-semibold"
+          class="m-0 flex items-center gap-2 text-base font-semibold"
         >
+          <ImageUp
+            class="size-5 shrink-0 text-ink-muted"
+            aria-hidden="true"
+          />
           Drop {{ fileCount }} image{{ fileCount === 1 ? "" : "s" }}
         </h2>
       </header>
@@ -79,45 +86,65 @@ function onPackOne(): void {
 
         <button
           type="button"
-          class="rounded border border-line bg-surface px-3 py-2.5 text-left transition-colors hover:border-primary hover:bg-primary/10"
+          class="flex gap-3 rounded border border-line bg-surface px-3 py-2.5 text-left transition-colors hover:border-primary hover:bg-primary/10"
           @click="onSeparateOutputs"
         >
-          <div class="text-sm font-medium">
-            Separate KTX outputs
-          </div>
-          <div class="hint mt-0.5">
-            One output per image (batch encode)
+          <Split
+            class="mt-0.5 size-4 shrink-0 text-ink-muted"
+            aria-hidden="true"
+          />
+          <div class="min-w-0">
+            <div class="text-sm font-medium">
+              Separate KTX outputs
+            </div>
+            <div class="hint mt-0.5">
+              One output per image (batch encode)
+            </div>
           </div>
         </button>
 
-        <div class="rounded border border-line bg-surface px-3 py-2.5">
-          <div class="text-sm font-medium">
-            Pack into one KTX
+        <div class="flex gap-3 rounded border border-line bg-surface px-3 py-2.5">
+          <Combine
+            class="mt-0.5 size-4 shrink-0 text-ink-muted"
+            aria-hidden="true"
+          />
+          <div class="min-w-0 flex-1">
+            <div class="text-sm font-medium">
+              Pack into one KTX
+            </div>
+            <div class="hint mt-0.5 mb-2">
+              Multiple inputs for a single output — choose what the list means
+            </div>
+            <div class="field-row mb-3">
+              <span class="label truncate">Kind</span>
+              <EnumSelect
+                class="min-w-0 flex-1"
+                :model-value="packRole"
+                :options="roleOptions"
+                :empty-label="false"
+                @update:model-value="onRoleChange"
+              />
+            </div>
+            <Button
+              variant="primary"
+              class="w-full"
+              @click="onPackOne"
+            >
+              <PackagePlus
+                class="size-4 shrink-0"
+                aria-hidden="true"
+              />
+              Pack as {{ packRoleLabel }}
+            </Button>
           </div>
-          <div class="hint mt-0.5 mb-2">
-            Multiple inputs for a single output — choose what the list means
-          </div>
-          <div class="field-row mb-3">
-            <span class="label truncate">Kind</span>
-            <EnumSelect
-              class="min-w-0 flex-1"
-              :model-value="packRole"
-              :options="roleOptions"
-              :empty-label="false"
-              @update:model-value="onRoleChange"
-            />
-          </div>
-          <Button
-            variant="primary"
-            class="w-full"
-            @click="onPackOne"
-          >
-            Pack as {{ packRoleLabel }}
-          </Button>
         </div>
 
         <div class="flex justify-end">
           <Button @click="onCancel">
+            <X
+              class="size-4 shrink-0"
+              aria-hidden="true"
+            />
             Cancel
           </Button>
         </div>

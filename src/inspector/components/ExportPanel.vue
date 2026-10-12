@@ -7,6 +7,7 @@ import type { ExportFormat } from "../../bindings/ExportFormat";
 import type { ExportSelection } from "../../bindings/ExportSelection";
 import type { ImageSelection } from "../../bindings/ImageSelection";
 import type { PreviewKind } from "../../bindings/PreviewKind";
+import { Download } from "@lucide/vue";
 import Button from "../../shared/components/Button.vue";
 import Panel from "../../shared/components/Panel.vue";
 import { alertAppError } from "../../shared/alertAppError";
@@ -165,6 +166,7 @@ watchEffect(() => {
 <template>
   <Panel
     title="Export"
+    :icon="Download"
     :collapsible="false"
   >
     <div class="field-row">
@@ -247,6 +249,10 @@ watchEffect(() => {
         :disabled="!canExport"
         @click="onExport"
       >
+        <Download
+          class="size-4 shrink-0"
+          aria-hidden="true"
+        />
         {{ busy ? "Exporting…" : "Export" }}
       </Button>
     </div>

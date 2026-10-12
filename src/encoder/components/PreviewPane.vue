@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Eye } from "@lucide/vue";
 import DepthVolumeView from "../../shared/components/DepthVolumeView.vue";
 import ImageViewport from "../../shared/components/ImageViewport.vue";
 import { setDropZone } from "../dropTarget";
@@ -39,7 +40,11 @@ const {
     @pointerenter="setDropZone('center')"
   >
     <header class="shrink-0 border-b border-line px-3 py-2">
-      <h2 class="m-0 text-sm font-semibold">
+      <h2 class="m-0 flex items-center gap-1.5 text-sm font-semibold">
+        <Eye
+          class="size-4 shrink-0 text-ink-muted"
+          aria-hidden="true"
+        />
         Preview
       </h2>
     </header>

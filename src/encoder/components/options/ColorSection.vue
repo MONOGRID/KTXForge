@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Palette } from "@lucide/vue";
 import type { OptionKey } from "../../../bindings/OptionKey";
 import Panel from "../../../shared/components/Panel.vue";
 import { store } from "../../store";
@@ -207,6 +208,7 @@ const fields: OptionControlField[] = [
   <Panel
     v-if="anyEnabled(KEYS)"
     title="Color, orientation, channels"
+    :icon="Palette"
   >
     <OptionControls :fields="fields" />
   </Panel>

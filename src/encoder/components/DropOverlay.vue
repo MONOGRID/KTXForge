@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ImageUp } from "@lucide/vue";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { onMounted, onUnmounted } from "vue";
 import {
@@ -56,8 +57,12 @@ onUnmounted(() => {
     aria-hidden="true"
   >
     <div
-      class="absolute bottom-4 left-1/2 -translate-x-1/2 rounded bg-surface-raised px-3 py-1.5 text-xs font-medium shadow"
+      class="absolute bottom-4 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded bg-surface-raised px-3 py-1.5 text-xs font-medium shadow"
     >
+      <ImageUp
+        class="size-3.5 shrink-0"
+        aria-hidden="true"
+      />
       Drop → {{ dropHintLabel }}
     </div>
   </div>

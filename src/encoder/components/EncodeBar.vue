@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { CirclePlay, CircleStop, Cpu, Save, SaveAll } from "@lucide/vue";
 import { computed, onMounted, onUnmounted } from "vue";
 import { on } from "../../api/events";
 import type { EncodeStage } from "../../bindings/EncodeStage";
@@ -64,7 +65,11 @@ onUnmounted(() => {
 <template>
   <section class="panel shrink-0 overflow-hidden">
     <header class="border-b border-line px-3 py-2">
-      <h2 class="m-0 text-sm font-semibold">
+      <h2 class="m-0 flex items-center gap-1.5 text-sm font-semibold">
+        <Cpu
+          class="size-4 shrink-0 text-ink-muted"
+          aria-hidden="true"
+        />
         Encode
       </h2>
     </header>
@@ -76,24 +81,40 @@ onUnmounted(() => {
           :disabled="!encodeEnabled"
           @click="encode"
         >
+          <CirclePlay
+            class="size-4 shrink-0"
+            aria-hidden="true"
+          />
           Encode all
         </Button>
         <Button
           :disabled="!cancelEnabled"
           @click="cancelEncode"
         >
+          <CircleStop
+            class="size-4 shrink-0"
+            aria-hidden="true"
+          />
           Cancel queue
         </Button>
         <Button
           :disabled="!saveEnabled"
           @click="saveEncoded"
         >
+          <Save
+            class="size-4 shrink-0"
+            aria-hidden="true"
+          />
           Save…
         </Button>
         <Button
           :disabled="!saveAllEnabled"
           @click="saveAllEncoded"
         >
+          <SaveAll
+            class="size-4 shrink-0"
+            aria-hidden="true"
+          />
           Save all…
         </Button>
         <span

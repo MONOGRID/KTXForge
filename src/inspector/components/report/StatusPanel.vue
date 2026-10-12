@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { Activity } from "@lucide/vue";
 import { computed } from "vue";
 import type { ValidationMessage } from "../../../bindings/ValidationMessage";
 import Panel from "../../../shared/components/Panel.vue";
@@ -21,7 +22,10 @@ const rows = computed((): ValidationMessage[] => props.messages ?? []);
 </script>
 
 <template>
-  <Panel title="Status">
+  <Panel
+    title="Status"
+    :icon="Activity"
+  >
     <ReportField
       label="valid"
       :value="validLabel"
