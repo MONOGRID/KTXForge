@@ -99,7 +99,7 @@ pub fn app_menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>>
     {
         let app_menu = macos_app_menu(app)?;
         let edit = macos_edit_menu(app)?;
-        return Menu::with_items(app, &[&app_menu, &file, &edit, &view, &help]);
+        Menu::with_items(app, &[&app_menu, &file, &edit, &view, &help])
     }
 
     #[cfg(not(target_os = "macos"))]

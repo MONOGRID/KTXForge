@@ -49,9 +49,7 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
-      - name: Fetch ktx sidecar
-        run: npm run fetch-ktx
-
+      # fetch-ktx + ensure-tools (incl. cargo-machete) via package.json precheck:rust
       - name: Quality gate
         run: npm run check
 
@@ -140,6 +138,7 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
+      # Must pass --target: pretauri only fetches the host triple, not cross targets.
       - name: Fetch ktx sidecar
         run: npm run fetch-ktx -- --target ${{ matrix.target }}
 

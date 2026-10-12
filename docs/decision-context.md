@@ -377,3 +377,9 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 **Decided:** Brand/Tauri icons and test-fixture binaries (*.png / *.jpg / *.ktx / *.ktx2, plus other binary patterns in .gitattributes) are Git LFS. *.svg is not LFS-tracked. Every ctions/checkout in ci.yml and elease.yml sets `lfs: true`. After converting blobs to pointers, push LFS objects with `git lfs push --all origin` if a normal push skipped them.
 
 **Why:** Icon LFS blobs never reached GitHub (clone 404). Without `lfs: true`, CI saw pointer text and failed with Invalid PNG signature. Fixtures were committed as raw blobs while LFS rules applied (`should have been pointers`). Docs SVG placeholders are small text and do not belong in LFS.
+
+## 2026-10-12 — Auto-install Rust check tools on new machines
+
+**Decided:** Add `scripts/ensure-tools.mjs` and `npm run setup` / `npm run ensure-tools`. On a fresh checkout, `setup` installs `rustfmt` and `clippy` via rustup when missing, installs `cargo-machete` via `cargo install --locked` when missing, then runs `fetch-ktx`. Wire tool install + fetch into `precheck:rust` only. `pretauri` runs `fetch-ktx` alone (host triple). CI quality-gate jobs drop the explicit `fetch-ktx` step; release matrix builds keep `fetch-ktx -- --target <triple>` because tauri-action’s `npm run tauri` prehook cannot see the matrix target.
+
+**Why:** A clean machine failed `npm run check` at `cargo machete` (`no such command`) after tests passed, and earlier failed Tauri builds without a staged sidecar. Putting `ensure-tools` on `pretauri` would compile machete on every release OS/arch build; release `check` had no machete step before, so `precheck:rust` also closes that gap.

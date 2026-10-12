@@ -63,11 +63,11 @@ Replace the SVGs under [`docs/screenshots/`](docs/screenshots/) with real captur
 
 ```bash
 npm ci
-npm run fetch-ktx   # stage pinned ktx sidecars (see project scripts)
+npm run setup      # rustfmt/clippy, cargo-machete, fetch pinned ktx sidecar
 npm run tauri dev
 ```
 
-Prerequisites: Node LTS, Rust stable, and `cargo install cargo-machete` (CI caches the binary).
+Prerequisites: Node LTS and [Rust via rustup](https://rustup.rs) (stable). On Linux you also need the usual Tauri system packages (`libwebkit2gtk-4.1-dev`, `libappindicator3-dev`, `librsvg2-dev`, `patchelf`). `npm run setup` installs `rustfmt`, `clippy`, and `cargo-machete` when missing, then stages the `ktx` sidecar. The same tool install + fetch runs via `precheck:rust` before `npm run check`; `pretauri` only runs `fetch-ktx` (host triple) so release cross-builds stay fast.
 
 Quality gate before commit:
 

@@ -61,9 +61,7 @@ jobs:
       - name: Install npm dependencies
         run: npm ci
 
-      - name: Fetch ktx sidecar
-        run: npm run fetch-ktx
-
+      # fetch-ktx + ensure-tools run via package.json precheck:rust
       - name: Quality gate
         run: npm run check
 
