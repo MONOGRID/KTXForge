@@ -24,19 +24,18 @@ import {
   modeValues,
   parseAstc,
   uncompressedLabels,
-  uncompressedValues,
+  type AstcBlock,
+  type AstcColor,
   type FormatMode,
-  type UncompressedFormat,
 } from "./formatCatalog";
-import { choiceHelp, enumEntriesWithHelp } from "./optionControls";
+import {
+  choiceHelp,
+  enumEntriesWithHelp,
+  isChoiceAllowed,
+} from "./optionControls";
 
 const uncompressedOptions = computed(() =>
-  enumEntriesWithHelp(
-    "format",
-    Object.fromEntries(
-      uncompressedValues.map((value) => [value, uncompressedLabels[value]]),
-    ),
-  ),
+  enumEntriesWithHelp("format", uncompressedLabels),
 );
 
 const encodeOptions = computed(() =>
@@ -46,38 +45,58 @@ const encodeOptions = computed(() =>
   ),
 );
 
+/** ASTC formats Rust allows for this block / color pair. */
+function astcAllowed(block: AstcBlock, color: AstcColor): boolean {
+  return isChoiceAllowed("format", astcFormat(block, color));
+}
+
 const astcBlockOptions = computed(() =>
-  astcBlockValues.map((value) => ({
-    value,
-    label: astcBlockLabels[value],
-    help:
-      choiceHelp("format", `ASTC_${value}_UNORM_BLOCK`) ??
-      `ASTC ${astcBlockLabels[value]} block size.`,
-  })),
+  astcBlockValues
+    .filter((value) => astcAllowed(value, "UNORM") || astcAllowed(value, "SRGB"))
+    .map((value) => ({
+      value,
+      label: astcBlockLabels[value],
+      help:
+        choiceHelp("format", `ASTC_${value}_UNORM_BLOCK`) ??
+        `ASTC ${astcBlockLabels[value]} block size.`,
+    })),
 );
 
-const astcColorOptions = [
-  {
-    value: "UNORM" as const,
-    label: astcColorLabels.UNORM,
-    help: "Linear UNORM ASTC (no sRGB decode in the GPU sampler).",
-  },
-  {
-    value: "SRGB" as const,
-    label: astcColorLabels.SRGB,
-    help: "sRGB ASTC. Use for color textures viewed in sRGB.",
-  },
-] as const;
+const astcColorHelps = {
+  UNORM: "Linear UNORM ASTC (no sRGB decode in the GPU sampler).",
+  SRGB: "sRGB ASTC. Use for color textures viewed in sRGB.",
+} satisfies Record<AstcColor, string>;
 
-const modeOptions = computed(() => {
-  const allowed: readonly FormatMode[] =
-    store.report.sourcesClass === "hdr" ? (["uncompressed"] as const) : modeValues;
-  return allowed.map((value) => ({
+const astcColorOptions = computed(() =>
+  (["UNORM", "SRGB"] as const)
+    .filter((color) => astcAllowed(astcParts.value.block, color))
+    .map((value) => ({
+      value,
+      label: astcColorLabels[value],
+      help: astcColorHelps[value],
+    })),
+);
+
+/** Modes with at least one choice Rust allows for the current sources. */
+const allowedModes = computed((): readonly FormatMode[] =>
+  modeValues.filter((value) => {
+    if (value === "astc") {
+      return astcBlockOptions.value.length > 0;
+    }
+    if (value === "codec") {
+      return encodeOptions.value.length > 0;
+    }
+    return uncompressedOptions.value.length > 0;
+  }),
+);
+
+const modeOptions = computed(() =>
+  allowedModes.value.map((value) => ({
     value,
     label: modeLabels[value],
     help: modeHelps[value],
-  }));
-});
+  })),
+);
 
 const groupId = useId();
 
@@ -99,15 +118,9 @@ const formatWarnings = computed(() =>
   ),
 );
 
-function defaultUncompressedFormat(): UncompressedFormat {
-  return store.report.sourcesClass === "hdr"
-    ? "R16G16B16A16_SFLOAT"
-    : "R8G8B8A8_SRGB";
-}
-
 function ensureUncompressedFormat(): void {
   if (!isUncompressedFormat(store.options.format)) {
-    store.options.format = defaultUncompressedFormat();
+    store.options.format = store.report.defaultFormat;
   }
 }
 
@@ -124,13 +137,14 @@ function setAstcMode(): void {
 
 function setCodecMode(): void {
   ensureUncompressedFormat();
-  if (store.options.encode === null) {
-    store.options.encode = "basis-lz";
+  const first = encodeOptions.value.map((option) => option.value).find(isEncodeCodec);
+  if (store.options.encode === null && first !== undefined) {
+    store.options.encode = first;
   }
 }
 
 function setMode(next: FormatMode): void {
-  if (store.report.sourcesClass === "hdr" && next !== "uncompressed") {
+  if (!allowedModes.value.includes(next)) {
     return;
   }
   if (next === "uncompressed") {
@@ -178,13 +192,8 @@ function onEncode(value: string | null): void {
     store.options.encode = null;
     return;
   }
-  if (store.report.sourcesClass === "hdr") {
-    return;
-  }
-  if (isEncodeCodec(value)) {
-    if (!isUncompressedFormat(store.options.format)) {
-      store.options.format = defaultUncompressedFormat();
-    }
+  if (isEncodeCodec(value) && isChoiceAllowed("encode", value)) {
+    ensureUncompressedFormat();
     store.options.encode = value;
   }
 }
@@ -201,9 +210,9 @@ const astcBlockGroups = computed(() => [
   { label: "ASTC block size", options: astcBlockOptions.value },
 ]);
 
-const astcColorGroups = [
-  { label: "sRGB / UNORM", options: astcColorOptions },
-] as const;
+const astcColorGroups = computed(() => [
+  { label: "sRGB / UNORM", options: astcColorOptions.value },
+]);
 </script>
 
 <template>

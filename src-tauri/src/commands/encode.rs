@@ -11,9 +11,10 @@ use crate::ktx::anim::write_anim_data;
 use crate::ktx::create_args::build_create_args;
 use crate::ktx::extract_ops::{cached_preview_png, extract_preview_png, read_texture_meta};
 use crate::ktx::info_types::{ImageSelection, PreviewKind};
-use crate::ktx::input_role::{self, InputRole};
+use crate::ktx::input_role::InputRole;
 use crate::ktx::metrics::parse_metrics;
 use crate::ktx::options::{CreateOptions, EncodeCodec};
+use crate::ktx::rules;
 use crate::ktx::sidecar::{self, CancellationHandle};
 use crate::state::{AppState, Job};
 
@@ -75,8 +76,6 @@ pub async fn run_encode(
         prepared_paths.push(prepared.path);
     }
 
-    let mut options = request.options.clone();
-    input_role::apply_role(&mut options, request.input_role, prepared_paths.len());
     if request.animation.is_some() {
         if request.input_role != InputRole::ArrayLayers {
             return Err(AppError::invalid_input(
@@ -88,16 +87,15 @@ pub async fn run_encode(
                 "animation requires at least two layer images",
             ));
         }
-        options.container.layers = Some(prepared_paths.len() as u32);
     }
 
-    if let Err(errors) = input_role::validate_output(&options, request.input_role, &source_infos) {
-        return Err(AppError::invalid_input(errors.join("; ")));
-    }
+    let resolved = rules::resolve_for_encode(&request.options, &source_infos, request.input_role)
+        .map_err(|errors| AppError::invalid_input(errors.join("; ")))?;
+    let options = resolved.options();
 
     let output_path = job_dir.join("output.ktx2");
     let mut args = vec!["create".to_owned()];
-    args.extend(build_create_args(&options, &prepared_paths, &output_path)?);
+    args.extend(build_create_args(&resolved, &prepared_paths, &output_path));
 
     emit_stage(app, &request.job_id, EncodeStage::Encoding, None);
 
@@ -128,7 +126,7 @@ pub async fn run_encode(
     emit_stage(app, &request.job_id, EncodeStage::Previewing, None);
 
     let meta = read_texture_meta(&output_path)?;
-    let preview_kind = preview_kind_for_options(&options, &meta.preview);
+    let preview_kind = preview_kind_for_options(options, &meta.preview);
     let mut meta = meta;
     meta.preview = preview_kind.clone();
     meta.needs_transcode = options.encode.is_some() || meta.needs_transcode;
@@ -166,7 +164,7 @@ pub async fn run_encode(
         (None, None)
     };
 
-    let codec = codec_label(&options);
+    let codec = codec_label(options);
     let warnings = out
         .stderr
         .lines()
@@ -206,8 +204,7 @@ pub async fn run_encode(
 }
 
 fn preview_kind_for_options(options: &CreateOptions, fallback: &PreviewKind) -> PreviewKind {
-    let fmt = options.format.cli().to_ascii_uppercase();
-    if fmt.contains("SFLOAT") || fmt.contains("UFLOAT") || fmt.contains("DFLOAT") {
+    if options.format.is_hdr_float() {
         return PreviewKind::TonemappedFromExr;
     }
     fallback.clone()
@@ -417,6 +414,129 @@ mod tests {
                 None
             }
         })
+    }
+
+    /// Run argv from the real resolve → build path through the staged `ktx create`.
+    /// Each case keeps a value the UI hides; the tool must accept what we emit.
+    #[test]
+    fn resolved_args_are_accepted_by_ktx_create() {
+        use crate::ktx::options::{
+            AstcQuality, EncodeCodec, Supercompression, TexcoordOrigin, VkFormat,
+        };
+
+        let Some(ktx) = staged_ktx() else {
+            return;
+        };
+        let root = fixtures();
+        let rgba = vec![root.join("rgba.png")];
+        let frames: Vec<_> = (1..=4)
+            .map(|i| root.join(format!("frames/frame_00{i}.png")))
+            .collect();
+        let faces: Vec<_> = (0..6)
+            .map(|i| root.join(format!("cube/face_{i}.png")))
+            .collect();
+        // Scanline EXR: the tiled `hdr.exr` fixture crashes the Linux v4.4.2 binary.
+        let hdr = vec![root.join("hdr_scanline.exr")];
+
+        let mut ssim_no_encode = CreateOptions::default();
+        ssim_no_encode.encoder.compare_ssim = true;
+        ssim_no_encode.encoder.compare_psnr = true;
+
+        let mut uastc = CreateOptions {
+            encode: Some(EncodeCodec::Uastc),
+            supercompression: Supercompression::Zstd { level: 3 },
+            ..Default::default()
+        };
+        uastc.uastc_ldr.uastc_rdo = true;
+        uastc.encoder.compare_ssim = true;
+        uastc.basis_lz.max_endpoints = Some(16);
+
+        let basis_with_zstd = CreateOptions {
+            encode: Some(EncodeCodec::BasisLz),
+            supercompression: Supercompression::Zstd { level: 3 },
+            ..Default::default()
+        };
+
+        let mut astc = CreateOptions {
+            format: VkFormat::Astc6x6SrgbBlock,
+            ..Default::default()
+        };
+        astc.astc.astc_quality = Some(AstcQuality::Fast);
+        astc.encoder.compare_psnr = true;
+        astc.uastc_ldr.uastc_rdo = true;
+
+        let mut mip_and_layers = CreateOptions::default();
+        mip_and_layers.container.generate_mipmap = true;
+        mip_and_layers.container.runtime_mipmap = true;
+
+        let mut cube = CreateOptions::default();
+        cube.container.one_d = true;
+        cube.color.assign_texcoord_origin = Some(TexcoordOrigin::BottomLeft);
+
+        let mut depth = CreateOptions::default();
+        depth.container.generate_mipmap = true;
+        depth.container.levels = Some(3);
+
+        let hdr_with_encode = CreateOptions {
+            format: VkFormat::R16G16B16A16Sfloat,
+            encode: Some(EncodeCodec::BasisLz),
+            ..Default::default()
+        };
+
+        let cases = [
+            (
+                "ssim without encode",
+                ssim_no_encode,
+                InputRole::Base2D,
+                &rgba,
+            ),
+            ("uastc rdo zstd ssim", uastc, InputRole::Base2D, &rgba),
+            (
+                "basis-lz keeps zstd",
+                basis_with_zstd,
+                InputRole::Base2D,
+                &rgba,
+            ),
+            ("astc", astc, InputRole::Base2D, &rgba),
+            (
+                "layers + mipmaps",
+                mip_and_layers,
+                InputRole::ArrayLayers,
+                &frames,
+            ),
+            (
+                "cubemap + 1d + origin",
+                cube,
+                InputRole::CubemapFaces,
+                &faces,
+            ),
+            ("depth + mipmaps", depth, InputRole::DepthSlices, &frames),
+            ("hdr + encode", hdr_with_encode, InputRole::Base2D, &hdr),
+        ];
+
+        let dir = tempfile::tempdir().unwrap();
+        for (i, (name, options, role, paths)) in cases.into_iter().enumerate() {
+            let sources: Vec<_> = paths.iter().map(|p| read_source_info(p).unwrap()).collect();
+            let prepared: Vec<_> = paths
+                .iter()
+                .map(|p| {
+                    prepare_input(p, &dir.path().join(format!("in{i}")))
+                        .unwrap()
+                        .path
+                })
+                .collect();
+            let resolved = rules::resolve_for_encode(&options, &sources, role)
+                .unwrap_or_else(|e| panic!("{name}: {e:?}"));
+            let out = dir.path().join(format!("out{i}.ktx2"));
+            let mut args = vec!["create".to_owned()];
+            args.extend(build_create_args(&resolved, &prepared, &out));
+            let output = Command::new(&ktx).args(&args).output().unwrap();
+            assert!(
+                output.status.success(),
+                "{name}: ktx {args:?}\n{}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+        }
     }
 
     #[test]

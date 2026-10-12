@@ -5,7 +5,7 @@ import type { ImageSelection } from "../bindings/ImageSelection";
 import type { InputRole } from "../bindings/InputRole";
 import { createScrubGate } from "../shared/scrubGate";
 import { composeCubemapCross } from "../shared/cubemapCross";
-import { selectedOutput, store, type OutputSlot } from "./store";
+import { selectedOutput, selectedRole, type OutputSlot } from "./store";
 
 type PackAxis = "layer" | "mip" | "depth" | null;
 
@@ -105,7 +105,7 @@ export function usePreviewPane() {
   /** One in-flight encoded extract; prevents UASTC/Zstd stampede on scrub. */
   const encodedGate = createScrubGate();
 
-  const role = computed((): InputRole => store.inputRole);
+  const role = computed((): InputRole => selectedRole.value);
 
   const isDepthVolume = computed((): boolean => role.value === "depthSlices");
 

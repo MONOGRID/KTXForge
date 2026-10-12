@@ -8,7 +8,7 @@ use crate::commands::{OptionReport, SourceInfo};
 use crate::error::AppError;
 use crate::image::classify::{classify, FileKind};
 use crate::image::convert::{read_source_info, source_preview_png, thumbnail_png};
-use crate::ktx::input_role::{self, InputRole};
+use crate::ktx::input_role::{self, InputRole, RoleArity};
 use crate::ktx::options::CreateOptions;
 use crate::ktx::rules;
 use crate::state::AppState;
@@ -32,6 +32,12 @@ pub fn describe_options(
     input_role: InputRole,
 ) -> Result<OptionReport, AppError> {
     Ok(rules::describe(&options, &sources, input_role))
+}
+
+/// Input-count bounds for every role (drives the Inputs panel and Encode enablement).
+#[tauri::command]
+pub fn input_role_arities() -> Vec<RoleArity> {
+    input_role::all_arities()
 }
 
 /// Whether `candidate` may be added as a new KTX output given the queue's first primary.

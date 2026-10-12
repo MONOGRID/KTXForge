@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Archive } from "@lucide/vue";
-import { computed, useId, watch } from "vue";
+import { computed, useId } from "vue";
 import type { OptionKey } from "../../../bindings/OptionKey";
 import type { Supercompression } from "../../../bindings/Supercompression";
 import { Input } from "@/components/ui/input";
@@ -70,14 +70,6 @@ const scWarnings = computed(() =>
 const panelVisible = computed(
   () => anyEnabled(KEYS) || store.options.supercompression.kind === "none",
 );
-
-watch([zstdEnabled, zlibEnabled, scheme], ([zstdOk, zlibOk, kind]) => {
-  if (kind === "zstd" && !zstdOk) {
-    store.options.supercompression = { kind: "none" };
-  } else if (kind === "zlib" && !zlibOk) {
-    store.options.supercompression = { kind: "none" };
-  }
-});
 
 function clampInt(raw: string | number, min: number, max: number, fallback: number): number {
   const n = Number(raw);

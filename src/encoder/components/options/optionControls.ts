@@ -90,28 +90,23 @@ export function enumEntriesWithHelp(
   key: OptionKey,
   labels: Record<string, string>,
 ): EnumSelectOption[] {
-  const choices = fieldState(key).choices;
-  const helps = new Map(choices.map((choice) => [choice.value, choice.help]));
-  // When Rust filters choices (e.g. HDR vs LDR formats), only offer those values.
-  const values =
-    choices.length > 0
-      ? choices.map((choice) => choice.value).filter((value) => value in labels)
-      : Object.keys(labels);
-  return values.map((value) => {
-    const help = helps.get(value);
-    const entry: EnumSelectOption = {
-      value,
-      label: labels[value] ?? value,
-    };
-    if (help === undefined) {
-      return entry;
-    }
-    return { ...entry, help };
-  });
+  // Rust filters choices (HDR vs LDR formats, role origins, …); offer only those.
+  return fieldState(key)
+    .choices.filter((choice) => choice.value in labels)
+    .map((choice) => ({
+      value: choice.value,
+      label: labels[choice.value] ?? choice.value,
+      help: choice.help,
+    }));
 }
 
 export function choiceHelp(key: OptionKey, value: string): string | undefined {
   return fieldState(key).choices.find((choice) => choice.value === value)?.help;
+}
+
+/** Whether Rust currently offers `value` for `key`. */
+export function isChoiceAllowed(key: OptionKey, value: string): boolean {
+  return fieldState(key).choices.some((choice) => choice.value === value);
 }
 
 export function isLabeled<E extends string>(

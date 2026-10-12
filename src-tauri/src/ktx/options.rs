@@ -280,6 +280,59 @@ cli_enum! {
     }
 }
 
+impl VkFormat {
+    /// Uncompressed formats; every other variant is an ASTC block format.
+    pub fn is_astc(self) -> bool {
+        !matches!(
+            self,
+            Self::R8Unorm
+                | Self::R8Srgb
+                | Self::R8G8Unorm
+                | Self::R8G8Srgb
+                | Self::R8G8B8Unorm
+                | Self::R8G8B8Srgb
+                | Self::R8G8B8A8Unorm
+                | Self::R8G8B8A8Srgb
+                | Self::R16G16B16Sfloat
+                | Self::R16G16B16A16Sfloat
+        )
+    }
+
+    /// Half-float formats, the only ones that accept HDR (EXR / Radiance) input.
+    pub fn is_hdr_float(self) -> bool {
+        matches!(self, Self::R16G16B16Sfloat | Self::R16G16B16A16Sfloat)
+    }
+
+    pub fn is_srgb(self) -> bool {
+        matches!(
+            self,
+            Self::R8Srgb
+                | Self::R8G8Srgb
+                | Self::R8G8B8Srgb
+                | Self::R8G8B8A8Srgb
+                | Self::Astc4x4SrgbBlock
+                | Self::Astc5x4SrgbBlock
+                | Self::Astc5x5SrgbBlock
+                | Self::Astc6x5SrgbBlock
+                | Self::Astc6x6SrgbBlock
+                | Self::Astc8x5SrgbBlock
+                | Self::Astc8x6SrgbBlock
+                | Self::Astc8x8SrgbBlock
+                | Self::Astc10x5SrgbBlock
+                | Self::Astc10x6SrgbBlock
+                | Self::Astc10x8SrgbBlock
+                | Self::Astc10x10SrgbBlock
+                | Self::Astc12x10SrgbBlock
+                | Self::Astc12x12SrgbBlock
+        )
+    }
+
+    /// UNORM formats with a `*_SRGB` counterpart (every 8-bit and ASTC UNORM format).
+    pub fn has_srgb_twin(self) -> bool {
+        !self.is_srgb() && !self.is_hdr_float()
+    }
+}
+
 /// One variant per v4.4.2 `ktx create` UI flag (serde name = flag without `--`).
 #[derive(
     Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, TS, EnumIter, Display,
@@ -736,6 +789,8 @@ pub struct OptionReport {
     pub fields: Vec<FieldState>,
     pub warnings: Vec<OptionWarning>,
     pub sources_class: SourcesClass,
+    /// Uncompressed format to fall back to for these sources (fresh form, mode switch).
+    pub default_format: VkFormat,
     /// When set, the current options are known-invalid for these sources; apply before encode.
     pub suggestion: Option<OptionSuggestion>,
 }
@@ -776,6 +831,17 @@ mod tests {
             assert_eq!(serde_name_of_enum_variant(&v), v.cli());
         }
         assert_eq!(VkFormat::Astc6x6SrgbBlock.cli(), "ASTC_6x6_SRGB_BLOCK");
+    }
+
+    #[test]
+    fn vk_format_properties_match_cli_names() {
+        for v in VkFormat::iter() {
+            let name = v.cli();
+            assert_eq!(v.is_astc(), name.starts_with("ASTC_"), "{name}");
+            assert_eq!(v.is_srgb(), name.contains("_SRGB"), "{name}");
+            assert_eq!(v.is_hdr_float(), name.contains("SFLOAT"), "{name}");
+            assert_eq!(v.has_srgb_twin(), name.contains("_UNORM"), "{name}");
+        }
     }
 
     #[test]

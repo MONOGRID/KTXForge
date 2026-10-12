@@ -1,12 +1,12 @@
 <script setup lang="ts">
 import { Film } from "@lucide/vue";
-import { computed, useId, watch } from "vue";
+import { computed, useId } from "vue";
 import type { AnimationOptions } from "../../bindings/AnimationOptions";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import HelpTooltip from "../../shared/components/HelpTooltip.vue";
 import Panel from "../../shared/components/Panel.vue";
-import { selectedOutput, store } from "../store";
+import { selectedOutput, selectedRole } from "../store";
 
 const DEFAULT_ANIMATION = {
   duration: 1,
@@ -22,14 +22,17 @@ const loopCountId = useId();
 const layerCount = computed((): number => selectedOutput.value?.inputs.length ?? 0);
 
 const canEnable = computed(
-  (): boolean =>
-    store.inputRole === "arrayLayers" && layerCount.value >= 2,
+  (): boolean => selectedRole.value === "arrayLayers" && layerCount.value >= 2,
 );
 
-const enabled = computed((): boolean => store.animation !== null);
+const animation = computed(
+  (): AnimationOptions | null => selectedOutput.value?.animation ?? null,
+);
+
+const enabled = computed((): boolean => animation.value !== null);
 
 const anim = computed((): AnimationOptions => {
-  return store.animation ?? { ...DEFAULT_ANIMATION };
+  return animation.value ?? { ...DEFAULT_ANIMATION };
 });
 
 const frameLengthSec = computed((): number => {
@@ -44,12 +47,6 @@ const sequenceLengthSec = computed(
   (): number => frameLengthSec.value * layerCount.value,
 );
 
-watch(canEnable, (ok) => {
-  if (!ok && store.animation !== null) {
-    store.animation = null;
-  }
-});
-
 function formatSeconds(value: number): string {
   if (!Number.isFinite(value)) {
     return "—";
@@ -58,18 +55,18 @@ function formatSeconds(value: number): string {
 }
 
 function setEnabled(next: boolean): void {
-  if (!canEnable.value) {
-    store.animation = null;
+  const slot = selectedOutput.value;
+  if (slot === null) {
     return;
   }
-  store.animation = next ? { ...DEFAULT_ANIMATION } : null;
+  slot.animation = next && canEnable.value ? { ...DEFAULT_ANIMATION } : null;
 }
 
 function writeU32(
   field: keyof AnimationOptions,
   value: string | number,
 ): void {
-  const current = store.animation;
+  const current = animation.value;
   if (current === null) {
     return;
   }
@@ -87,14 +84,14 @@ function writeU32(
 
 <template>
   <Panel
-    v-if="store.inputRole === 'arrayLayers'"
+    v-if="selectedRole === 'arrayLayers'"
     title="Animation"
     :icon="Film"
   >
     <div class="flex flex-col gap-2">
       <div class="field-row">
         <HelpTooltip
-          text="Write KTXanimData after create. Needs Input role = Array layers and at least two images on the selected output. Applied to every output with ≥2 layers."
+          text="Write KTXanimData after create. Needs Input role = Array layers and at least two images. Applies to the selected output only."
           class="label"
         >
           <label

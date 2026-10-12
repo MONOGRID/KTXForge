@@ -3,8 +3,13 @@ import type { FieldState } from "./FieldState";
 import type { OptionSuggestion } from "./OptionSuggestion";
 import type { OptionWarning } from "./OptionWarning";
 import type { SourcesClass } from "./SourcesClass";
+import type { VkFormat } from "./VkFormat";
 
 export type OptionReport = { fields: Array<FieldState>, warnings: Array<OptionWarning>, sourcesClass: SourcesClass, 
+/**
+ * Uncompressed format to fall back to for these sources (fresh form, mode switch).
+ */
+defaultFormat: VkFormat, 
 /**
  * When set, the current options are known-invalid for these sources; apply before encode.
  */

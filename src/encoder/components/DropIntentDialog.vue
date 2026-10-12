@@ -8,7 +8,11 @@ import {
   applyCenterDropAsOutputs,
   applyCenterDropAsPacked,
 } from "../actions";
-import { INPUT_ROLE_OPTIONS, type PackInputRole } from "../inputRole";
+import {
+  INPUT_ROLE_OPTIONS,
+  parsePackRole,
+  type PackInputRole,
+} from "../inputRole";
 import { INPUT_ROLE_ICONS } from "../inputRoleIcons";
 import { clearPendingCenterDrop, store } from "../store";
 
@@ -39,10 +43,10 @@ watch(visible, (open) => {
 });
 
 function onRoleChange(value: string | null): void {
-  if (value === null) {
-    return;
+  const role = value === null ? null : parsePackRole(value);
+  if (role !== null) {
+    packRole.value = role;
   }
-  packRole.value = value as PackInputRole;
 }
 
 function onCancel(): void {

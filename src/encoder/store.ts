@@ -10,14 +10,9 @@ import type { InputRole } from "../bindings/InputRole";
 import type { KtxVersion } from "../bindings/KtxVersion";
 import type { OptionKey } from "../bindings/OptionKey";
 import type { OptionReport } from "../bindings/OptionReport";
+import type { RoleArity } from "../bindings/RoleArity";
 import type { SourceInfo } from "../bindings/SourceInfo";
-import {
-  applyRoleToOptions,
-  isPackRole,
-  maxInputsForRole,
-  validateArity,
-  type PackInputRole,
-} from "./inputRole";
+import { isPackRole, roleLabel, type PackInputRole } from "./inputRole";
 
 export type JobStatus = "idle" | "queued" | "running" | "done" | "error";
 
@@ -32,6 +27,10 @@ export type JobState = {
 export type OutputSlot = {
   id: string;
   inputs: SourceInfo[];
+  /** How `inputs` map onto the KTX (single image, layers, cubemap, …). */
+  role: InputRole;
+  /** KTXanimData for an array-layers output; `null` = no animation. */
+  animation: AnimationOptions | null;
   job: JobState;
 };
 
@@ -39,7 +38,6 @@ export type BatchQueueState = {
   total: number;
   done: number;
   cancelRequested: boolean;
-  runningJobIds: string[];
 };
 
 /** Center-panel drop waiting for the user to pick outputs vs pack+role. */
@@ -52,10 +50,10 @@ type EncoderStore = {
   selectedId: string | null;
   /** Output id whose Inputs panel was opened via "+" (even with one input). */
   inputsExpandedId: string | null;
-  inputRole: InputRole;
   options: CreateOptions;
   report: OptionReport;
-  animation: AnimationOptions | null;
+  /** Input-count bounds per role, from Rust `input_role_arities`. */
+  arities: RoleArity[];
   ktxVersion: KtxVersion | null;
   ready: boolean;
   queue: BatchQueueState | null;
@@ -77,6 +75,7 @@ function emptyReport(): OptionReport {
     fields: [],
     warnings: [],
     sourcesClass: "empty",
+    defaultFormat: "R8G8B8A8_SRGB",
     suggestion: null,
   };
 }
@@ -187,10 +186,9 @@ export const store = reactive<EncoderStore>({
   outputs: [],
   selectedId: null,
   inputsExpandedId: null,
-  inputRole: "base2D",
   options: interimOptions(),
   report: emptyReport(),
-  animation: null,
+  arities: [],
   ktxVersion: null,
   ready: false,
   queue: null,
@@ -217,18 +215,56 @@ export const showInputsPanel = computed((): boolean => {
   return store.inputsExpandedId === selected.id;
 });
 
-function ensurePackRole(preferred: PackInputRole = "arrayLayers"): void {
-  if (!isPackRole(store.inputRole)) {
-    store.inputRole = preferred;
+/** Role of the selected output (Base 2D when nothing is selected). */
+export const selectedRole = computed(
+  (): InputRole => selectedOutput.value?.role ?? "base2D",
+);
+
+function setSlotRole(slot: OutputSlot, role: InputRole): void {
+  slot.role = role;
+  if (role !== "arrayLayers") {
+    slot.animation = null;
   }
 }
 
-function maybeResetToBase2D(): void {
-  const anyMulti = store.outputs.some((slot) => slot.inputs.length > 1);
-  if (!anyMulti && store.inputsExpandedId === null) {
-    store.inputRole = "base2D";
-    store.animation = null;
+function ensurePackRole(slot: OutputSlot): void {
+  if (!isPackRole(slot.role)) {
+    setSlotRole(slot, "arrayLayers");
   }
+}
+
+/** Back to a single image: drop the pack role unless Inputs was opened with "+". */
+function maybeResetToBase2D(slot: OutputSlot): void {
+  if (slot.inputs.length <= 1 && store.inputsExpandedId !== slot.id) {
+    setSlotRole(slot, "base2D");
+  }
+}
+
+function arityFor(role: InputRole): RoleArity | undefined {
+  return store.arities.find((arity) => arity.role === role);
+}
+
+function fitsArity(role: InputRole, count: number): boolean {
+  const arity = arityFor(role);
+  if (arity === undefined) {
+    return false;
+  }
+  return count >= arity.min && (arity.max === null || count <= arity.max);
+}
+
+function arityNotice(role: InputRole, count: number): string | null {
+  if (fitsArity(role, count)) {
+    return null;
+  }
+  const arity = arityFor(role);
+  if (arity === undefined) {
+    return "waiting for input rules";
+  }
+  const expected =
+    arity.max === arity.min
+      ? `exactly ${String(arity.min)}`
+      : `at least ${String(arity.min)}`;
+  return `${roleLabel(role)} expects ${expected} input image(s), got ${String(count)}`;
 }
 
 /** Sources passed to describe_options: selected inputs, else first output primary. */
@@ -247,23 +283,27 @@ function describeSources(): SourceInfo[] {
   return [first.inputs[0]];
 }
 
-function syncRoleOptions(): void {
-  const selected = selectedOutput.value;
-  const count = selected?.inputs.length ?? 0;
-  applyRoleToOptions(store.options, store.inputRole, count);
+function describeOptions(): Promise<OptionReport> {
+  return call("describe_options", {
+    options: store.options,
+    sources: describeSources(),
+    inputRole: selectedRole.value,
+  });
 }
+
+/** Latest request wins; an older response arriving late is dropped. */
+let reportSeq = 0;
 
 const refreshReport = useDebounceFn(async () => {
   if (!store.ready) {
     return;
   }
-  syncRoleOptions();
+  const seq = ++reportSeq;
   try {
-    const report = await call("describe_options", {
-      options: store.options,
-      sources: describeSources(),
-      inputRole: store.inputRole,
-    });
+    const report = await describeOptions();
+    if (seq !== reportSeq) {
+      return;
+    }
     store.report = report;
     applySuggestion(report);
   } catch {
@@ -277,22 +317,12 @@ watch(
       store.outputs.map((o) => o.inputs),
       store.selectedId,
       store.options,
-      store.inputRole,
+      selectedRole.value,
     ] as const,
   () => {
     void refreshReport();
   },
   { deep: true },
-);
-
-watch(
-  () => store.inputRole,
-  () => {
-    syncRoleOptions();
-    if (store.inputRole !== "arrayLayers" && store.animation !== null) {
-      store.animation = null;
-    }
-  },
 );
 
 /** Rust `describe_options` is the only source of enablement. Missing → hidden. */
@@ -369,6 +399,8 @@ export async function addOutputsFromSources(
     const slot: OutputSlot = {
       id: newOutputId(),
       inputs: [item],
+      role: "base2D",
+      animation: null,
       job: emptyJob(),
     };
     store.outputs.push(slot);
@@ -377,23 +409,24 @@ export async function addOutputsFromSources(
   return rejected;
 }
 
-function kindMismatchNotice(items: readonly SourceInfo[]): string | null {
-  const anchor = sessionAnchor();
-  if (anchor === null) {
-    return null;
+/** First item Rust refuses to mix with the session anchor (LDR vs HDR), as a notice. */
+async function firstIncompatible(
+  items: readonly SourceInfo[],
+): Promise<string | null> {
+  for (const item of items) {
+    const reason = await canAddAsOutput(item);
+    if (reason !== null) {
+      return `${item.name}: ${reason}`;
+    }
   }
-  const mismatch = items.find((item) => item.kind !== anchor.kind);
-  if (mismatch === undefined) {
-    return null;
-  }
-  return `${mismatch.name}: kind must match the first KTX output (${anchor.kind})`;
+  return null;
 }
 
 function roomForRole(slot: OutputSlot, want: number): {
   room: number;
   fullMessage: string | null;
 } {
-  const max = maxInputsForRole(store.inputRole);
+  const max = arityFor(slot.role)?.max ?? null;
   if (max === null) {
     return { room: want, fullMessage: null };
   }
@@ -405,16 +438,16 @@ function roomForRole(slot: OutputSlot, want: number): {
   };
 }
 
-function appendPackInputs(
+async function appendPackInputs(
   slot: OutputSlot,
   items: readonly SourceInfo[],
-): string | null {
+): Promise<string | null> {
   const { room, fullMessage } = roomForRole(slot, items.length);
   if (room === 0) {
     return fullMessage ?? "cannot add more inputs";
   }
   const toAdd = items.slice(0, room);
-  const kindError = kindMismatchNotice(toAdd);
+  const kindError = await firstIncompatible(toAdd);
   if (kindError !== null) {
     return kindError;
   }
@@ -430,7 +463,7 @@ function promoteToPackIfMulti(slot: OutputSlot, items: readonly SourceInfo[]): v
   if (!willBeMulti) {
     return;
   }
-  ensurePackRole("arrayLayers");
+  ensurePackRole(slot);
   store.inputsExpandedId = slot.id;
 }
 
@@ -448,7 +481,9 @@ function replaceBase2DInput(
  * Append inputs on the selected output. Entering multi-input switches the
  * session to a pack role (default array layers) and keeps the Inputs panel open.
  */
-export function addInputsToSelected(items: readonly SourceInfo[]): string | null {
+export async function addInputsToSelected(
+  items: readonly SourceInfo[],
+): Promise<string | null> {
   const slot = selectedOutput.value;
   if (slot === null) {
     return "Select a KTX output before adding inputs";
@@ -460,7 +495,7 @@ export function addInputsToSelected(items: readonly SourceInfo[]): string | null
   clearJobOnSlot(slot);
   promoteToPackIfMulti(slot, items);
 
-  if (store.inputRole === "base2D") {
+  if (slot.role === "base2D") {
     return replaceBase2DInput(slot, items);
   }
 
@@ -475,20 +510,19 @@ export async function addPackedOutputFromSources(
   if (items.length === 0) {
     return null;
   }
-  const arityError = validateArity(role, items.length);
+  const arityError = arityNotice(role, items.length);
   if (arityError !== null) {
     return arityError;
   }
-  for (const item of items) {
-    const reason = await canAddAsOutput(item);
-    if (reason !== null) {
-      return `${item.name}: ${reason}`;
-    }
+  const kindError = await firstIncompatible(items);
+  if (kindError !== null) {
+    return kindError;
   }
-  store.inputRole = role;
   const slot: OutputSlot = {
     id: newOutputId(),
     inputs: [...items],
+    role,
+    animation: null,
     job: emptyJob(),
   };
   store.outputs.push(slot);
@@ -505,7 +539,7 @@ export function beginAddInputs(outputId: string): void {
   }
   store.selectedId = outputId;
   store.inputsExpandedId = outputId;
-  ensurePackRole("arrayLayers");
+  ensurePackRole(slot);
 }
 
 export function setPendingCenterDrop(sources: readonly SourceInfo[]): void {
@@ -539,7 +573,6 @@ export function removeOutput(id: string): void {
   }
   store.outputs.splice(index, 1);
   forgetOutputIds(id);
-  maybeResetToBase2D();
 }
 
 export function clearOutputs(): void {
@@ -549,8 +582,6 @@ export function clearOutputs(): void {
   store.outputs.splice(0, store.outputs.length);
   store.selectedId = null;
   store.inputsExpandedId = null;
-  store.animation = null;
-  store.inputRole = "base2D";
   store.pendingCenterDrop = null;
 }
 
@@ -561,9 +592,14 @@ export function removeInput(index: number): void {
   }
   clearJobOnSlot(slot);
   slot.inputs.splice(index, 1);
+  if (slot.inputs.length < 2) {
+    slot.animation = null;
+  }
   if (slot.inputs.length <= 1) {
-    store.inputsExpandedId = null;
-    maybeResetToBase2D();
+    if (store.inputsExpandedId === slot.id) {
+      store.inputsExpandedId = null;
+    }
+    maybeResetToBase2D(slot);
   }
 }
 
@@ -588,21 +624,21 @@ export function moveInput(index: number, delta: -1 | 1): void {
   inputs[next] = current;
 }
 
-export function setInputRole(role: InputRole): void {
-  store.inputRole = role;
-  if (isPackRole(role) && store.selectedId !== null) {
-    store.inputsExpandedId = store.selectedId;
+export function setInputRole(role: PackInputRole): void {
+  const slot = selectedOutput.value;
+  if (slot === null) {
+    return;
   }
-  syncRoleOptions();
+  clearJobOnSlot(slot);
+  setSlotRole(slot, role);
+  store.inputsExpandedId = slot.id;
 }
 
 export function allOutputsValid(): boolean {
   if (store.outputs.length === 0) {
     return false;
   }
-  return store.outputs.every(
-    (slot) => validateArity(store.inputRole, slot.inputs.length) === null,
-  );
+  return store.outputs.every((slot) => fitsArity(slot.role, slot.inputs.length));
 }
 
 export function outputLabel(slot: OutputSlot): string {
@@ -617,17 +653,18 @@ export function outputLabel(slot: OutputSlot): string {
 }
 
 export async function initStore(): Promise<void> {
-  const [options, ktxVersion] = await Promise.all([
+  const [options, ktxVersion, arities] = await Promise.all([
     call("default_create_options", {}),
     call("ktx_version", {}),
+    call("input_role_arities", {}),
   ]);
   store.options = options;
   store.ktxVersion = ktxVersion;
+  store.arities = arities;
   store.ready = true;
-  syncRoleOptions();
-  store.report = await call("describe_options", {
-    options: store.options,
-    sources: describeSources(),
-    inputRole: store.inputRole,
-  });
+  const seq = ++reportSeq;
+  const report = await describeOptions();
+  if (seq === reportSeq) {
+    store.report = report;
+  }
 }

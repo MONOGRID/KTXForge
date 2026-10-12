@@ -12,6 +12,7 @@ Total size is under 2 MB (~90 KiB as of Wave 0).
 | `rgb.jpg` | Solid 48×48 JPEG via System.Drawing |
 | `gray.png` | Synthetic 32×32 greyscale PNG |
 | `hdr.exr` | Minimal OpenEXR float RGBA 32×32 with alphabetically sorted channels (rewritten Wave 3; prior Wave 0 file failed OpenEXR channel-order validation) |
+| `hdr_scanline.exr` | `oiiotool --pattern fill:color=0.5,1.5,2.0,1 32x32 4 -d float --compression zip` — scanline ZIP EXR. The tiled RLE `hdr.exr` segfaults the Linux v4.4.2 `ktx create`. |
 | `odd_size.png` | Synthetic 37×19 RGBA PNG |
 | `frames/frame_001.png` … `frame_004.png` | 32×32 solid colors |
 | `cube/face_0.png` … `face_5.png` | Cubemap faces in +X…−Z order |

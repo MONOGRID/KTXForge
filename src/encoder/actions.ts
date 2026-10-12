@@ -31,12 +31,10 @@ import {
 const ENCODE_PARALLELISM = 2;
 
 function animationBlocksEncode(): boolean {
-  if (store.animation === null) {
-    return false;
-  }
-  return (
-    store.inputRole !== "arrayLayers" ||
-    store.outputs.some((slot) => slot.inputs.length < 2)
+  return store.outputs.some(
+    (slot) =>
+      slot.animation !== null &&
+      (slot.role !== "arrayLayers" || slot.inputs.length < 2),
   );
 }
 
@@ -107,7 +105,7 @@ export async function openSourcesAsInputs(): Promise<void> {
     if (picked.length === 0) {
       return;
     }
-    const notice = addInputsToSelected(picked);
+    const notice = await addInputsToSelected(picked);
     if (notice !== null) {
       await alertInvalidInput(notice);
     }
@@ -120,21 +118,6 @@ export async function openSourcesAsInputs(): Promise<void> {
 export async function addInputsForOutput(outputId: string): Promise<void> {
   beginAddInputs(outputId);
   await openSourcesAsInputs();
-}
-
-function trackRunningJob(jobId: string): void {
-  store.queue?.runningJobIds.push(jobId);
-}
-
-function untrackRunningJob(jobId: string): void {
-  const queue = store.queue;
-  if (queue === null) {
-    return;
-  }
-  const at = queue.runningJobIds.indexOf(jobId);
-  if (at >= 0) {
-    queue.runningJobIds.splice(at, 1);
-  }
 }
 
 function applyEncodeSuccess(
@@ -176,7 +159,6 @@ async function encodeOne(slot: OutputSlot): Promise<void> {
     result: null,
     errorMessage: null,
   };
-  trackRunningJob(jobId);
 
   try {
     const result = await call("encode", {
@@ -184,15 +166,13 @@ async function encodeOne(slot: OutputSlot): Promise<void> {
         jobId,
         sources: slot.inputs.map((source) => source.path),
         options: store.options,
-        animation: store.animation,
-        inputRole: store.inputRole,
+        animation: slot.role === "arrayLayers" ? slot.animation : null,
+        inputRole: slot.role,
       },
     });
     applyEncodeSuccess(slot, jobId, result);
   } catch (err: unknown) {
     applyEncodeFailure(slot, jobId, err);
-  } finally {
-    untrackRunningJob(jobId);
   }
 }
 
@@ -260,7 +240,6 @@ export async function encode(): Promise<void> {
     total: slots.length,
     done: 0,
     cancelRequested: false,
-    runningJobIds: [],
   };
   store.queue = queueState;
   markSlotsQueued(slots);
@@ -385,16 +364,16 @@ export function clearSources(): void {
   clearOutputs();
 }
 
-function dropOntoInputs(sources: readonly SourceInfo[]): void {
+async function dropOntoInputs(sources: readonly SourceInfo[]): Promise<void> {
   if (selectedOutput.value === null) {
-    void alertInvalidInput(
+    await alertInvalidInput(
       "Select a KTX output (or use +) before dropping inputs",
     );
     return;
   }
-  const notice = addInputsToSelected(sources);
+  const notice = await addInputsToSelected(sources);
   if (notice !== null) {
-    void alertInvalidInput(notice);
+    await alertInvalidInput(notice);
   }
 }
 
@@ -419,7 +398,7 @@ export async function handleDroppedSources(
     return;
   }
   if (zone === "inputs") {
-    dropOntoInputs(sources);
+    await dropOntoInputs(sources);
     return;
   }
   await dropOntoOutputs(sources);

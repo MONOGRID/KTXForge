@@ -1,6 +1,4 @@
-import type { CreateOptions } from "../bindings/CreateOptions";
 import type { InputRole } from "../bindings/InputRole";
-import type { TexcoordOrigin } from "../bindings/TexcoordOrigin";
 
 /** Multi-input roles shown in the Inputs panel (Base 2D is implicit for single-input outputs). */
 export type PackInputRole = Exclude<InputRole, "base2D">;
@@ -37,110 +35,13 @@ export function isPackRole(role: InputRole): role is PackInputRole {
   return role !== "base2D";
 }
 
-function clearPackDims(options: CreateOptions): void {
-  options.container.layers = null;
-  options.container.cubemap = false;
-  options.container.depth = null;
+/** Narrow a select value to a pack role without a cast. */
+export function parsePackRole(value: string): PackInputRole | null {
+  return INPUT_ROLE_OPTIONS.find((opt) => opt.value === value)?.value ?? null;
 }
 
-function applyBase2D(options: CreateOptions): void {
-  clearPackDims(options);
-}
-
-function applyArrayLayers(options: CreateOptions, n: number): void {
-  clearPackDims(options);
-  options.container.layers = n > 0 ? n : null;
-}
-
-function applyCubemapFaces(options: CreateOptions): void {
-  clearPackDims(options);
-  options.container.cubemap = true;
-  options.container.oneD = false;
-  ensureTopLeftOrigin(options);
-}
-
-function applyMipChain(options: CreateOptions, n: number): void {
-  clearPackDims(options);
-  options.container.levels = n > 0 ? n : null;
-  options.container.generateMipmap = false;
-  options.container.runtimeMipmap = false;
-}
-
-function applyDepthSlices(options: CreateOptions, n: number): void {
-  clearPackDims(options);
-  options.container.depth = n > 0 ? n : null;
-  options.container.oneD = false;
-  ensureFrontBackOrigin(options);
-}
-
-const ROLE_APPLIERS = {
-  base2D: applyBase2D,
-  arrayLayers: applyArrayLayers,
-  cubemapFaces: applyCubemapFaces,
-  mipChain: applyMipChain,
-  depthSlices: applyDepthSlices,
-} as const satisfies Record<
-  InputRole,
-  (options: CreateOptions, n: number) => void
->;
-
-/** Mirror of Rust `input_role::apply_role` — keeps Container options honest in the UI. */
-export function applyRoleToOptions(
-  options: CreateOptions,
-  role: InputRole,
-  inputCount: number,
-): void {
-  ROLE_APPLIERS[role](options, inputCount);
-}
-
-function ensureTopLeftOrigin(options: CreateOptions): void {
-  const current = options.color.assignTexcoordOrigin;
-  if (
-    current === "top-left" ||
-    current === "top-left-front" ||
-    current === "top-left-back"
-  ) {
-    return;
-  }
-  options.color.assignTexcoordOrigin = "top-left" satisfies TexcoordOrigin;
-}
-
-function ensureFrontBackOrigin(options: CreateOptions): void {
-  const current = options.color.assignTexcoordOrigin;
-  if (
-    current === "top-left-front" ||
-    current === "top-left-back" ||
-    current === "bottom-left-front" ||
-    current === "bottom-left-back"
-  ) {
-    return;
-  }
-  options.color.assignTexcoordOrigin = "top-left-front" satisfies TexcoordOrigin;
-}
-
-export function validateArity(
-  role: InputRole,
-  inputCount: number,
-): string | null {
-  if (inputCount === 0) {
-    return "each KTX output needs at least one input image";
-  }
-  if (role === "base2D" && inputCount !== 1) {
-    return `Base 2D expects exactly 1 input image, got ${String(inputCount)}`;
-  }
-  if (role === "cubemapFaces" && inputCount !== 6) {
-    return `Cubemap expects exactly 6 face images, got ${String(inputCount)}`;
-  }
-  return null;
-}
-
-/** Max inputs the bottom panel should accept for this role (`null` = unlimited). */
-export function maxInputsForRole(role: InputRole): number | null {
-  if (role === "base2D") {
-    return 1;
-  }
-  if (role === "cubemapFaces") {
-    return 6;
-  }
-  return null;
+export function roleLabel(role: InputRole): string {
+  return (
+    INPUT_ROLE_OPTIONS.find((opt) => opt.value === role)?.label ?? "Base 2D"
+  );
 }

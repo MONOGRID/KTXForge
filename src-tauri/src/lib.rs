@@ -87,6 +87,7 @@ pub fn run() {
             commands::app::ktx_version,
             commands::encoder::default_create_options,
             commands::encoder::describe_options,
+            commands::encoder::input_role_arities,
             commands::encoder::check_output_compatible,
             commands::encoder::pick_sources,
             commands::encoder::source_thumbnail,

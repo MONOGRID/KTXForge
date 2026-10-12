@@ -1,21 +1,21 @@
 <script setup lang="ts">
 import { ChevronDown, ChevronUp, Images, Plus, X } from "@lucide/vue";
 import { useTimeoutFn } from "@vueuse/core";
-import { computed, onMounted, onUnmounted, reactive, watch } from "vue";
+import { computed, onUnmounted, reactive, watch } from "vue";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { call } from "../../api/commands";
-import type { InputRole } from "../../bindings/InputRole";
 import type { SourceInfo } from "../../bindings/SourceInfo";
 import EnumSelect from "../../shared/components/EnumSelect.vue";
 import type { EnumSelectOption } from "../../shared/enumSelect";
 import { openSourcesAsInputs } from "../actions";
 import { isDropTarget, setDropZone } from "../dropTarget";
-import { INPUT_ROLE_OPTIONS, isPackRole } from "../inputRole";
+import { INPUT_ROLE_OPTIONS, isPackRole, parsePackRole } from "../inputRole";
 import { INPUT_ROLE_ICONS } from "../inputRoleIcons";
 import {
   moveInput,
   removeInput,
   selectedOutput,
+  selectedRole,
   setInputRole,
   store,
 } from "../store";
@@ -73,14 +73,8 @@ const roleOptions = computed((): EnumSelectOption[] =>
 
 /** Pack roles only — Base 2D is implicit when the Inputs panel is hidden. */
 const roleModel = computed((): string =>
-  isPackRole(store.inputRole) ? store.inputRole : "arrayLayers",
+  isPackRole(selectedRole.value) ? selectedRole.value : "arrayLayers",
 );
-
-onMounted(() => {
-  if (!isPackRole(store.inputRole)) {
-    setInputRole("arrayLayers");
-  }
-});
 
 watch(
   () => inputs.value.map((s) => s.path),
@@ -110,10 +104,10 @@ function onAdd(): void {
 }
 
 function onRoleChange(value: string | null): void {
-  if (value === null) {
-    return;
+  const role = value === null ? null : parsePackRole(value);
+  if (role !== null) {
+    setInputRole(role);
   }
-  setInputRole(value as InputRole);
 }
 
 function onPointerEnter(): void {

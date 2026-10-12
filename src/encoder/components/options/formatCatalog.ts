@@ -116,19 +116,6 @@ const astcFormats = {
   "12x12_SRGB": "ASTC_12x12_SRGB_BLOCK",
 } satisfies Record<`${AstcBlock}_${AstcColor}`, Extract<VkFormat, `ASTC_${string}`>>;
 
-export const uncompressedValues = [
-  "R8_UNORM",
-  "R8_SRGB",
-  "R8G8_UNORM",
-  "R8G8_SRGB",
-  "R8G8B8_UNORM",
-  "R8G8B8_SRGB",
-  "R8G8B8A8_UNORM",
-  "R8G8B8A8_SRGB",
-  "R16G16B16_SFLOAT",
-  "R16G16B16A16_SFLOAT",
-] as const satisfies readonly UncompressedFormat[];
-
 export const encodeValues = ["basis-lz", "uastc"] as const satisfies readonly EncodeCodec[];
 
 export const astcBlockValues = [

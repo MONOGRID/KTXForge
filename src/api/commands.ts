@@ -9,6 +9,7 @@ import type { InputRole } from "../bindings/InputRole";
 import type { InspectReport } from "../bindings/InspectReport";
 import type { KtxVersion } from "../bindings/KtxVersion";
 import type { OptionReport } from "../bindings/OptionReport";
+import type { RoleArity } from "../bindings/RoleArity";
 import type { SourceInfo } from "../bindings/SourceInfo";
 import type { UpdateInfo } from "../bindings/UpdateInfo";
 import { toAppError } from "./guards";
@@ -27,6 +28,7 @@ export type Commands = {
     };
     result: OptionReport;
   };
+  input_role_arities: { args: EmptyArgs; result: RoleArity[] };
   check_output_compatible: {
     args: { anchor: SourceInfo; candidate: SourceInfo };
     result: null;
