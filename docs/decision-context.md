@@ -413,3 +413,21 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 **Decided:** Soft chrome keyed to `assets/icon-full.png` brand blue, without brand green/orange. Brand / primary / ring are the flame electric blue `#0870f8` (`214 94% 50%`) in both modes. Light mode uses cool off-white page (`#f0f2f5`) and white raised cards. Dark mode keeps VS Code Dark+ panel surfaces (`#1e1e1e` / `#252526` / `#181818`, borders `#3e3e42`, ink `#cccccc`) from the 2026-10-11 theme entry — only the accent is the logo blue. Surfaces and controls prefer `border-transparent` + soft shadow / fill contrast over hard strokes; `--radius` is `0.5rem` with mostly `rounded-md` / `rounded-lg`. Supersedes the brand-green choice in the 2026-10-11 shadcn/theme entries; dark panel greys stay VS Code–aligned. Palette ownership stays in `theme.css`.
 
 **Why:** Match the product mark on accents while keeping dark panels familiar for a desktop tool; navy-tinted dark fought the VS Code look users expected.
+
+## 2026-10-12 — Capped parallel extracts for mip scrub
+
+**Decided:** Keep latest-only scrub coalescing (encoder `createScrubGate`, inspector interactive queue). Raise process-wide `EXTRACT_SLOTS` from 1 → 3 and match the inspector frontend fetch pool (`MAX_INFLIGHT_FETCHES = 3`) so mip-warm / neighbors / wipe sides can overlap. Soft in-memory LRU cap goes 16 → 32. Miss debounce / prefetch idle settle to 60 ms / 100 ms. Disk PNG cache hits still skip the semaphore.
+
+**Why:** A single extract slot stopped stampedes but left multi-level scrub and mip warm serialized at ~one decompress (~10% CPU). Three slots is the middle ground between that underuse and the unbounded UASTC/Zstd stampede that ballooned RAM.
+
+## 2026-10-12 — Core-scaled extract concurrency (~80%)
+
+**Decided:** Size process-wide extract slots with `extract_slots_for_cores`: `max(1, min(16, cores * 4 / 5))` (~80% of logical cores, hard cap 16). `OnceLock<Semaphore>` replaces the fixed-3 semaphore. Expose the value via Tauri `extract_concurrency`; inspector `imageCache` starts from the same formula on `navigator.hardwareConcurrency` and syncs from that command. Latest-only scrub coalesce and the disk PNG cache short-circuit stay unchanged.
+
+**Why:** A fixed 3 left higher-core machines ~40% busy while scrubbing mips. Scaling to ~80% uses spare cores without locking the UI core(s); the cap of 16 prevents RAM stampedes on very wide hosts.
+
+## 2026-10-12 — Idle warm of full layer / frame stack
+
+**Decided:** After the viewport settles, inspector idle warm enqueues the **full** array-layer / anim-frame stack for the current level/face/depth (`warmInspectorLayerStack`, nearest-first), in addition to the existing mip-chain warm. FramePlayer uses the same warm instead of only the next frame. Interactive scrub still coalesces to the latest selection and takes free extract slots first, but **no longer clears** the prefetch queue — spare slots keep background pre-extract running. Disk PNG cache remains the durable hit; in-memory LRU stays capped.
+
+**Why:** Scrubbing only needs a fresh `ktx extract` for selections not yet on disk. Warming only ±1 neighbors left the rest of an anim/array cold, so each new frame still paid a decompress. Filling the stack while the user is stopped (or slowly scrubbing) makes later scrub hits cache.

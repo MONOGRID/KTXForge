@@ -56,6 +56,7 @@ pub fn run() {
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
+            commands::app::extract_concurrency,
             commands::app::ktx_version,
             commands::encoder::default_create_options,
             commands::encoder::describe_options,

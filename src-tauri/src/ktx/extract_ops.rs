@@ -2,6 +2,7 @@
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
+use std::sync::OnceLock;
 use std::time::SystemTime;
 
 use ktx2::Reader;
@@ -22,8 +23,30 @@ use crate::workspace::Workspace;
 
 /// Global cap on concurrent `ktx extract` processes.
 /// Disk-cached PNG reads skip this path; only real sidecar work takes a slot.
-/// One slot stops scrub stampedes from spawning dozens of UASTC/Zstd decompressors.
-static EXTRACT_SLOTS: Semaphore = Semaphore::const_new(1);
+/// Sized to ~80% of logical cores (see [`extract_slots_for_cores`]) so mip-warm
+/// can use the machine without a free-for-all scrub stampede.
+static EXTRACT_SLOTS: OnceLock<Semaphore> = OnceLock::new();
+
+/// Hard ceiling so a 64+/128-core host cannot spawn dozens of UASTC/Zstd workers.
+const EXTRACT_SLOTS_MAX: usize = 16;
+
+/// ~80% of `cores`, at least 1, at most [`EXTRACT_SLOTS_MAX`].
+pub fn extract_slots_for_cores(cores: usize) -> usize {
+    let roughly_eighty = cores.saturating_mul(4) / 5;
+    roughly_eighty.max(1).min(EXTRACT_SLOTS_MAX)
+}
+
+/// Process-wide extract concurrency for this host.
+pub fn extract_slot_count() -> usize {
+    let cores = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1);
+    extract_slots_for_cores(cores)
+}
+
+fn extract_slots() -> &'static Semaphore {
+    EXTRACT_SLOTS.get_or_init(|| Semaphore::new(extract_slot_count()))
+}
 
 #[derive(Debug, Clone)]
 pub struct TextureMeta {
@@ -226,7 +249,7 @@ pub async fn run_extract(
     transcode: Option<TranscodeTarget>,
     cancel: CancellationHandle,
 ) -> Result<(), AppError> {
-    let _permit = EXTRACT_SLOTS
+    let _permit = extract_slots()
         .acquire()
         .await
         .map_err(|_| AppError::io("extract slot closed"))?;
@@ -382,22 +405,34 @@ pub async fn texture_meta_via_info(app: &AppHandle, path: &Path) -> Result<Textu
 
 #[cfg(test)]
 mod extract_slot_tests {
-    use super::EXTRACT_SLOTS;
+    use super::{extract_slot_count, extract_slots, extract_slots_for_cores};
     use std::sync::atomic::{AtomicUsize, Ordering};
     use std::sync::Arc;
     use std::time::Duration;
 
+    #[test]
+    fn extract_slots_for_cores_targets_eighty_percent() {
+        assert_eq!(extract_slots_for_cores(1), 1);
+        assert_eq!(extract_slots_for_cores(4), 3);
+        assert_eq!(extract_slots_for_cores(8), 6);
+        assert_eq!(extract_slots_for_cores(10), 8);
+        assert_eq!(extract_slots_for_cores(16), 12);
+        assert_eq!(extract_slots_for_cores(32), 16);
+        assert_eq!(extract_slots_for_cores(128), 16);
+    }
+
     #[tokio::test]
-    async fn extract_slots_serialize_concurrent_acquirers() {
+    async fn extract_slots_cap_concurrent_acquirers() {
+        let slots = extract_slot_count();
         let concurrent = Arc::new(AtomicUsize::new(0));
         let peak = Arc::new(AtomicUsize::new(0));
 
         let mut joins = Vec::new();
-        for _ in 0..8 {
+        for _ in 0..(slots * 2 + 2) {
             let concurrent = Arc::clone(&concurrent);
             let peak = Arc::clone(&peak);
             joins.push(tokio::spawn(async move {
-                let _permit = EXTRACT_SLOTS.acquire().await.expect("slot");
+                let _permit = extract_slots().acquire().await.expect("slot");
                 let now = concurrent.fetch_add(1, Ordering::SeqCst) + 1;
                 peak.fetch_max(now, Ordering::SeqCst);
                 tokio::time::sleep(Duration::from_millis(15)).await;
@@ -409,6 +444,6 @@ mod extract_slot_tests {
             join.await.expect("join");
         }
 
-        assert_eq!(peak.load(Ordering::SeqCst), 1);
+        assert_eq!(peak.load(Ordering::SeqCst), slots);
     }
 }

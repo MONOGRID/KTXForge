@@ -11,6 +11,7 @@ import {
   releaseInspectorImage,
   retainInspectorImage,
   touchInspectorImageUrl,
+  warmInspectorLayerStack,
   warmInspectorMipChain,
   type SubresourceDims,
 } from "../../imageCache";
@@ -18,8 +19,8 @@ import { path, report, selection } from "../../store";
 import { useCubemapCross } from "../../useCubemapCross";
 import { useDepthVolume } from "../../useDepthVolume";
 
-const MISS_DEBOUNCE_MS = 120;
-const PREFETCH_IDLE_MS = 200;
+const MISS_DEBOUNCE_MS = 60;
+const PREFETCH_IDLE_MS = 100;
 
 const objectUrl = ref<string | null>(null);
 const loading = ref(false);
@@ -228,6 +229,7 @@ function scheduleIdlePrefetch(filePath: string, sel: ImageSelection): void {
     }
     prefetchInspectorNeighbors(filePath, sel, dims);
     warmInspectorMipChain(filePath, sel, dims.levelCount);
+    warmInspectorLayerStack(filePath, sel, dims.layerCount);
   }, PREFETCH_IDLE_MS);
 }
 

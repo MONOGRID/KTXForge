@@ -8,9 +8,21 @@ function selectionKey(filePath: string, sel: ImageSelection): string {
 /**
  * Soft cap on decoded preview blobs in the webview. Disk PNG cache in Rust
  * stays unbounded; revisits rehydrate from disk without keeping every layer hot.
- * ~16 × 1024² RGBA-ish PNGs is a few tens of MB — not 400 layers × dual sides.
+ * ~32 entries covers a mip chain + neighbors without holding a full layer array.
  */
-const MAX_MEMORY_ENTRIES = 16;
+const MAX_MEMORY_ENTRIES = 32;
+
+/** Match Rust `EXTRACT_SLOTS_MAX` — large hosts must not spawn endless decompressors. */
+const EXTRACT_SLOTS_MAX = 16;
+
+/**
+ * Same formula as Rust `extract_slots_for_cores`: ~80% of logical cores, ≥1, ≤16.
+ * Used until `extract_concurrency` confirms the host value.
+ */
+function extractSlotsForCores(cores: number): number {
+  const n = Number.isFinite(cores) && cores > 0 ? Math.trunc(cores) : 1;
+  return Math.min(EXTRACT_SLOTS_MAX, Math.max(1, Math.floor((n * 4) / 5)));
+}
 
 const urls = new Map<string, string>();
 /** In-flight fetches by key (shared by interactive + prefetch). */
@@ -18,7 +30,6 @@ const inflight = new Map<string, Promise<string>>();
 /** Keys that must not be revoked (active viewport / depth volume planes). */
 const pinCounts = new Map<string, number>();
 
-/** At most one `ktx extract` / IPC at a time (scrubbing must not stampede). */
 type PrefetchItem = ImageSelection & { filePath: string };
 
 type QueuedLoad = {
@@ -28,11 +39,25 @@ type QueuedLoad = {
   reject: (err: unknown) => void;
 };
 
-let fetchBusy = false;
+let maxInflightFetches = extractSlotsForCores(
+  typeof navigator !== "undefined" ? navigator.hardwareConcurrency : 4,
+);
+let inflightCount = 0;
 let interactiveQueued: QueuedLoad | null = null;
 /** Non-coalescing loads (depth volume stacks); yield to interactive, outrank prefetch. */
 const ensureQueue: QueuedLoad[] = [];
 const prefetchQueue: PrefetchItem[] = [];
+
+void call("extract_concurrency", {})
+  .then((n) => {
+    if (typeof n === "number" && Number.isFinite(n) && n >= 1) {
+      maxInflightFetches = Math.min(EXTRACT_SLOTS_MAX, Math.trunc(n));
+      pumpFetches();
+    }
+  })
+  .catch(() => {
+    // Keep navigator-based fallback when IPC is unavailable (e.g. unit tests).
+  });
 
 function isPinned(key: string): boolean {
   return (pinCounts.get(key) ?? 0) > 0;
@@ -165,9 +190,9 @@ async function runFetch(
 }
 
 function beginFetch(work: Promise<unknown>): void {
-  fetchBusy = true;
+  inflightCount += 1;
   void work.finally(() => {
-    fetchBusy = false;
+    inflightCount -= 1;
     pumpFetches();
   });
 }
@@ -201,41 +226,43 @@ function takeInteractive(): QueuedLoad | null {
   return item;
 }
 
-function startPrefetchIfAny(): void {
+function startPrefetchIfAny(): boolean {
   const next = takeNextPrefetch();
   if (next === null) {
-    return;
+    return false;
   }
   beginFetch(
     runFetch(next.filePath, next).catch(() => {
       // Prefetch failures are ignored; the viewer surfaces real load errors.
     }),
   );
+  return true;
 }
 
 function pumpFetches(): void {
-  if (fetchBusy) {
-    return;
-  }
+  while (inflightCount < maxInflightFetches) {
+    const interactive = takeInteractive();
+    if (interactive !== null) {
+      startQueuedLoad(interactive);
+      continue;
+    }
 
-  const interactive = takeInteractive();
-  if (interactive !== null) {
-    startQueuedLoad(interactive);
-    return;
-  }
+    const ensure = ensureQueue.shift();
+    if (ensure !== undefined) {
+      startQueuedLoad(ensure);
+      continue;
+    }
 
-  const ensure = ensureQueue.shift();
-  if (ensure !== undefined) {
-    startQueuedLoad(ensure);
-    return;
+    if (!startPrefetchIfAny()) {
+      return;
+    }
   }
-
-  startPrefetchIfAny();
 }
 
 /**
  * Resolve an object URL for a subresource.
- * Concurrent interactive requests coalesce to the latest selection only.
+ * Concurrent interactive requests coalesce to the latest selection only;
+ * up to `maxInflightFetches` IPC/extracts may run (prefetch fills spare slots).
  */
 export function loadInspectorImageUrl(
   filePath: string,
@@ -257,8 +284,8 @@ export function loadInspectorImageUrl(
       interactiveQueued.reject(new DOMException("Superseded", "AbortError"));
     }
     interactiveQueued = { filePath, sel, resolve, reject };
-    // Prefetch work yields to the interactive slider target.
-    prefetchQueue.length = 0;
+    // Interactive takes the next free slot; leave the warm queue running in
+    // spare extract slots so background pre-extract can finish while scrubbing.
     pumpFetches();
   });
 }
@@ -345,21 +372,51 @@ export function prefetchInspectorNeighbors(
 }
 
 /**
- * Enqueue every mip for the current face/layer/depth on the low-priority
- * prefetch queue (interactive slider loads always win and flush this queue).
+ * Enqueue selections nearest-first on the low-priority prefetch queue.
+ * Interactive loads still win free slots first via `pumpFetches` priority.
+ */
+function warmAxisNearestFirst(
+  filePath: string,
+  sel: ImageSelection,
+  axis: "level" | "layer",
+  count: number,
+): void {
+  if (count <= 1) {
+    return;
+  }
+  const origin = sel[axis];
+  prefetchInspectorImage(filePath, sel);
+  for (let dist = 1; dist < count; dist += 1) {
+    const hi = origin + dist;
+    const lo = origin - dist;
+    if (hi < count) {
+      prefetchInspectorImage(filePath, { ...sel, [axis]: hi });
+    }
+    if (lo >= 0) {
+      prefetchInspectorImage(filePath, { ...sel, [axis]: lo });
+    }
+  }
+}
+
+/**
+ * Enqueue every mip for the current face/layer/depth (nearest level first).
  */
 export function warmInspectorMipChain(
   filePath: string,
   sel: ImageSelection,
   levelCount: number,
 ): void {
-  const base = {
-    face: sel.face,
-    layer: sel.layer,
-    depthSlice: sel.depthSlice,
-  };
+  warmAxisNearestFirst(filePath, sel, "level", levelCount);
+}
 
-  for (let level = 0; level < levelCount; level += 1) {
-    prefetchInspectorImage(filePath, { ...base, level });
-  }
+/**
+ * Enqueue every array layer / anim frame for the current level/face/depth
+ * (nearest layer first) so idle time fills the disk cache ahead of scrubbing.
+ */
+export function warmInspectorLayerStack(
+  filePath: string,
+  sel: ImageSelection,
+  layerCount: number,
+): void {
+  warmAxisNearestFirst(filePath, sel, "layer", layerCount);
 }

@@ -16,6 +16,7 @@ import { toAppError } from "./guards";
 type EmptyArgs = Record<string, never>;
 
 export type Commands = {
+  extract_concurrency: { args: EmptyArgs; result: number };
   ktx_version: { args: EmptyArgs; result: KtxVersion };
   default_create_options: { args: EmptyArgs; result: CreateOptions };
   describe_options: {

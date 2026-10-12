@@ -3,7 +3,7 @@ import { ChevronLeft, ChevronRight, Pause, Play } from "@lucide/vue";
 import { computed, ref, watch } from "vue";
 import { useIntervalFn } from "@vueuse/core";
 import type { KtxAnimDataInfo } from "../../../bindings/KtxAnimDataInfo";
-import { prefetchInspectorImage } from "../../imageCache";
+import { warmInspectorLayerStack } from "../../imageCache";
 import { path, report, selection } from "../../store";
 
 const playsCompleted = ref(0);
@@ -108,7 +108,7 @@ function togglePlay(): void {
   resume();
 }
 
-function preloadNext(): void {
+function warmFrames(): void {
   const filePath = path.value;
   const data = anim.value;
   if (filePath === null || filePath === "" || data === null) {
@@ -118,13 +118,7 @@ function preloadNext(): void {
   if (count <= 1) {
     return;
   }
-  const nextLayer = (selection.value.layer + 1) % count;
-  prefetchInspectorImage(filePath, {
-    level: selection.value.level,
-    face: selection.value.face,
-    layer: nextLayer,
-    depthSlice: selection.value.depthSlice,
-  });
+  warmInspectorLayerStack(filePath, { ...selection.value }, count);
 }
 
 watch(
@@ -138,7 +132,7 @@ watch(
       anim.value,
     ] as const,
   () => {
-    preloadNext();
+    warmFrames();
   },
 );
 

@@ -2,9 +2,16 @@ use tauri::AppHandle;
 
 use crate::commands::KtxVersion;
 use crate::error::AppError;
+use crate::ktx::extract_ops::extract_slot_count;
 use crate::ktx::sidecar::{self, CancellationHandle};
 
 const KTX_VERSION_JSON: &str = include_str!("../../../ktx-version.json");
+
+/// How many concurrent `ktx extract` processes this host allows (~80% of cores).
+#[tauri::command]
+pub fn extract_concurrency() -> u32 {
+    u32::try_from(extract_slot_count()).unwrap_or(1)
+}
 
 #[tauri::command]
 pub async fn ktx_version(app: AppHandle) -> Result<KtxVersion, AppError> {
