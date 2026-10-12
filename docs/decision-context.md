@@ -371,3 +371,9 @@ Closes the open “batch vs single-KTX” note from the source-aware format defa
 **Decided:** `scripts/fetch-ktx.mjs` expands Darwin `.pkg` assets with `pkgutil --expand-full` only. It does not use `7z` for those packages. Linux and macOS library lookup follows soname symlinks (`libktx.so.4`, `libktx.4.dylib`) and matches the path suffix under the archive prefix (`KTX-Software-…/` or a component `Payload/`). This replaces the “or `7z x` the pkg” option in [ktx-cli/staging.md](ktx-cli/staging.md).
 
 **Why:** CI failed on v4.4.2. `7z x` stops at the xar, so `usr/local/bin/ktx` stays inside a gzip+cpio Payload. The Linux tarball nests files under `KTX-Software-4.4.2-Linux-x86_64/`, and `lib/libktx.so.4` is a symlink to `libktx.so.4.4.2`. A walk that only accepts regular files never sees that name, which is the `NEEDED` entry.
+
+## 2026-10-12 — Git LFS for binaries; SVGs stay in Git
+
+**Decided:** Brand/Tauri icons and test-fixture binaries (*.png / *.jpg / *.ktx / *.ktx2, plus other binary patterns in .gitattributes) are Git LFS. *.svg is not LFS-tracked. Every ctions/checkout in ci.yml and elease.yml sets `lfs: true`. After converting blobs to pointers, push LFS objects with `git lfs push --all origin` if a normal push skipped them.
+
+**Why:** Icon LFS blobs never reached GitHub (clone 404). Without `lfs: true`, CI saw pointer text and failed with Invalid PNG signature. Fixtures were committed as raw blobs while LFS rules applied (`should have been pointers`). Docs SVG placeholders are small text and do not belong in LFS.
