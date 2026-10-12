@@ -1,10 +1,10 @@
 # 🔥 KTXForge
 
-Desktop GUI for [KTX](https://www.khronos.org/ktx/) textures — encode ordinary images to KTX2 and inspect `.ktx` / `.ktx2` files without installing Khronos tools separately.
+Encode [KTX](https://www.khronos.org/ktx/) textures without learning the format or opening a terminal — drop ordinary images, press Encode, move on.
 
-KTXForge embeds the official [KTX-Software](https://github.com/KhronosGroup/KTX-Software) `ktx` CLI and surfaces **every documented `ktx create` option** (plus inspector detail from `ktx info` / extract). The UI hides or auto-corrects known-invalid combinations so you do not have to learn the sidecar’s fatal messages by trial and error.
+For people who want the result, not a `ktx create` degree. Sensible defaults and a rules engine hide invalid option combos; every documented option is still there when you need it. Inspect `.ktx` / `.ktx2` the same way: drop a file, no CLI.
 
-Local-only: nothing is uploaded. Runs on Windows, macOS, and Linux.
+The official [KTX-Software](https://github.com/KhronosGroup/KTX-Software) tools ship inside the app, so nothing else is installed. Local-only. Windows, macOS, and Linux.
 
 ## 📸 Highlights
 

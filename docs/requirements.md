@@ -1,6 +1,8 @@
 # KTXForge — encoder and inspector
 
-Requirements for **KTXForge**, a Tauri desktop GUI that encodes ordinary images to KTX and inspects existing KTX files. This document records the product requirements and the constraints taken from the current Khronos and Tauri documentation. It is the source of truth before implementation.
+Requirements for **KTXForge**. This document records the product requirements and the constraints taken from the current Khronos and Tauri documentation. It is the source of truth before implementation.
+
+KTXForge exists so artists and engine folks can produce and inspect KTX without memorizing codec/format rules or running Khronos CLIs. The GUI is the product: drop ordinary images, press Encode, get a good KTX2. The embedded `ktx` sidecar is how that product stays correct — not the reason the app exists.
 
 The app is a local desktop tool. It does not upload textures. The installed app must run on Windows, macOS, and Linux with no KTX tools installed on the machine.
 
