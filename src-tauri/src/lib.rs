@@ -35,6 +35,10 @@ pub fn run() {
     }
 
     builder = builder
+        // Wayland + proprietary NVIDIA: create the GL context before the first
+        // frame so GTK never attaches a shared-memory buffer (Error 71).
+        // No-op on unaffected systems. Keep early in the plugin chain.
+        .plugin(tauri_plugin_wayland_nvidia_quirk::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
