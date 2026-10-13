@@ -339,7 +339,7 @@ mod tests {
                 "--threads".to_owned(),
                 threads.to_string(),
                 "--zstd".to_owned(),
-                "22".to_owned(),
+                "18".to_owned(),
                 "in0.png".to_owned(),
                 "out.ktx2".to_owned(),
             ]
