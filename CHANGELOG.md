@@ -1,3 +1,16 @@
+## [1.1.0](https://github.com/MONOGRID/KTXForge/compare/v1.0.0...v1.1.0) (2026-10-13)
+
+### Features
+
+* enhance inspector functionality with vertical flip option ([6d68514](https://github.com/MONOGRID/KTXForge/commit/6d68514ab88d5983b40c3e1328869a1445705b3a))
+* implement multi-input pack validation for KTX encoding ([af32193](https://github.com/MONOGRID/KTXForge/commit/af321937f0ebd2e297b3c425aaf59bef542b688e))
+
+### Bug Fixes
+
+* fix menu zoom functionality ([a344465](https://github.com/MONOGRID/KTXForge/commit/a34446528006c73a4bfedf77741487fb19716be6))
+* wayland startup quirk ([6b8fbe0](https://github.com/MONOGRID/KTXForge/commit/6b8fbe02c3356e8363bdf9dd0230ce08d3f24405))
+* zstd 18 is the new default for presets, balance between memory consumption and high compression ([fcae0cf](https://github.com/MONOGRID/KTXForge/commit/fcae0cffde15e1ad9801c7920f57e182f1dbaf8c))
+
 ## 1.0.0 (2026-10-13)
 
 ### Features
