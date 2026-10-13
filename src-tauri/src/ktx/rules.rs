@@ -768,6 +768,29 @@ mod tests {
         vec![source(SourceKind::Ldr); n]
     }
 
+    /// Same base as [`ldr_sources`], with halved sizes per level for mip-chain pack checks.
+    fn mip_sources(n: usize) -> Vec<SourceInfo> {
+        (0..n)
+            .map(|level| {
+                let shift = u32::try_from(level).unwrap_or(0);
+                let mut s = source(SourceKind::Ldr);
+                s.width = (s.width >> shift).max(1);
+                s.height = (s.height >> shift).max(1);
+                s
+            })
+            .collect()
+    }
+
+    fn sources_for(role: InputRole, n: usize) -> Vec<SourceInfo> {
+        match role {
+            InputRole::MipChain => mip_sources(n),
+            InputRole::Base2D
+            | InputRole::ArrayLayers
+            | InputRole::CubemapFaces
+            | InputRole::DepthSlices => ldr_sources(n),
+        }
+    }
+
     fn report(o: &CreateOptions) -> OptionReport {
         describe(o, &[], InputRole::Base2D)
     }
@@ -786,7 +809,7 @@ mod tests {
         role: InputRole,
         n: usize,
     ) -> Result<CreateOptions, Vec<String>> {
-        resolve_for_encode(o, &ldr_sources(n), role).map(|r| r.0)
+        resolve_for_encode(o, &sources_for(role, n), role).map(|r| r.0)
     }
 
     fn field(report: &OptionReport, key: OptionKey) -> &FieldState {
@@ -848,7 +871,7 @@ mod tests {
             (everything, InputRole::DepthSlices, 4),
         ];
         for (o, role, n) in cases {
-            let sources = ldr_sources(n);
+            let sources = sources_for(role, n);
             let r = describe(&o, &sources, role);
             let mut resolved = resolve_for_encode(&o, &sources, role)
                 .unwrap_or_else(|e| panic!("{role:?}: {e:?}"))
