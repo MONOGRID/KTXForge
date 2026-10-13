@@ -37,6 +37,32 @@ pub struct RoleArity {
     pub max: Option<u32>,
 }
 
+/// One bad input in a pack (row-level Inputs panel error).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "camelCase")]
+pub struct InputIssue {
+    pub index: u32,
+    pub message: String,
+}
+
+/// Pack validity for one KTX output's input list. Vue paints panel vs row chrome from this.
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, TS)]
+#[ts(export)]
+#[serde(rename_all = "camelCase")]
+pub struct InputValidationReport {
+    /// Wrong count, too many mip levels for base size, etc.
+    pub panel: Option<String>,
+    /// Per-input size / kind / square failures.
+    pub inputs: Vec<InputIssue>,
+}
+
+impl InputValidationReport {
+    pub fn ok(&self) -> bool {
+        self.panel.is_none() && self.inputs.is_empty()
+    }
+}
+
 impl InputRole {
     fn label(self) -> &'static str {
         match self {
@@ -161,6 +187,109 @@ pub fn validate_arity(role: InputRole, input_count: usize) -> Result<(), String>
     ))
 }
 
+/// Max mip levels for a base image: `floor(log2(max(w,h))) + 1` (matches `ktx create`).
+fn max_mip_levels(width: u32, height: u32) -> u32 {
+    let max_dim = width.max(height).max(1);
+    max_dim.ilog2() + 1
+}
+
+fn expected_size_at_level(base_w: u32, base_h: u32, level: u32) -> (u32, u32) {
+    ((base_w >> level).max(1), (base_h >> level).max(1))
+}
+
+fn size_label(width: u32, height: u32) -> String {
+    format!("{width}×{height}")
+}
+
+/// Full pack checks the GUI needs before encode: arity, LDR/HDR, same size, cubemap square,
+/// mip-chain halving. Does not inspect transfer-function / primaries metadata.
+pub fn validate_pack_inputs(role: InputRole, sources: &[SourceInfo]) -> InputValidationReport {
+    let mut panel = validate_arity(role, sources.len()).err();
+
+    let Some(first) = sources.first() else {
+        return InputValidationReport {
+            panel,
+            inputs: Vec::new(),
+        };
+    };
+
+    if panel.is_none() && role == InputRole::MipChain {
+        let max = max_mip_levels(first.width, first.height);
+        let count = u32::try_from(sources.len()).unwrap_or(u32::MAX);
+        if count > max {
+            panel = Some(format!(
+                "Mip chain has {count} levels but base {} allows at most {max}",
+                size_label(first.width, first.height)
+            ));
+        }
+    }
+
+    let mut inputs = Vec::new();
+    for (i, src) in sources.iter().enumerate() {
+        let index = u32::try_from(i).unwrap_or(u32::MAX);
+        if src.kind != first.kind {
+            inputs.push(InputIssue {
+                index,
+                message: format!(
+                    "expected {} (same as first input), got {}",
+                    kind_label(first.kind),
+                    kind_label(src.kind)
+                ),
+            });
+        }
+
+        if role == InputRole::CubemapFaces && src.width != src.height {
+            inputs.push(InputIssue {
+                index,
+                message: format!(
+                    "cubemap face must be square, got {}",
+                    size_label(src.width, src.height)
+                ),
+            });
+        }
+
+        let (expected_w, expected_h) = match role {
+            InputRole::MipChain => expected_size_at_level(first.width, first.height, index),
+            InputRole::Base2D
+            | InputRole::ArrayLayers
+            | InputRole::CubemapFaces
+            | InputRole::DepthSlices => (first.width, first.height),
+        };
+        if src.width != expected_w || src.height != expected_h {
+            let message = match role {
+                InputRole::MipChain => format!(
+                    "expected {} for mip level {index}, got {}",
+                    size_label(expected_w, expected_h),
+                    size_label(src.width, src.height)
+                ),
+                _ => format!(
+                    "expected {} (same as first input), got {}",
+                    size_label(expected_w, expected_h),
+                    size_label(src.width, src.height)
+                ),
+            };
+            inputs.push(InputIssue { index, message });
+        }
+    }
+
+    InputValidationReport { panel, inputs }
+}
+
+/// Flatten a pack report into encode-backstop error strings.
+pub fn pack_validation_errors(report: &InputValidationReport) -> Vec<String> {
+    if report.ok() {
+        return Vec::new();
+    }
+    let mut errors = Vec::new();
+    if let Some(panel) = &report.panel {
+        errors.push(panel.clone());
+    }
+    for issue in &report.inputs {
+        errors.push(format!("input {}: {}", issue.index + 1, issue.message));
+    }
+    errors
+}
+
 /// Whether a new primary source may join a queue pinned by `anchor` (first output).
 pub fn compatible_with_anchor(anchor: &SourceInfo, candidate: &SourceInfo) -> Result<(), String> {
     if anchor.kind != candidate.kind {
@@ -204,12 +333,20 @@ mod tests {
     use crate::commands::SourceKind;
 
     fn src(kind: SourceKind) -> SourceInfo {
+        sized(kind, 4, 4)
+    }
+
+    fn sized(kind: SourceKind, width: u32, height: u32) -> SourceInfo {
+        let name = match kind {
+            SourceKind::Ldr => "a.png",
+            SourceKind::Hdr => "a.exr",
+        };
         SourceInfo {
-            path: "a.png".into(),
-            name: "a.png".into(),
+            path: name.into(),
+            name: name.into(),
             kind,
-            width: 4,
-            height: 4,
+            width,
+            height,
             needs_conversion: false,
         }
     }
@@ -317,5 +454,79 @@ mod tests {
     fn compatible_same_kind() {
         assert!(compatible_with_anchor(&src(SourceKind::Ldr), &src(SourceKind::Ldr)).is_ok());
         assert!(compatible_with_anchor(&src(SourceKind::Ldr), &src(SourceKind::Hdr)).is_err());
+    }
+
+    #[test]
+    fn pack_array_size_mismatch() {
+        let sources = [
+            sized(SourceKind::Ldr, 1567, 834),
+            sized(SourceKind::Ldr, 491, 362),
+        ];
+        let report = validate_pack_inputs(InputRole::ArrayLayers, &sources);
+        assert!(report.panel.is_none());
+        assert_eq!(report.inputs.len(), 1);
+        assert_eq!(report.inputs[0].index, 1);
+        assert!(report.inputs[0].message.contains("1567×834"));
+        assert!(report.inputs[0].message.contains("491×362"));
+    }
+
+    #[test]
+    fn pack_cubemap_arity_and_square() {
+        let five = vec![sized(SourceKind::Ldr, 64, 64); 5];
+        let report = validate_pack_inputs(InputRole::CubemapFaces, &five);
+        assert!(report
+            .panel
+            .as_ref()
+            .is_some_and(|m| m.contains("exactly 6")));
+        assert!(!report.ok());
+
+        let mut faces = vec![sized(SourceKind::Ldr, 64, 64); 6];
+        faces[2] = sized(SourceKind::Ldr, 64, 32);
+        let report = validate_pack_inputs(InputRole::CubemapFaces, &faces);
+        assert!(report.panel.is_none());
+        assert!(report
+            .inputs
+            .iter()
+            .any(|i| i.index == 2 && i.message.contains("square")));
+        assert!(report
+            .inputs
+            .iter()
+            .any(|i| i.index == 2 && i.message.contains("64×64")));
+    }
+
+    #[test]
+    fn pack_mip_chain_halving_and_max_levels() {
+        let ok = [
+            sized(SourceKind::Ldr, 256, 256),
+            sized(SourceKind::Ldr, 128, 128),
+            sized(SourceKind::Ldr, 64, 64),
+        ];
+        assert!(validate_pack_inputs(InputRole::MipChain, &ok).ok());
+
+        let bad = [
+            sized(SourceKind::Ldr, 256, 256),
+            sized(SourceKind::Ldr, 100, 100),
+        ];
+        let report = validate_pack_inputs(InputRole::MipChain, &bad);
+        assert_eq!(report.inputs.len(), 1);
+        assert_eq!(report.inputs[0].index, 1);
+        assert!(report.inputs[0].message.contains("128×128"));
+
+        let too_many = vec![sized(SourceKind::Ldr, 4, 4); 4];
+        let report = validate_pack_inputs(InputRole::MipChain, &too_many);
+        assert!(report
+            .panel
+            .as_ref()
+            .is_some_and(|m| m.contains("at most 3")));
+    }
+
+    #[test]
+    fn pack_mixed_kind() {
+        let sources = [sized(SourceKind::Ldr, 8, 8), sized(SourceKind::Hdr, 8, 8)];
+        let report = validate_pack_inputs(InputRole::ArrayLayers, &sources);
+        assert!(report
+            .inputs
+            .iter()
+            .any(|i| { i.index == 1 && i.message.contains("LDR") && i.message.contains("HDR") }));
     }
 }

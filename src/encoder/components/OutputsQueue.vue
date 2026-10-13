@@ -8,6 +8,7 @@ import {
   outputLabel,
   removeOutput,
   selectOutput,
+  slotPackValid,
   store,
   type OutputSlot,
 } from "../store";
@@ -58,6 +59,22 @@ function canAddInputs(slot: OutputSlot): boolean {
     slot.job.status !== "queued"
   );
 }
+
+const ROW_CLASS = {
+  selectedOk: "border-transparent bg-primary/15 ring-2 ring-inset ring-primary/45",
+  selectedBad: "border-danger/50 bg-danger/10 ring-2 ring-inset ring-danger/45",
+  idleOk: "border-transparent bg-surface-sunken",
+  idleBad: "border-danger/50 bg-danger/5 ring-1 ring-inset ring-danger/40",
+} as const satisfies Record<string, string>;
+
+function rowClass(slot: OutputSlot): string {
+  const selected = slot.id === store.selectedId;
+  const ok = slotPackValid(slot.id);
+  if (selected) {
+    return ok ? ROW_CLASS.selectedOk : ROW_CLASS.selectedBad;
+  }
+  return ok ? ROW_CLASS.idleOk : ROW_CLASS.idleBad;
+}
 </script>
 
 <template>
@@ -100,11 +117,7 @@ function canAddInputs(slot: OutputSlot): boolean {
           v-for="slot in rows"
           :key="slot.id"
           class="mb-1 flex items-center gap-2 rounded-md border px-2 py-1.5 last:mb-0"
-          :class="
-            slot.id === store.selectedId
-              ? 'border-transparent bg-primary/15 ring-2 ring-inset ring-primary/45'
-              : 'border-transparent bg-surface-sunken'
-          "
+          :class="rowClass(slot)"
         >
           <button
             type="button"

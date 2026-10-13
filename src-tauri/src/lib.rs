@@ -94,6 +94,7 @@ pub fn run() {
             commands::encoder::encode_preset_matches,
             commands::encoder::describe_options,
             commands::encoder::input_role_arities,
+            commands::encoder::validate_pack_inputs,
             commands::encoder::check_output_compatible,
             commands::encoder::pick_sources,
             commands::encoder::source_thumbnail,

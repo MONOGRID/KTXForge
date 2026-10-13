@@ -7,6 +7,7 @@ import type { ExportRequest } from "../bindings/ExportRequest";
 import type { ExportResult } from "../bindings/ExportResult";
 import type { ImageSelection } from "../bindings/ImageSelection";
 import type { InputRole } from "../bindings/InputRole";
+import type { InputValidationReport } from "../bindings/InputValidationReport";
 import type { InspectReport } from "../bindings/InspectReport";
 import type { KtxVersion } from "../bindings/KtxVersion";
 import type { OptionReport } from "../bindings/OptionReport";
@@ -39,6 +40,10 @@ export type Commands = {
     result: OptionReport;
   };
   input_role_arities: { args: EmptyArgs; result: RoleArity[] };
+  validate_pack_inputs: {
+    args: { sources: SourceInfo[]; inputRole: InputRole };
+    result: InputValidationReport;
+  };
   check_output_compatible: {
     args: { anchor: SourceInfo; candidate: SourceInfo };
     result: null;

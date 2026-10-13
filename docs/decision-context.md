@@ -577,3 +577,9 @@ elease.yml sets `lfs: true`. After converting blobs to pointers, push LFS object
 **Decided:** Dropping exactly one image onto the center/preview (or chrome, which counts as center) adds a separate KTX output immediately. The "How should these files be used?" dialog still appears for two or more images.
 
 **Why:** With one file there is no meaningful pack-vs-batch choice; the dialog was an extra click for the common case.
+
+## 2026-10-13 — Multi-input pack validation before encode
+
+**Decided:** Rust owns pack validity via `validate_pack_inputs` → `InputValidationReport` (`panel` for list-wide errors, `inputs[]` for per-row). Checks: role arity, same LDR/HDR within a pack, same pixel size for array/cubemap/depth (level 0), cubemap faces square, mip-chain sizes `max(1, base>>i)` and level count ≤ `floor(log2(max(w,h)))+1`. Vue paints red Inputs panel / row chrome with tooltips from that report; Outputs queue rows get a danger cue; `allOutputsValid` / Encode all require every output's report to be clean. Encode backstop uses the same function in `resolve_for_encode`. Soft `ktx create` warnings (e.g. 8-bit PNG with no transfer function → default sRGB) do **not** block Encode. Per-file TF / primaries / origin metadata mismatches are out of scope until `SourceInfo` carries them.
+
+**Why:** Packing mismatched screenshots into one array hit `ktx create` exit 3 ("does not match expected size … for level 0"). The product rule is never to offer a known-invalid encode; artists should see which input (or the whole list) is wrong without reading sidecar stderr.

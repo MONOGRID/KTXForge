@@ -10,7 +10,7 @@ use crate::dialog;
 use crate::error::AppError;
 use crate::image::classify::{classify, FileKind};
 use crate::image::convert::{read_source_info, source_preview_png, thumbnail_png};
-use crate::ktx::input_role::{self, InputRole, RoleArity};
+use crate::ktx::input_role::{self, InputRole, InputValidationReport, RoleArity};
 use crate::ktx::options::CreateOptions;
 use crate::ktx::presets::{self, EncodePresetInfo};
 use crate::ktx::rules;
@@ -57,6 +57,15 @@ pub fn describe_options(
 #[tauri::command]
 pub fn input_role_arities() -> Vec<RoleArity> {
     input_role::all_arities()
+}
+
+/// Pack validity for one output's inputs (arity, size, kind, cubemap square, mip halving).
+#[tauri::command]
+pub fn validate_pack_inputs(
+    sources: Vec<SourceInfo>,
+    input_role: InputRole,
+) -> InputValidationReport {
+    crate::ktx::input_role::validate_pack_inputs(input_role, &sources)
 }
 
 /// Whether `candidate` may be added as a new KTX output given the queue's first primary.

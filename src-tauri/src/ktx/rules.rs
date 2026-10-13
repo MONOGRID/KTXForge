@@ -84,9 +84,9 @@ pub fn resolve_for_encode(
     role: InputRole,
 ) -> Result<ResolvedOptions, Vec<String>> {
     let mut errors = Vec::new();
-    if let Err(e) = input_role::validate_arity(role, sources.len()) {
-        errors.push(e);
-    }
+    errors.extend(input_role::pack_validation_errors(
+        &input_role::validate_pack_inputs(role, sources),
+    ));
     let class = classify_sources(sources);
     let effective = resolve(opts, class, role, sources.len()).options;
     reject_source_format_mismatch(&effective, class, &mut errors);
@@ -1344,5 +1344,27 @@ mod tests {
         assert!(r.suggestion.is_none());
         assert!(r.warnings.iter().any(|w| w.message.contains("all LDR")));
         assert!(resolve_for_encode(&o, &mixed, InputRole::ArrayLayers).is_err());
+    }
+
+    #[test]
+    fn pack_size_mismatch_fails_resolve() {
+        let o = opts();
+        let a = SourceInfo {
+            path: "a.png".into(),
+            name: "a.png".into(),
+            kind: SourceKind::Ldr,
+            width: 64,
+            height: 64,
+            needs_conversion: false,
+        };
+        let b = SourceInfo {
+            width: 32,
+            height: 32,
+            ..a.clone()
+        };
+        let err = resolve_for_encode(&o, &[a, b], InputRole::ArrayLayers).unwrap_err();
+        assert!(err
+            .iter()
+            .any(|e| e.contains("64×64") && e.contains("32×32")));
     }
 }

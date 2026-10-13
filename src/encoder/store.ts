@@ -8,6 +8,7 @@ import type { EncodeResult } from "../bindings/EncodeResult";
 import type { EncodeStage } from "../bindings/EncodeStage";
 import type { FieldState } from "../bindings/FieldState";
 import type { InputRole } from "../bindings/InputRole";
+import type { InputValidationReport } from "../bindings/InputValidationReport";
 import type { KtxVersion } from "../bindings/KtxVersion";
 import type { OptionKey } from "../bindings/OptionKey";
 import type { OptionReport } from "../bindings/OptionReport";
@@ -60,6 +61,8 @@ type EncoderStore = {
   report: OptionReport;
   /** Input-count bounds per role, from Rust `input_role_arities`. */
   arities: RoleArity[];
+  /** Pack validation per output id, from Rust `validate_pack_inputs`. */
+  inputReports: Partial<Record<string, InputValidationReport>>;
   ktxVersion: KtxVersion | null;
   ready: boolean;
   queue: BatchQueueState | null;
@@ -84,6 +87,16 @@ function emptyReport(): OptionReport {
     defaultFormat: "R8G8B8A8_SRGB",
     suggestion: null,
   };
+}
+
+function emptyInputReport(): InputValidationReport {
+  return { panel: null, inputs: [] };
+}
+
+function inputReportOk(report: InputValidationReport | undefined): boolean {
+  return (
+    report !== undefined && report.panel === null && report.inputs.length === 0
+  );
 }
 
 function newOutputId(): string {
@@ -211,6 +224,7 @@ export const store = reactive<EncoderStore>({
   activePresetId: DEFAULT_ENCODE_PRESET_ID,
   report: emptyReport(),
   arities: [],
+  inputReports: {},
   ktxVersion: null,
   ready: false,
   queue: null,
@@ -315,6 +329,7 @@ function describeOptions(): Promise<OptionReport> {
 
 /** Latest request wins; an older response arriving late is dropped. */
 let reportSeq = 0;
+let inputReportSeq = 0;
 
 const refreshReport = useDebounceFn(async () => {
   if (!store.ready) {
@@ -334,6 +349,46 @@ const refreshReport = useDebounceFn(async () => {
   }
 }, 80);
 
+async function fetchInputReports(
+  slots: readonly { id: string; role: InputRole; inputs: SourceInfo[] }[],
+): Promise<Partial<Record<string, InputValidationReport>>> {
+  const entries = await Promise.all(
+    slots.map(async (slot) => {
+      const report = await call("validate_pack_inputs", {
+        sources: slot.inputs,
+        inputRole: slot.role,
+      });
+      return [slot.id, report] as const;
+    }),
+  );
+  const next: Partial<Record<string, InputValidationReport>> = {};
+  for (const [id, report] of entries) {
+    next[id] = report;
+  }
+  return next;
+}
+
+const refreshInputReports = useDebounceFn(async () => {
+  if (!store.ready) {
+    return;
+  }
+  const seq = ++inputReportSeq;
+  const slots = store.outputs.map((slot) => ({
+    id: slot.id,
+    role: slot.role,
+    inputs: slot.inputs,
+  }));
+  try {
+    const next = await fetchInputReports(slots);
+    if (seq !== inputReportSeq) {
+      return;
+    }
+    store.inputReports = next;
+  } catch {
+    // Keep the last successful reports.
+  }
+}, 80);
+
 watch(
   () =>
     [
@@ -344,6 +399,19 @@ watch(
     ] as const,
   () => {
     void refreshReport();
+  },
+  { deep: true },
+);
+
+watch(
+  () =>
+    store.outputs.map((o) => ({
+      id: o.id,
+      role: o.role,
+      inputs: o.inputs,
+    })),
+  () => {
+    void refreshInputReports();
   },
   { deep: true },
 );
@@ -673,7 +741,30 @@ export function allOutputsValid(): boolean {
   if (store.outputs.length === 0) {
     return false;
   }
-  return store.outputs.every((slot) => fitsArity(slot.role, slot.inputs.length));
+  return store.outputs.every((slot) =>
+    inputReportOk(store.inputReports[slot.id]),
+  );
+}
+
+/** Pack report for the selected output (empty when nothing selected). */
+export const selectedInputReport = computed((): InputValidationReport => {
+  const id = store.selectedId;
+  if (id === null) {
+    return emptyInputReport();
+  }
+  return store.inputReports[id] ?? emptyInputReport();
+});
+
+/**
+ * Whether a queue row should show as valid. Missing report means validation has
+ * not landed yet — do not paint red; Encode still waits on {@link allOutputsValid}.
+ */
+export function slotPackValid(slotId: string): boolean {
+  const report = store.inputReports[slotId];
+  if (report === undefined) {
+    return true;
+  }
+  return inputReportOk(report);
 }
 
 export function outputLabel(slot: OutputSlot): string {
@@ -728,4 +819,5 @@ export async function initStore(): Promise<void> {
     applySuggestion(report);
     await syncActivePreset();
   }
+  await refreshInputReports();
 }
