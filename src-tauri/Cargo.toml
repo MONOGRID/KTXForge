@@ -1,6 +1,6 @@
 [package]
 name = "ktxforge"
-version = "0.0.0"
+version = "1.0.0"
 description = "KTXForge — desktop GUI for KTX encode and inspect"
 authors = ["MONOGRID"]
 license = "MIT"
