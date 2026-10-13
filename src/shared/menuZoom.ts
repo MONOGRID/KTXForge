@@ -24,7 +24,8 @@ function isZoomMenuAction(action: MenuAction): action is ZoomMenuAction {
 }
 
 /**
- * Handle View-menu zoom actions when this window is OS-focused.
+ * Handle View-menu zoom actions when this window is the menu-zoom target
+ * (last focused among app windows; see `menuZoomFocus`).
  * Returns true when `action` was a zoom command (handled or ignored).
  */
 export function applyZoomMenuAction(action: MenuAction): boolean {

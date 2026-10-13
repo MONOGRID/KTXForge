@@ -124,5 +124,9 @@ describe("menu shortcut wiring", () => {
       "isMenuZoomWindowFocused",
     );
     expect(read("src/shared/menuZoom.ts")).not.toContain("document.hasFocus");
+    expect(read("src/shared/menuZoomFocus.ts")).toContain(
+      "nextMenuZoomEligibility",
+    );
+    expect(read("src/shared/menuZoomFocus.ts")).toContain("getAllWindows");
   });
 });
