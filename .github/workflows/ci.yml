@@ -70,7 +70,3 @@ jobs:
 
       - name: Bindings unchanged
         run: git diff --exit-code src/bindings
-
-      - name: Commitlint (pull requests)
-        if: github.event_name == 'pull_request' && matrix.os == 'ubuntu-22.04'
-        run: npx commitlint --from ${{ github.event.pull_request.base.sha }} --to ${{ github.event.pull_request.head.sha }}

@@ -19,7 +19,7 @@
     "icons": "node scripts/generate-icons.mjs",
     "lint": "eslint src",
     "lint:style": "stylelint \"src/**/*.{css,scss,vue}\"",
-    "prepare": "husky && git lfs install --local --skip-repo",
+    "prepare": "node scripts/prepare-git.mjs",
     "preview": "vite preview",
     "release": "semantic-release",
     "release-outputs": "node scripts/release-outputs.mjs",
@@ -46,8 +46,6 @@
     "vue": "^3.5.43"
   },
   "devDependencies": {
-    "@commitlint/cli": "^21.2.3",
-    "@commitlint/config-conventional": "^21.2.3",
     "@eslint/js": "^10.0.1",
     "@semantic-release/changelog": "^7.0.0",
     "@semantic-release/exec": "^7.1.0",
@@ -60,7 +58,6 @@
     "eslint-plugin-vue": "^10.11.1",
     "fallow": "^3.33.1",
     "globals": "^17.13.0",
-    "husky": "^9.1.7",
     "sass": "^1.105.1",
     "semantic-release": "^25.0.9",
     "stylelint": "^17.16.0",
@@ -75,5 +72,8 @@
     "vite": "^8.3.4",
     "vitest": "^5.0.4",
     "vue-tsc": "^3.3.13"
+  },
+  "allowScripts": {
+    "@parcel/watcher@2.6.0": true
   }
 }

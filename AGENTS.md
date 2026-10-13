@@ -68,7 +68,7 @@ Run `npm run check` before every commit. Fallow findings (dead code, duplication
 
 ## Commits
 
-Use [Conventional Commits](https://www.conventionalcommits.org/). The type drives the release: `feat` → minor, `fix` / `perf` → patch, `!` or a `BREAKING CHANGE:` footer → major; other types do not release. Enforced locally by husky + commitlint.
+Use [Conventional Commits](https://www.conventionalcommits.org/). The type drives the release: `feat` → minor, `fix` / `perf` → patch, `!` or a `BREAKING CHANGE:` footer → major; other types do not release. Not enforced by a commit hook; semantic-release is the consumer.
 
 <!-- generated:task-matrix:start -->
 | When the agent is about to... | Run |

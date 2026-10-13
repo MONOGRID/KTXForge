@@ -66,7 +66,7 @@ npm run setup      # rustfmt/clippy, cargo-machete, fetch pinned ktx sidecar
 npm run tauri dev
 ```
 
-Prerequisites: Node LTS, [Git LFS](https://git-lfs.com) (`git lfs install` once per machine), and [Rust via rustup](https://rustup.rs) (stable). On Linux you also need the usual Tauri system packages (`libwebkit2gtk-4.1-dev`, `libappindicator3-dev`, `librsvg2-dev`, `patchelf`). `npm ci` / `npm install` runs husky and configures LFS filters; push hooks under `.husky/` upload LFS objects automatically. `npm run setup` installs `rustfmt`, `clippy`, and `cargo-machete` when missing, then stages the `ktx` and `ktx2ktx2` sidecars. The same tool install + fetch runs via `precheck:rust` before `npm run check`; `pretauri` only runs `fetch-ktx` (host triple) so release cross-builds stay fast.
+Prerequisites: Node LTS, [Git LFS](https://git-lfs.com) (`git lfs install` once per machine), and [Rust via rustup](https://rustup.rs) (stable). On Linux you also need the usual Tauri system packages (`libwebkit2gtk-4.1-dev`, `libappindicator3-dev`, `librsvg2-dev`, `patchelf`). `npm ci` / `npm install` runs `git lfs install --local` (filters + hooks in `.git/hooks`) so a normal `git push` uploads LFS objects. `npm run setup` installs `rustfmt`, `clippy`, and `cargo-machete` when missing, then stages the `ktx` and `ktx2ktx2` sidecars. The same tool install + fetch runs via `precheck:rust` before `npm run check`; `pretauri` only runs `fetch-ktx` (host triple) so release cross-builds stay fast.
 
 Quality gate before commit (Rust fmt/clippy/tests/machete, Vue build/lint/style, Vitest, fallow):
 

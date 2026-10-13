@@ -1,5 +1,0 @@
-command -v git-lfs >/dev/null 2>&1 || {
-  printf >&2 '\n%s\n\n' "This repository uses Git LFS but 'git-lfs' was not found on PATH. Install Git LFS (https://git-lfs.com)."
-  exit 2
-}
-git lfs post-checkout "$@"

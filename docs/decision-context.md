@@ -565,3 +565,9 @@ elease.yml sets `lfs: true`. After converting blobs to pointers, push LFS object
 **Decided:** Scale all shadcn-vue control defaults to about two-thirds of stock New York sizes: control height `h-9`→`h-6`, body text `text-sm`→`text-xs`, switches `h-5 w-9`→`h-3.5 w-6`, icons `size-4`→`size-3`, `--radius` `0.5rem`→`0.333rem`. Tighten shared `field-row` / `label` shortcuts (`py-1.5`→`py-0.5`, label `text-xs`) so options-rail and inspector report rows pack denser. Drop call-site `h-8` overrides that previously shrank stock `h-9` inputs; the new defaults are smaller.
 
 **Why:** The options rail and inspector field lists are dense settings UIs; stock shadcn heights waste vertical space and force scrolling for routine encode work.
+
+## 2026-10-13 — Drop husky + commitlint; LFS via git hooks
+
+**Decided:** Remove `husky`, `@commitlint/cli`, `@commitlint/config-conventional`, `.husky/*`, `commitlint.config.js`, and the PR commitlint CI step. Conventional Commits remain the convention for semantic-release, but nothing lint-enforces them at commit or PR time. `package.json` `prepare` runs `scripts/prepare-git.mjs`: unset `core.hooksPath` (leftover from husky) and `git lfs install --local` so LFS filters and hooks live in `.git/hooks` again.
+
+**Why:** `@semantic-release/git`'s release commit embeds the full changelog; commitlint's `body-max-line-length` failed the husky `commit-msg` hook in CI and blocked the release. Husky existed mainly for commitlint and forced LFS hooks into `.husky/`; without husky, standard LFS install is enough.

@@ -9,5 +9,5 @@
     "types": ["node"],
     "skipLibCheck": true
   },
-  "include": ["vite.config.ts", "uno.config.ts", "commitlint.config.js"]
+  "include": ["vite.config.ts", "uno.config.ts"]
 }

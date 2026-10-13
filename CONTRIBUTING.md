@@ -111,7 +111,7 @@ Product requirements: [`docs/requirements.md`](docs/requirements.md). Decision l
 
 ## Commit Messages
 
-Commits follow [Conventional Commits](https://www.conventionalcommits.org/). The type drives the release: `feat` → minor, `fix` / `perf` → patch, `!` or a `BREAKING CHANGE:` footer → major; other types do not release. Enforced locally by husky + commitlint.
+Commits follow [Conventional Commits](https://www.conventionalcommits.org/). The type drives the release: `feat` → minor, `fix` / `perf` → patch, `!` or a `BREAKING CHANGE:` footer → major; other types do not release. There is no commitlint hook; write messages carefully so semantic-release bumps and changelog entries stay correct.
 
 <!-- omit in toc -->
 ## Attribution
