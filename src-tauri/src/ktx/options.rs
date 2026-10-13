@@ -685,7 +685,7 @@ pub struct CreateOptions {
 
 impl Default for CreateOptions {
     fn default() -> Self {
-        // Product default = Official > Color > UASTC RGBA (+ zstd 22).
+        // Product default = Official > Color > UASTC RGBA (+ zstd 18).
         crate::ktx::presets::product_default_options()
     }
 }
@@ -808,7 +808,7 @@ mod tests {
         assert_eq!(back.encode, Some(EncodeCodec::Uastc));
         assert!(matches!(
             back.supercompression,
-            Supercompression::Zstd { level: 22 }
+            Supercompression::Zstd { level: 18 }
         ));
         assert!(!back.container.generate_mipmap);
     }

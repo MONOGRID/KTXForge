@@ -128,20 +128,20 @@ The product ships an **Official** preset tree of opinionated content recipes (no
 
 | Preset | Intent |
 | --- | --- |
-| Color > UASTC RGBA | Product default: `R8G8B8A8_SRGB`, `--encode uastc`, `--zstd 22` |
-| Color > UASTC RGB | Color without alpha (`R8G8B8_SRGB`, UASTC, zstd 22) |
+| Color > UASTC RGBA | Product default: `R8G8B8A8_SRGB`, `--encode uastc`, `--zstd 18` |
+| Color > UASTC RGB | Color without alpha (`R8G8B8_SRGB`, UASTC, zstd 18) |
 | Color > BasisLZ RGBA | Smaller color with alpha (`R8G8B8A8_SRGB`, BasisLZ, no zstd) |
 | Color > BasisLZ RGB | Smaller color without alpha (`R8G8B8_SRGB`, BasisLZ, no zstd) |
-| Data > UASTC RGBA | Linear data with alpha (`R8G8B8A8_UNORM`, UASTC, zstd 22) |
-| Data > UASTC RGB | Linear data without alpha (`R8G8B8_UNORM`, UASTC, zstd 22) |
+| Data > UASTC RGBA | Linear data with alpha (`R8G8B8A8_UNORM`, UASTC, zstd 18) |
+| Data > UASTC RGB | Linear data without alpha (`R8G8B8_UNORM`, UASTC, zstd 18) |
 | Data > BasisLZ RGBA | Smaller linear data with alpha (BasisLZ, no zstd) |
 | Data > BasisLZ RGB | Smaller linear data without alpha (BasisLZ, no zstd) |
-| Normal > UASTC | High-quality normals (UNORM, `--normal-mode`, `--normalize`, UASTC RDO λ 0.5, zstd 22) |
+| Normal > UASTC | High-quality normals (UNORM, `--normal-mode`, `--normalize`, UASTC RDO λ 0.5, zstd 18) |
 | Normal > BasisLZ | Smaller normals (UNORM, `--normal-mode`, `--normalize`, BasisLZ, no zstd) |
-| Mask > UASTC R8 | Single-channel mask (`R8_UNORM`, UASTC, zstd 22) |
+| Mask > UASTC R8 | Single-channel mask (`R8_UNORM`, UASTC, zstd 18) |
 | Mask > BasisLZ R8 | Smaller single-channel mask (`R8_UNORM`, BasisLZ, no zstd) |
 
-UASTC presets use zstd 22. BasisLZ presets omit supercompression (invalid with BasisLZ). The zstd level control’s own help notes that levels above 20 use much more memory. Source compatibility rules still win (e.g. HDR clearing UASTC → Custom).
+UASTC presets use zstd 18. BasisLZ presets omit supercompression (invalid with BasisLZ). The zstd level control’s own help notes that levels above 20 use much more memory. Source compatibility rules still win (e.g. HDR clearing UASTC → Custom).
 
 ### Options that must appear in the UI
 

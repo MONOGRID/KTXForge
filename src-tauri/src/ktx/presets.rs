@@ -14,7 +14,7 @@ use super::options::{
 /// Product default: Official > Color > UASTC RGBA.
 pub const DEFAULT_ENCODE_PRESET_ID: &str = "official.color.uastc-rgba";
 
-const ZSTD_DEFAULT_LEVEL: u8 = 22;
+const ZSTD_DEFAULT_LEVEL: u8 = 18;
 const NORMAL_UASTC_RDO_L: f32 = 0.5;
 
 /// Owned encode fields written by an Official preset (for catalog + Custom detect).
@@ -58,7 +58,7 @@ struct Recipe {
     supercompression: Supercompression,
 }
 
-fn zstd22() -> Supercompression {
+fn zstd_default() -> Supercompression {
     Supercompression::Zstd {
         level: ZSTD_DEFAULT_LEVEL,
     }
@@ -70,24 +70,24 @@ fn recipes() -> [Recipe; 12] {
         Recipe {
             id: "official.color.uastc-rgba",
             path: &["Color", "UASTC RGBA"],
-            help: "Product default for sRGB color with alpha (albedo, decals, UI). Pros: high quality UASTC, keeps alpha, zstd shrinks the file. Cons: larger than BasisLZ; zstd 22 uses much more encode memory.",
+            help: "Product default for sRGB color with alpha (albedo, decals, UI). Pros: high quality UASTC, keeps alpha, zstd shrinks the file. Cons: larger than BasisLZ.",
             format: VkFormat::R8G8B8A8Srgb,
             encode: EncodeCodec::Uastc,
             normalize: false,
             normal_mode: false,
             uastc_rdo: false,
-            supercompression: zstd22(),
+            supercompression: zstd_default(),
         },
         Recipe {
             id: "official.color.uastc-rgb",
             path: &["Color", "UASTC RGB"],
-            help: "Opaque sRGB color (no alpha channel). Pros: same high quality as RGBA UASTC without unused alpha. Cons: cannot store transparency; larger than BasisLZ; zstd 22 uses much more encode memory.",
+            help: "Opaque sRGB color (no alpha channel). Pros: same high quality as RGBA UASTC without unused alpha. Cons: cannot store transparency; larger than BasisLZ.",
             format: VkFormat::R8G8B8Srgb,
             encode: EncodeCodec::Uastc,
             normalize: false,
             normal_mode: false,
             uastc_rdo: false,
-            supercompression: zstd22(),
+            supercompression: zstd_default(),
         },
         Recipe {
             id: "official.color.basislz-rgba",
@@ -115,24 +115,24 @@ fn recipes() -> [Recipe; 12] {
         Recipe {
             id: "official.data.uastc-rgba",
             path: &["Data", "UASTC RGBA"],
-            help: "Linear data with alpha (ORM packs, non-color channels). Pros: UNORM (not sRGB), high quality UASTC. Cons: wrong for display albedo (use Color); larger than BasisLZ; zstd 22 uses much more encode memory.",
+            help: "Linear data with alpha (ORM packs, non-color channels). Pros: UNORM (not sRGB), high quality UASTC. Cons: wrong for display albedo (use Color); larger than BasisLZ.",
             format: VkFormat::R8G8B8A8Unorm,
             encode: EncodeCodec::Uastc,
             normalize: false,
             normal_mode: false,
             uastc_rdo: false,
-            supercompression: zstd22(),
+            supercompression: zstd_default(),
         },
         Recipe {
             id: "official.data.uastc-rgb",
             path: &["Data", "UASTC RGB"],
-            help: "Linear opaque data (no alpha). Pros: UNORM UASTC quality without unused alpha. Cons: not for sRGB albedo; larger than BasisLZ; zstd 22 uses much more encode memory.",
+            help: "Linear opaque data (no alpha). Pros: UNORM UASTC quality without unused alpha. Cons: not for sRGB albedo; larger than BasisLZ.",
             format: VkFormat::R8G8B8Unorm,
             encode: EncodeCodec::Uastc,
             normalize: false,
             normal_mode: false,
             uastc_rdo: false,
-            supercompression: zstd22(),
+            supercompression: zstd_default(),
         },
         Recipe {
             id: "official.data.basislz-rgba",
@@ -160,13 +160,13 @@ fn recipes() -> [Recipe; 12] {
         Recipe {
             id: "official.normal.uastc",
             path: &["Normal", "UASTC"],
-            help: "High-quality tangent-space normals. Pros: normalize + normal-mode, UASTC RDO tuned for normals, zstd shrinks the file. Cons: larger than BasisLZ normals; zstd 22 uses much more encode memory; not for color/albedo.",
+            help: "High-quality tangent-space normals. Pros: normalize + normal-mode, UASTC RDO tuned for normals, zstd shrinks the file. Cons: larger than BasisLZ normals; not for color/albedo.",
             format: VkFormat::R8G8B8A8Unorm,
             encode: EncodeCodec::Uastc,
             normalize: true,
             normal_mode: true,
             uastc_rdo: true,
-            supercompression: zstd22(),
+            supercompression: zstd_default(),
         },
         Recipe {
             id: "official.normal.basis-lz",
@@ -183,13 +183,13 @@ fn recipes() -> [Recipe; 12] {
         Recipe {
             id: "official.mask.uastc-r8",
             path: &["Mask", "UASTC R8"],
-            help: "Single-channel mask (AO, opacity mask, scalar map). Pros: R8 only, high quality UASTC. Cons: one channel only; larger than BasisLZ mask; zstd 22 uses much more encode memory.",
+            help: "Single-channel mask (AO, opacity mask, scalar map). Pros: R8 only, high quality UASTC. Cons: one channel only; larger than BasisLZ mask.",
             format: VkFormat::R8Unorm,
             encode: EncodeCodec::Uastc,
             normalize: false,
             normal_mode: false,
             uastc_rdo: false,
-            supercompression: zstd22(),
+            supercompression: zstd_default(),
         },
         Recipe {
             id: "official.mask.basislz-r8",
@@ -283,7 +283,7 @@ pub fn matches_preset(options: &CreateOptions, id: &str) -> bool {
     owned_equal(options, &owned_from_recipe(&recipe))
 }
 
-/// Product `CreateOptions::default` payload (Color UASTC RGBA + zstd 22).
+/// Product `CreateOptions::default` payload (Color UASTC RGBA + zstd 18).
 pub fn product_default_options() -> CreateOptions {
     let baseline = CreateOptions {
         format: VkFormat::R8G8B8A8Srgb,
@@ -339,7 +339,7 @@ mod tests {
                     assert_eq!(applied.encode, Some(EncodeCodec::Uastc));
                     assert!(matches!(
                         applied.supercompression,
-                        Supercompression::Zstd { level: 22 }
+                        Supercompression::Zstd { level: 18 }
                     ));
                 }
                 other => panic!("unexpected preset id {other}"),
@@ -370,7 +370,7 @@ mod tests {
         assert_eq!(opts.encode, Some(EncodeCodec::Uastc));
         assert!(matches!(
             opts.supercompression,
-            Supercompression::Zstd { level: 22 }
+            Supercompression::Zstd { level: 18 }
         ));
         assert!(!opts.color.normal_mode);
         assert!(!opts.color.normalize);

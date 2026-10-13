@@ -36,7 +36,7 @@ function colorOwned(): EncodePresetOwned {
       uastcRdoM: false,
     },
     astc: { astcQuality: "medium", astcPerceptual: false },
-    supercompression: { kind: "zstd", level: 22 },
+    supercompression: { kind: "zstd", level: 18 },
   };
 }
 

@@ -1,6 +1,6 @@
 # 🔥 KTXForge
 
-Encode [KTX](https://www.khronos.org/ktx/) textures without learning the format or opening a terminal — drop ordinary images, press Encode, move on.
+Encode [KTX](https://www.khronos.org/ktx/) textures without learning the format or opening a terminal — drop ordinary images, press Encode, move on. If you enjoy using handbrake but never learned ffmpeg command line arguments and syntax: congratulations you are a human! This tool is for you.
 
 For people who want the result, not a `ktx create` degree. Sensible defaults and a rules engine hide invalid option combos; every documented option is still there when you need it. Inspect `.ktx` / `.ktx2` the same way: drop a file, no CLI.
 
@@ -8,23 +8,18 @@ The official [KTX-Software](https://github.com/KhronosGroup/KTX-Software) tools 
 
 ## 📸 Highlights
 
-### Encode with a wipe preview
+### Encode 
 
-Batch KTX outputs on the left, original vs encoded wipe in the center, and the full `ktx create` options rail on the right.
+Batch KTX outputs, Official presets, option explanations, wipe preview
 
-![Encoder: outputs queue, original vs encoded wipe preview, and format / mipmap options](docs/screenshots/encoder-main.png)
 
-### Codec and option help in place
+![Encoder](docs/screenshots/encoder-main.png)
 
-Every encode choice carries a tooltip from the tool docs — here UASTC vs BasisLZ — so you pick a codec without leaving the rail.
+### Inspect
 
-![Format rail: Encode dropdown open on UASTC with an inline codec tooltip](docs/screenshots/encoder-options.png)
+Drop a `.ktx` / `.ktx2` to browse mips, layers, cubemap faces, 3D texture orbit preview, supports KTX1 / KTX2 in a dedicated window.
 
-### Inspect KTX1 / KTX2 in a dedicated window
-
-Drop a `.ktx` / `.ktx2` to browse mips, layers, and faces while the sidebar shows validation status and the full header / level-index report.
-
-![Inspector: image viewport with mip and layer scrubbers, plus status and KTX header panels](docs/screenshots/inspector-main.png)
+![Inspector](docs/screenshots/inspector-main.png)
 
 ## ✨ Features
 
@@ -33,6 +28,7 @@ Drop a `.ktx` / `.ktx2` to browse mips, layers, and faces while the sidebar show
 - Drag-and-drop ordinary images onto the main window (panel-aware drops: outputs, inputs, or preview).
 - **Batch of KTX outputs** — one encode job per output, shared options, limited-parallel queue with Cancel.
 - Pack multiple inputs into one KTX as **array layers**, **cubemap faces**, **mip chain**, or **depth slices**.
+- **Encode presets** Handbrake-style: pick a recipe, press Encode; full options stay editable.
 - **Every `ktx create` option** in the UI (tooltips from the tool docs); unavailable options are hidden, not left dangling disabled.
 - Formats and codecs: uncompressed Vulkan layouts, **BasisLZ**, **UASTC LDR/HDR**, **ASTC** block sizes, **Zstd / Zlib** supercompression.
 - Color / orientation / channels: transfer functions, primaries, texcoord origin, swizzle, normalize, premultiply, normal-mode, conversion warn/fail flags.
@@ -41,6 +37,25 @@ Drop a `.ktx` / `.ktx2` to browse mips, layers, and faces while the sidebar show
 - Everyday formats the CLI rejects (JPEG, WebP, BMP, GIF, TIFF, …) are converted in Rust before `ktx create`.
 - Animation packing with **`KTXanimData`** written after a successful create.
 - Save selected or all completed results; native alert + OS notification on encode failure.
+
+### 🎛️ Presets
+
+Opinionated content recipes. Applying a preset fills format, encode, color/normal flags, codec knobs, and supercompression for every output in the queue.
+
+Default for a new session: **Color > UASTC RGBA** (`R8G8B8A8_SRGB`, UASTC, zstd 18).
+
+| Preset | Intent |
+| --- | --- |
+| Color > UASTC RGBA | Product default: sRGB with alpha, high quality, zstd 18 |
+| Color > UASTC RGB | Opaque sRGB color |
+| Color > BasisLZ RGBA / RGB | Smaller sRGB when size beats peak quality (no zstd) |
+| Data > UASTC RGBA / RGB | Linear UNORM packs (ORM, non-color); not for albedo |
+| Data > BasisLZ RGBA / RGB | Smaller linear data |
+| Normal > UASTC | Tangent-space normals (normalize + normal-mode, UASTC RDO, zstd 18) |
+| Normal > BasisLZ | Smaller normals (normalize + normal-mode) |
+| Mask > UASTC R8 / BasisLZ R8 | Single-channel mask (`R8_UNORM`) |
+
+UASTC leaves use zstd 18 (levels above 20 use much more encode memory — noted on the zstd control). BasisLZ leaves omit supercompression (invalid with that codec). Source compatibility rules still win (for example HDR can clear UASTC and land you on Custom).
 
 ### 🔍 Inspector
 

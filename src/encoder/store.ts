@@ -184,7 +184,7 @@ function interimOptions(): CreateOptions {
       compareSsim: false,
       comparePsnr: false,
     },
-    supercompression: { kind: "zstd", level: 22 },
+    supercompression: { kind: "zstd", level: 18 },
   } satisfies CreateOptions;
 }
 
