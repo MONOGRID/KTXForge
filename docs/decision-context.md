@@ -571,3 +571,9 @@ elease.yml sets `lfs: true`. After converting blobs to pointers, push LFS object
 **Decided:** Remove `husky`, `@commitlint/cli`, `@commitlint/config-conventional`, `.husky/*`, `commitlint.config.js`, and the PR commitlint CI step. Conventional Commits remain the convention for semantic-release, but nothing lint-enforces them at commit or PR time. `package.json` `prepare` runs `scripts/prepare-git.mjs`: unset `core.hooksPath` (leftover from husky) and `git lfs install --local` so LFS filters and hooks live in `.git/hooks` again.
 
 **Why:** `@semantic-release/git`'s release commit embeds the full changelog; commitlint's `body-max-line-length` failed the husky `commit-msg` hook in CI and blocked the release. Husky existed mainly for commitlint and forced LFS hooks into `.husky/`; without husky, standard LFS install is enough.
+
+## 2026-10-13 — Single-image center drop skips intent dialog
+
+**Decided:** Dropping exactly one image onto the center/preview (or chrome, which counts as center) adds a separate KTX output immediately. The "How should these files be used?" dialog still appears for two or more images.
+
+**Why:** With one file there is no meaningful pack-vs-batch choice; the dialog was an extra click for the common case.

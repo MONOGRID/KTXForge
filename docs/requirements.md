@@ -74,7 +74,7 @@ Drop one or more ordinary images onto the main window. The encoder session is a 
 
 - **Top-left — KTX outputs:** queue of independent outputs. Drop here → one new output per image. Selectable rows; Add / delete; no reorder. A **+** on each row opens Inputs for that output and picks more images.
 - **Bottom-left — Inputs:** shown only when the selected output has (or is about to have) multiple inputs. Role selector is array layers, cubemap faces, mip chain, or depth slices (single-image Base 2D is implicit when Inputs is hidden). List length **is** the arity (`--layers`, `--cubemap` + 6 faces, `--levels`, `--depth`). Drop here → append inputs for the selected output.
-- **Center — Preview** for the selected output (source vs encoded wipe). Drop here opens a dialog: separate KTX outputs, or pack into one KTX with a chosen input kind.
+- **Center — Preview** for the selected output (source vs encoded wipe). Drop one image here → one new KTX output. Drop several → dialog: separate KTX outputs, or pack into one KTX with a chosen input kind.
 - **Header — Official preset** selector beside the product name (Handbrake-style breadcrumb + nested Color / Data / Normal / Mask menu). Applies to every output in the queue.
 - **Right — Shared encode options** for every output in the queue. New outputs incompatible with the first (e.g. HDR vs LDR) are rejected.
 

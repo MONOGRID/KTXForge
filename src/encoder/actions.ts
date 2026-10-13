@@ -396,7 +396,12 @@ export async function handleDroppedSources(
     return;
   }
   // null / center: ask via the preview dialog (chrome drops count as center).
+  // One image has no pack choice — go straight to a separate KTX output.
   if (zone === null || zone === "center") {
+    if (sources.length === 1) {
+      await dropOntoOutputs(sources);
+      return;
+    }
     setPendingCenterDrop(sources);
     return;
   }
