@@ -1,17 +1,21 @@
 <script setup lang="ts">
-defineProps<{
-  src: string;
-  compareSrc: string;
-  alt: string;
-  compareAlt: string;
-  splitPct: number;
-  transformStyle: { transform: string };
-  canvasStyle: { width: string; height: string } | undefined;
-  revealInnerStyle: { width: string };
-  originalLabel: string;
-  resultLabel: string;
-  showChrome: boolean;
-}>();
+withDefaults(
+  defineProps<{
+    src: string;
+    compareSrc: string;
+    alt: string;
+    compareAlt: string;
+    splitPct: number;
+    transformStyle: { transform: string };
+    canvasStyle: { width: string; height: string } | undefined;
+    revealInnerStyle: { width: string };
+    originalLabel: string;
+    resultLabel: string;
+    showChrome: boolean;
+    flipY?: boolean;
+  }>(),
+  { flipY: false },
+);
 
 const emit = defineEmits<{
   primaryLoad: [event: Event];
@@ -40,6 +44,7 @@ const emit = defineEmits<{
           :src="compareSrc"
           :alt="compareAlt"
           class="compare-img"
+          :class="{ 'scale-y-[-1]': flipY }"
           draggable="false"
           @load="emit('compareLoad', $event)"
           @dragstart.prevent
@@ -67,6 +72,7 @@ const emit = defineEmits<{
             :src="src"
             :alt="alt"
             class="compare-img"
+            :class="{ 'scale-y-[-1]': flipY }"
             draggable="false"
             @load="emit('primaryLoad', $event)"
             @dragstart.prevent

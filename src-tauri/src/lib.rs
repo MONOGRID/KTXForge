@@ -20,17 +20,23 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    os_open::note_process_start();
+
     let mut builder = tauri::Builder::default();
 
     // single-instance must be registered before other plugins (plugin order).
     #[cfg(desktop)]
     {
         builder = builder.plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.set_focus();
+            let rest = argv.into_iter().skip(1).collect::<Vec<_>>();
+            let opening_ktx = !os_open::ktx_paths_from_open_args(&rest).is_empty();
+            // Focus encoder only when this activation is not an OS "open KTX".
+            if !opening_ktx {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.set_focus();
+                }
             }
-            // argv[0] is the executable; remaining args may include opened paths.
-            os_open::open_from_args(app, argv.into_iter().skip(1));
+            os_open::open_from_args(app, rest);
         }));
     }
 
@@ -63,12 +69,16 @@ pub fn run() {
             StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED | StateFlags::VISIBLE
         };
 
+        // Cold KTX argv: do not restore/show or track `main` this session so the
+        // encoder never appears and exit does not persist `visible: false`.
+        let cold_ktx_argv = os_open::cold_ktx_from_argv();
+        let mut window_state = WindowStateBuilder::default().with_state_flags(flags);
+        if cold_ktx_argv {
+            window_state = window_state.with_filter(|label| label != "main");
+        }
+
         builder = builder
-            .plugin(
-                WindowStateBuilder::default()
-                    .with_state_flags(flags)
-                    .build(),
-            )
+            .plugin(window_state.build())
             .menu(menu::app_menu)
             .on_menu_event(|app, event| {
                 menu::on_menu_event(app, &event);

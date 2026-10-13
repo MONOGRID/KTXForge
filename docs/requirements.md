@@ -32,7 +32,7 @@ The frontend calls Tauri commands and listens for progress events. It never rece
 
 Drag-and-drop uses Tauri's file-drop events (`over`, `drop`, `cancel`), which provide absolute paths. Rust classifies each path. Image drops stay on the encoder window. KTX drops open the inspector. The webview drag-drop handler stays enabled so those paths are delivered. HTML5 drop is not the file pipeline.
 
-Installed builds register OS file associations for `.ktx` and `.ktx2` (`bundle.fileAssociations`). Opening a file that way routes through the same Rust inspector open path: Windows/Linux pass the path on argv (cold start in `setup`, warm start via `tauri-plugin-single-instance`); macOS also delivers `RunEvent::Opened` file URLs. Associations apply to bundled installs, not `tauri dev`.
+Installed builds register OS file associations for `.ktx` and `.ktx2` (`bundle.fileAssociations`). Opening a file that way routes through the same Rust inspector open path: Windows/Linux pass the path on argv (cold start in `setup`, warm start via `tauri-plugin-single-instance`); macOS also delivers `RunEvent::Opened` file URLs. Associations apply to bundled installs, not `tauri dev`. A cold “Open with” / double-click opens **only the inspector** (the encoder window is not shown). If the encoder is already open in a running instance, a second OS open adds or focuses the inspector and leaves the encoder as it is.
 
 The inspector is a second webview window, created from Rust with `WebviewWindowBuilder` on an async command. On Windows that builder deadlocks inside a synchronous command, so window creation stays async. The window label is stable and reused if the inspector is already open.
 
@@ -279,6 +279,8 @@ Block-compressed transcode targets (`etc-rgb`, `etc-rgba`, `eac-r11`, `eac-rg11`
 ## Inspector
 
 Dropping `.ktx` or `.ktx2`, or opening one through the OS file association, opens the inspector window for that file. KTX2 details come from `ktx info --format json`, which follows the [info schema](https://schema.khronos.org/ktx/info_v1.json). The command also validates KTX2 and returns errors and warnings. Invalid files still show a best-effort report.
+
+The viewer flips preview images vertically by default (**Flip Y**, matching a bottom-left / OpenGL-style origin). A switch in the Viewer header turns that off; the choice persists for the next session. Export writes the extracted pixels without this display flip.
 
 The inspector shows every field the schema can return:
 

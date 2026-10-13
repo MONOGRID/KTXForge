@@ -15,7 +15,7 @@ import {
   warmInspectorMipChain,
   type SubresourceDims,
 } from "../../imageCache";
-import { path, report, selection } from "../../store";
+import { flipY, path, report, selection } from "../../store";
 import { useCubemapCross } from "../../useCubemapCross";
 import { useDepthVolume } from "../../useDepthVolume";
 
@@ -386,6 +386,7 @@ onUnmounted(() => {
       :active-index="activeDepthIndex"
       :loading="volumeLoading"
       empty-label="No depth slices"
+      :flip-y="flipY"
     />
     <ImageViewport
       class="min-h-0 flex-1"
@@ -398,6 +399,7 @@ onUnmounted(() => {
       :error-label="errorLabel"
       :unavailable-label="unavailableLabel"
       :hint="tonemapHint"
+      :flip-y="flipY"
     />
   </div>
   <ImageViewport
@@ -411,5 +413,6 @@ onUnmounted(() => {
     :error-label="errorLabel"
     :unavailable-label="unavailableLabel"
     :hint="viewportHint"
+    :flip-y="flipY"
   />
 </template>

@@ -7,6 +7,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { Eye } from "@lucide/vue";
+import { Switch } from "@/components/ui/switch";
 import ModeToggle from "../shared/components/ModeToggle.vue";
 import ExportPanel from "./components/ExportPanel.vue";
 import InspectorInfoSidebar from "./components/InspectorInfoSidebar.vue";
@@ -19,6 +20,7 @@ import { bindMenuZoomFocusGate } from "../shared/menuZoomFocus";
 import { bindInspectorMenu } from "./menuBridge";
 import {
   displayValue,
+  flipY,
   initInspectorStore,
   ktx2Info,
   loading,
@@ -124,7 +126,7 @@ onUnmounted(() => {
             class="panel flex h-full min-h-0 flex-col overflow-hidden"
             aria-label="Image viewer"
           >
-            <header class="shrink-0 border-b border-line/50 px-3 py-2">
+            <header class="flex shrink-0 items-center justify-between gap-3 border-b border-line/50 px-3 py-2">
               <h2 class="m-0 flex items-center gap-1.5 text-sm font-semibold">
                 <Eye
                   class="size-4 shrink-0 text-ink-muted"
@@ -132,6 +134,16 @@ onUnmounted(() => {
                 />
                 Viewer
               </h2>
+              <label
+                class="flex cursor-pointer items-center gap-2 text-xs text-ink-muted"
+                title="Flip the preview vertically (KTX / OpenGL-style origin)"
+              >
+                <span>Flip Y</span>
+                <Switch
+                  :checked="flipY"
+                  @update:checked="flipY = $event"
+                />
+              </label>
             </header>
             <div class="flex min-h-0 flex-1 flex-col gap-2 p-3">
               <div class="flex shrink-0 flex-col gap-2">

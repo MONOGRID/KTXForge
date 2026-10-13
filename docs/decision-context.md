@@ -583,3 +583,15 @@ elease.yml sets `lfs: true`. After converting blobs to pointers, push LFS object
 **Decided:** Rust owns pack validity via `validate_pack_inputs` → `InputValidationReport` (`panel` for list-wide errors, `inputs[]` for per-row). Checks: role arity, same LDR/HDR within a pack, same pixel size for array/cubemap/depth (level 0), cubemap faces square, mip-chain sizes `max(1, base>>i)` and level count ≤ `floor(log2(max(w,h)))+1`. Vue paints red Inputs panel / row chrome with tooltips from that report; Outputs queue rows get a danger cue; `allOutputsValid` / Encode all require every output's report to be clean. Encode backstop uses the same function in `resolve_for_encode`. Soft `ktx create` warnings (e.g. 8-bit PNG with no transfer function → default sRGB) do **not** block Encode. Per-file TF / primaries / origin metadata mismatches are out of scope until `SourceInfo` carries them.
 
 **Why:** Packing mismatched screenshots into one array hit `ktx create` exit 3 ("does not match expected size … for level 0"). The product rule is never to offer a known-invalid encode; artists should see which input (or the whole list) is wrong without reading sidecar stderr.
+
+## 2026-10-13 — OS open KTX is inspector-only
+
+**Decided:** Cold-starting via file association (KTX on argv) does not show the encoder. `window-state` filters out `main` for that launch so it is neither restored/shown nor saved as `visible: false`; `os_open` destroys the still-hidden `main` webview before opening the inspector. Warm single-instance opens focus the inspector (not the encoder) when the activation carries a KTX path; a visible encoder in an already-running session is left alone. macOS `RunEvent::Opened` may also destroy `main` within a 2s launch grace if window-state already showed it. Extends the 2026-10-12 OS file associations entry. Spec: [requirements.md](requirements.md).
+
+**Why:** AppImage / “Open with” was restoring the encoder (`VISIBLE`) and opening the inspector, so two windows appeared for a Viewer association. Destroying a never-shown `main` avoids a zombie hidden window keeping the process alive after the inspector closes, without writing `visible: false` into the window-state file.
+
+## 2026-10-13 — Inspector Flip Y default on
+
+**Decided:** Inspector previews (flat viewport, depth volume slices, cubemap cross via the same viewport) apply a CSS vertical flip by default. A **Flip Y** switch in the Viewer header toggles it; the value is stored with VueUse `useLocalStorage` (`ktxforge.inspector.flipY`). Encoder previews stay unflipped. Export is unchanged (no display flip baked in). Spec: [requirements.md](requirements.md).
+
+**Why:** KTX samples often assume a bottom-left origin; without Flip Y the inspector looked upside-down relative to engines. A persistent switch covers top-left assets without making export surprising.

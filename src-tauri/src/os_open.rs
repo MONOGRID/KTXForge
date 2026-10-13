@@ -8,13 +8,45 @@ use crate::commands::inspector_window;
 use crate::image::classify::{classify, FileKind};
 use crate::state::AppState;
 
+#[cfg(target_os = "macos")]
+use std::sync::OnceLock;
+#[cfg(target_os = "macos")]
+use std::time::{Duration, Instant};
+
+#[cfg(target_os = "macos")]
+static LAUNCHED_AT: OnceLock<Instant> = OnceLock::new();
+
+/// Call once at process start so macOS `Opened` can detect a cold viewer launch.
+pub fn note_process_start() {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = LAUNCHED_AT.set(Instant::now());
+    }
+}
+
+/// `true` when argv (this process) already named a KTX file — used to keep the
+/// encoder window from being restored/shown by window-state.
+pub fn cold_ktx_from_argv() -> bool {
+    !ktx_paths_from_open_args(std::env::args().skip(1)).is_empty()
+}
+
+/// How aggressively to drop the encoder window when opening a KTX from the OS.
+#[derive(Clone, Copy)]
+enum SuppressMain {
+    /// Only if still hidden (Linux/Windows argv cold start after skip-restore).
+    IfHidden,
+    /// Also if the app just launched (macOS `Opened` after window-state showed main).
+    #[cfg(target_os = "macos")]
+    IfHiddenOrLaunchGrace,
+}
+
 /// Open the first KTX path from argv-like strings (executable already skipped by caller).
 pub fn open_from_args<I, S>(app: &AppHandle, args: I)
 where
     I: IntoIterator<Item = S>,
     S: AsRef<str>,
 {
-    open_ktx_paths(app, ktx_paths_from_open_args(args));
+    open_ktx_paths(app, ktx_paths_from_open_args(args), SuppressMain::IfHidden);
 }
 
 /// Open the first KTX path from `RunEvent::Opened` URLs (macOS).
@@ -25,13 +57,14 @@ pub fn open_from_urls(app: &AppHandle, urls: &[Url]) {
         .filter_map(|url| url.to_file_path().ok())
         .filter(|path| is_ktx_path(path))
         .collect::<Vec<_>>();
-    open_ktx_paths(app, paths);
+    open_ktx_paths(app, paths, SuppressMain::IfHiddenOrLaunchGrace);
 }
 
-fn open_ktx_paths(app: &AppHandle, paths: Vec<PathBuf>) {
+fn open_ktx_paths(app: &AppHandle, paths: Vec<PathBuf>, suppress: SuppressMain) {
     let Some(path) = paths.into_iter().next() else {
         return;
     };
+    suppress_encoder_window(app, suppress);
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         let state = app.state::<AppState>();
@@ -39,6 +72,27 @@ fn open_ktx_paths(app: &AppHandle, paths: Vec<PathBuf>) {
             eprintln!("os open inspector: {e}");
         }
     });
+}
+
+/// Viewer association should not leave an empty encoder window beside the inspector.
+fn suppress_encoder_window(app: &AppHandle, suppress: SuppressMain) {
+    let Some(main) = app.get_webview_window("main") else {
+        return;
+    };
+    let visible = main.is_visible().unwrap_or(false);
+    let drop = match suppress {
+        SuppressMain::IfHidden => !visible,
+        #[cfg(target_os = "macos")]
+        SuppressMain::IfHiddenOrLaunchGrace => {
+            let within_grace = LAUNCHED_AT
+                .get()
+                .is_some_and(|t| t.elapsed() < Duration::from_secs(2));
+            !visible || within_grace
+        }
+    };
+    if drop {
+        let _ = main.destroy();
+    }
 }
 
 /// Parse open-with arguments into existing (or extension-classified) KTX paths.

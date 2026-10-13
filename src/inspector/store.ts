@@ -1,3 +1,4 @@
+import { useLocalStorage } from "@vueuse/core";
 import { computed, ref, shallowRef } from "vue";
 import { call } from "../api/commands";
 import { on } from "../api/events";
@@ -22,6 +23,9 @@ export const path = ref<string | null>(null);
 export const report = shallowRef<InspectReport | null>(null);
 export const selection = ref<ImageSelection>({ ...DEFAULT_SELECTION });
 export const loading = ref(false);
+
+/** Vertical flip for inspector previews (KTX/OpenGL-style origin). Default on. */
+export const flipY = useLocalStorage("ktxforge.inspector.flipY", true);
 
 export const ktx2Info = computed((): Ktx2Info | null => {
   const current = report.value;

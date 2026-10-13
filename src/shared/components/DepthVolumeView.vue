@@ -9,10 +9,12 @@ const props = withDefaults(
     activeIndex: number;
     loading?: boolean;
     emptyLabel?: string;
+    flipY?: boolean;
   }>(),
   {
     loading: false,
     emptyLabel: "No depth slices",
+    flipY: false,
   },
 );
 
@@ -141,6 +143,7 @@ function onSceneDblClick(): void {
             :src="url"
             :alt="`Depth slice ${String(index)}`"
             class="depth-slice-img"
+            :class="{ 'scale-y-[-1]': flipY }"
             draggable="false"
             @dragstart.prevent
           >

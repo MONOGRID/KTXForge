@@ -30,6 +30,8 @@ const props = withDefaults(
      */
     contentWidth?: number | null;
     contentHeight?: number | null;
+    /** Flip the bitmap vertically (inspector default; encoder leaves off). */
+    flipY?: boolean;
   }>(),
   {
     compareSrc: null,
@@ -44,6 +46,7 @@ const props = withDefaults(
     resultLabel: "Result",
     contentWidth: null,
     contentHeight: null,
+    flipY: false,
   },
 );
 
@@ -335,7 +338,10 @@ onUnmounted(() => {
             :src="src"
             :alt="alt"
             class="viewer-img block max-w-none"
-            :class="{ 'viewer-img-canvas': canvasStyle !== undefined }"
+            :class="{
+              'viewer-img-canvas': canvasStyle !== undefined,
+              'scale-y-[-1]': flipY,
+            }"
             draggable="false"
             @load="onPrimaryLoad"
             @dragstart.prevent
@@ -357,6 +363,7 @@ onUnmounted(() => {
       :original-label="originalLabel"
       :result-label="resultLabel"
       :show-chrome="!loading && errorLabel === null"
+      :flip-y="flipY"
       @primary-load="onPrimaryLoad"
       @compare-load="onCompareLoad"
       @split-pointer-down="onSplitPointerDown"
