@@ -55,19 +55,26 @@ const presetSchema = z.array(
     owned: z.object({
       format: z.string(),
       encode: z.enum(["uastc", "basis-lz"]).nullable(),
+      normalize: z.boolean(),
       supercompression: z.object({ kind: z.enum(["none", "zstd", "zlib"]) }),
     }),
   }),
 );
 
+const CHANNELS = [0, 1, 2, 3] as const;
 const MODEL = { uastc: "KHR_DF_MODEL_UASTC", "basis-lz": "KHR_DF_MODEL_ETC1S" } as const;
 const SCHEME = { none: "KTX_SS_NONE", zstd: "KTX_SS_ZSTD", zlib: "KTX_SS_ZLIB" } as const;
+
+/** The input each Official preset is meant for. */
+function presetSource(id: string): string {
+  return id.includes(".mask.") ? "mask.png" : id.includes(".normal.") ? "normal.png" : "color-rgba.png";
+}
 
 test("every Official preset writes the format, codec and supercompression it names", async ({ ipc }, testInfo) => {
   const catalog = unwrap(await ipc.call("list_encode_presets", {}, presetSchema));
   for (const preset of catalog) {
     await test.step(preset.id, async () => {
-      const source = preset.id.includes(".mask.") ? "mask.png" : preset.id.includes(".normal.") ? "normal.png" : "color-rgba.png";
+      const source = presetSource(preset.id);
       const session = await EncoderSession.open(ipc, [input(source)], "base2D", preset.id);
       const { out, info } = await encodeValid(session, testInfo, preset.id);
       const block = info.dataFormatDescriptor.blocks[0];
@@ -86,6 +93,26 @@ test("every Official preset writes the format, codec and supercompression it nam
 
       expect.soft(summary(info)).toMatchSnapshot(`preset-${preset.id}.json`);
       expect.soft(await pngOf(decoded)).toMatchSnapshot(`preset-${preset.id}.png`);
+    });
+  }
+});
+
+test("linear Official presets store the PNG's bytes, not an sRGB → linear conversion", async ({ ipc }, testInfo) => {
+  const catalog = unwrap(await ipc.call("list_encode_presets", {}, presetSchema));
+  const linear = catalog.filter((p) => !p.owned.format.endsWith("_SRGB"));
+  expect(linear.length).toBeGreaterThan(0);
+  for (const preset of linear) {
+    await test.step(preset.id, async () => {
+      const source = presetSource(preset.id);
+      const session = await EncoderSession.open(ipc, [input(source)], "base2D", preset.id);
+      // Uncompressed, so any difference is a color conversion, not codec loss.
+      await edit(session, "encode", null);
+      const { out } = await encodeValid(session, testInfo, `linear-${preset.id}`);
+      const channels = CHANNELS.slice(0, preset.owned.format.split("8").length - 1);
+      // `--normalize` re-quantizes unit vectors by one step; a transfer conversion moves them by far more.
+      expect.soft(maxAbsDiff(await readRgba(input(source)), await decode(out.file), channels)).toBeLessThanOrEqual(
+        preset.owned.normalize ? 1 : 0,
+      );
     });
   }
 });

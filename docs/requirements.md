@@ -141,7 +141,7 @@ The product ships an **Official** preset tree of opinionated content recipes (no
 | Mask > UASTC R8 | Single-channel mask (`R8_UNORM`, UASTC, zstd 18) |
 | Mask > BasisLZ R8 | Smaller single-channel mask (`R8_UNORM`, BasisLZ, no zstd) |
 
-UASTC presets use zstd 18. BasisLZ presets omit supercompression (invalid with BasisLZ). The zstd level control’s own help notes that levels above 20 use much more memory. Source compatibility rules still win (e.g. HDR clearing UASTC → Custom).
+Every UNORM preset (Data, Normal, Mask) assigns a linear transfer function, so the input's bytes are stored as they are. Without it `ktx create` reads an 8-bit PNG as sRGB and converts it to linear, which changes mask values and breaks normal maps. Color presets let the sRGB format carry the transfer function. UASTC presets use zstd 18. BasisLZ presets omit supercompression (invalid with BasisLZ). The zstd level control’s own help notes that levels above 20 use much more memory. Source compatibility rules still win (e.g. HDR clearing UASTC → Custom).
 
 ### Options that must appear in the UI
 
@@ -280,7 +280,7 @@ Block-compressed transcode targets (`etc-rgb`, `etc-rgba`, `eac-r11`, `eac-rg11`
 
 Dropping `.ktx` or `.ktx2`, or opening one through the OS file association, opens the inspector window for that file. KTX2 details come from `ktx info --format json`, which follows the [info schema](https://schema.khronos.org/ktx/info_v1.json). The command also validates KTX2 and returns errors and warnings. Invalid files still show a best-effort report.
 
-The viewer flips preview images vertically by default (**Flip Y**, matching a bottom-left / OpenGL-style origin). A switch in the Viewer header turns that off; the choice persists for the next session. Export writes the extracted pixels without this display flip.
+The viewer shows images as stored, top row first. A **Flip Y** switch in the Viewer header flips the display vertically (for a bottom-left / OpenGL-style origin); it is off by default and the choice persists for the next session. Export writes the extracted pixels without this display flip.
 
 The inspector shows every field the schema can return:
 
@@ -338,6 +338,7 @@ Encoding multiple frames:
 - Rust calls `ktx create --layers <count>` with one image per layer, in order (`count` = list length).
 - The UI exposes duration, timescale, and loop count when that role is active and the selected output has ≥ 2 layers.
 - The current `ktx create` reference has no flag for `KTXanimData`. Rust writes that key onto the file after a successful create, using the 12-byte layout above, so the encoded file is a real animation and not only an array texture. The inspector reads the key back via `ktx info`.
+- BasisLZ animations are encoded as video (inter-frame). `ktx create` writes the uncompressed frames, Rust adds `KTXanimData`, and `ktx encode --codec basis-lz` compresses the result.
 
 Decoding:
 

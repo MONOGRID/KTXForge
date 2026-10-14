@@ -3,10 +3,16 @@ import type { AstcOptions } from "./AstcOptions";
 import type { BasisLzOptions } from "./BasisLzOptions";
 import type { EncodeCodec } from "./EncodeCodec";
 import type { Supercompression } from "./Supercompression";
+import type { TransferFunction } from "./TransferFunction";
 import type { UastcLdrOptions } from "./UastcLdrOptions";
 import type { VkFormat } from "./VkFormat";
 
 /**
  * Owned encode fields written by an Official preset (for catalog + Custom detect).
  */
-export type EncodePresetOwned = { format: VkFormat, encode: EncodeCodec | null, normalize: boolean, normalMode: boolean, basisLz: BasisLzOptions, uastcLdr: UastcLdrOptions, astc: AstcOptions, supercompression: Supercompression, };
+export type EncodePresetOwned = { format: VkFormat, encode: EncodeCodec | null, normalize: boolean, normalMode: boolean, 
+/**
+ * `linear` for UNORM presets: the bytes are data, so an 8-bit PNG that
+ * `ktx create` would read as sRGB must not be converted to linear.
+ */
+assignTf: TransferFunction | null, basisLz: BasisLzOptions, uastcLdr: UastcLdrOptions, astc: AstcOptions, supercompression: Supercompression, };

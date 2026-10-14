@@ -10,14 +10,16 @@ use crate::error::AppError;
 use crate::events::{EncodeProgressPayload, EncodeStage, ENCODE_PROGRESS};
 use crate::image::convert::{prepare_input, read_source_info};
 use crate::ktx::anim::write_anim_data;
-use crate::ktx::create_args::build_create_args;
+use crate::ktx::create_args::{
+    build_create_args, build_frames_create_args, build_video_encode_args, encodes_as_video,
+};
 use crate::ktx::extract_ops::{cached_preview_png, extract_preview_png, read_texture_meta};
 use crate::ktx::info_types::{ImageSelection, PreviewKind};
 use crate::ktx::input_role::InputRole;
 use crate::ktx::metrics::parse_metrics;
 use crate::ktx::options::{CreateOptions, EncodeCodec};
 use crate::ktx::rules;
-use crate::ktx::sidecar::{self, CancellationHandle, Sidecar};
+use crate::ktx::sidecar::{self, CancellationHandle, KtxOutput, Sidecar};
 use crate::state::{AppState, Job};
 
 #[tauri::command]
@@ -83,40 +85,49 @@ pub async fn run_encode<R: Runtime>(
         .map_err(|errors| AppError::invalid_input(errors.join("; ")))?;
     let options = resolved.options();
 
+    let video = encodes_as_video(&resolved, request.animation.is_some());
+    // Video: uncompressed frames first, then `ktx encode` once `KTXanimData` exists.
+    let create_output = if video {
+        job_dir.join("frames.ktx2")
+    } else {
+        output_path.clone()
+    };
     let mut args = vec!["create".to_owned()];
-    args.extend(build_create_args(&resolved, &prepared_paths, &output_path));
-    eprintln!(
-        "ktxforge: encode job {} → ktx {}",
-        request.job_id,
-        shell_join(&args)
-    );
+    if video {
+        args.extend(build_frames_create_args(
+            &resolved,
+            &prepared_paths,
+            &create_output,
+        ));
+    } else {
+        args.extend(build_create_args(
+            &resolved,
+            &prepared_paths,
+            &create_output,
+        ));
+    }
 
     emit_stage(app, &request.job_id, EncodeStage::Encoding, None);
-
-    let job_id_for_cb = request.job_id.clone();
-    let app_for_cb = app.clone();
-    let out = sidecar::run(
-        app,
-        Sidecar::Ktx,
-        args,
-        move |line| {
-            let _ = app_for_cb.emit(
-                ENCODE_PROGRESS,
-                EncodeProgressPayload {
-                    job_id: job_id_for_cb.clone(),
-                    stage: EncodeStage::Encoding,
-                    stderr_line: Some(line),
-                },
-            );
-        },
-        cancel.clone(),
-    )
-    .await?;
+    let mut out = run_ktx_logged(app, &request.job_id, args, &cancel).await?;
 
     if let Some(anim) = request.animation.clone() {
         emit_stage(app, &request.job_id, EncodeStage::WritingAnim, None);
-        let path = output_path.clone();
+        let path = create_output.clone();
         run_blocking(move || write_anim_data(&path, &anim)).await?;
+    }
+
+    if video {
+        emit_stage(app, &request.job_id, EncodeStage::Encoding, None);
+        let mut args = vec!["encode".to_owned()];
+        args.extend(build_video_encode_args(
+            &resolved,
+            &create_output,
+            &output_path,
+        ));
+        let encoded = run_ktx_logged(app, &request.job_id, args, &cancel).await?;
+        out.stderr.push_str(&encoded.stderr);
+        out.stdout = encoded.stdout;
+        let _ = tokio::fs::remove_file(&create_output).await;
     }
 
     emit_stage(app, &request.job_id, EncodeStage::Previewing, None);
@@ -177,6 +188,35 @@ pub async fn run_encode<R: Runtime>(
         warnings,
         preview: resolved_preview,
     })
+}
+
+/// Run one `ktx` step for an encode job, logging argv and forwarding stderr as progress.
+async fn run_ktx_logged<R: Runtime>(
+    app: &AppHandle<R>,
+    job_id: &str,
+    args: Vec<String>,
+    cancel: &CancellationHandle,
+) -> Result<KtxOutput, AppError> {
+    eprintln!("ktxforge: encode job {job_id} → ktx {}", shell_join(&args));
+    let job_id_for_cb = job_id.to_owned();
+    let app_for_cb = app.clone();
+    sidecar::run(
+        app,
+        Sidecar::Ktx,
+        args,
+        move |line| {
+            let _ = app_for_cb.emit(
+                ENCODE_PROGRESS,
+                EncodeProgressPayload {
+                    job_id: job_id_for_cb.clone(),
+                    stage: EncodeStage::Encoding,
+                    stderr_line: Some(line),
+                },
+            );
+        },
+        cancel.clone(),
+    )
+    .await
 }
 
 /// Read and stage every source on the blocking pool (image decode, EXR rewrite).

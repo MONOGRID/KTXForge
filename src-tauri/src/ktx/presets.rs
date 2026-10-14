@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 use ts_rs::TS;
 
 use super::options::{
-    AstcOptions, BasisLzOptions, CreateOptions, EncodeCodec, Supercompression, UastcLdrOptions,
-    VkFormat,
+    AstcOptions, BasisLzOptions, CreateOptions, EncodeCodec, Supercompression, TransferFunction,
+    UastcLdrOptions, VkFormat,
 };
 
 /// Product default: Official > Color > UASTC RGBA.
@@ -26,6 +26,9 @@ pub struct EncodePresetOwned {
     pub encode: Option<EncodeCodec>,
     pub normalize: bool,
     pub normal_mode: bool,
+    /// `linear` for UNORM presets: the bytes are data, so an 8-bit PNG that
+    /// `ktx create` would read as sRGB must not be converted to linear.
+    pub assign_tf: Option<TransferFunction>,
     pub basis_lz: BasisLzOptions,
     pub uastc_ldr: UastcLdrOptions,
     pub astc: AstcOptions,
@@ -216,6 +219,7 @@ fn owned_from_recipe(recipe: &Recipe) -> EncodePresetOwned {
         encode: Some(recipe.encode),
         normalize: recipe.normalize,
         normal_mode: recipe.normal_mode,
+        assign_tf: (!recipe.format.is_srgb()).then_some(TransferFunction::Linear),
         basis_lz: BasisLzOptions::default(),
         uastc_ldr,
         astc: AstcOptions::default(),
@@ -252,8 +256,9 @@ pub fn apply_preset(current: &CreateOptions, id: &str) -> Option<CreateOptions> 
     next.encode = owned.encode;
     next.color.normalize = owned.normalize;
     next.color.normal_mode = owned.normal_mode;
-    // Linear vs sRGB is carried by the format; clear leftover TF flags.
-    next.color.assign_tf = None;
+    // sRGB presets let the format carry the transfer; linear ones assign it
+    // so the input bytes pass through unconverted. Clear any conversion.
+    next.color.assign_tf = owned.assign_tf;
     next.color.convert_tf = None;
     next.basis_lz = owned.basis_lz;
     next.uastc_ldr = owned.uastc_ldr;
@@ -267,7 +272,7 @@ fn owned_equal(options: &CreateOptions, owned: &EncodePresetOwned) -> bool {
         && options.encode == owned.encode
         && options.color.normalize == owned.normalize
         && options.color.normal_mode == owned.normal_mode
-        && options.color.assign_tf.is_none()
+        && options.color.assign_tf == owned.assign_tf
         && options.color.convert_tf.is_none()
         && options.supercompression == owned.supercompression
         && options.basis_lz == owned.basis_lz

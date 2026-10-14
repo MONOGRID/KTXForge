@@ -16,7 +16,7 @@ Read the whole log before choosing or changing an approach.
 - Encode JPEG on export. `ktx extract` writes only PNG, EXR or raw.
 - Run `ktx create` / `ktx extract` off the UI thread and report exit code, stderr and progress.
 - Parse `ktx info --format json` ([Khronos info schema](https://schema.khronos.org/ktx/info_v1.json)).
-- Write the `KTXanimData` key after create. `ktx create` has `--layers` and no flag for that key.
+- Write the `KTXanimData` key after create (for BasisLZ, between `ktx create` and `ktx encode`). `ktx create` has `--layers` and no flag for that key.
 
 **Why:** The spec requires every `ktx create` option, the official info report and validation, and extract per mip, face, layer and frame. The CLI already does all of that. In the 2026-10-04 crates.io survey each crate covered only part of it:
 
@@ -104,11 +104,13 @@ The rpath step is idempotent and runs on already-staged binaries. Darwin `.pkg` 
 
 ## 2026-10-10 — Rust writes `KTXanimData`
 
-**Decided:** After `ktx create`, Rust rebuilds the KTX2 to insert `KTXanimData` (`duration`, `timescale`, `loopCount`; frames are array layers). It refuses `layerCount < 2`. The rebuilt file lists mip data smallest → largest (level index still base-first), aligns each level to `lcm(block, 4)` uncompressed or 1 with supercompression, and pads to 8 only before SGD when SGD exists. A test runs `ktx validate` on the result.
+**Decided:** After `ktx create`, Rust rebuilds the KTX2 to insert `KTXanimData` (`duration`, `timescale`, `loopCount`; frames are array layers). It refuses `layerCount < 2`. The rebuilt file lists mip data smallest → largest (level index still base-first), aligns each level to `lcm(block, 4)` uncompressed or 1 with supercompression, and pads to 8 only before SGD when SGD exists. The e2e suite runs `ktx validate` on the result.
 
-**Why:** The CLI has no flag for the key. Largest-first levels and unconditional 8-byte padding failed validation with `error-4004`.
+A BasisLZ animation is encoded in two steps (`create_args::encodes_as_video`): `ktx create` with every flag except the codec ones writes uncompressed frames, Rust inserts the key, then `ktx encode --codec basis-lz` with the codec flags writes the output. UASTC and uncompressed animations keep the single `ktx create`.
 
-**Revised:** 2026-10-12 — KTX2-valid level layout.
+**Why:** The CLI has no flag for the key. Largest-first levels and unconditional 8-byte padding failed validation with `error-4004`. libktx treats an ETC1S array that carries `KTXanimData` as video: the encoder then writes P-frames and the transcoder decodes the payload as a video bitstream. Adding the key after a plain-array encode left a file `ktx extract` could not transcode (`error-5007`). `ktx encode` loads the key from the input, so the payload is encoded as video.
+
+**Revised:** 2026-10-12 — KTX2-valid level layout. 2026-10-14 — BasisLZ animation via `ktx encode` after the key is written.
 
 ## 2026-10-11 — Preview extraction: transcode choice, caching, concurrency
 
@@ -120,10 +122,11 @@ The rpath step is idempotent and runs on already-staged binaries. Darwin `.pkg` 
 - Process-wide extract semaphore sized by `extract_slots_for_cores` (~80% of logical cores, 1–16), exposed via `extract_concurrency`; the inspector fetch pool uses the same formula. Disk hits skip the semaphore.
 - Scrubbing is latest-only: encoder sides use `createScrubGate`, the inspector coalesces interactive requests to the latest selection. After the viewport settles, idle warm enqueues the mip chain and the full layer / frame stack, nearest first, into spare slots.
 - Fit and zoom use KTX header dimensions × mip, not the decoded image's `naturalWidth`.
+- Only float formats (`SFLOAT` / `UFLOAT`) preview through EXR; `ktx extract` writes 16-bit UNORM as a 16-bit PNG. The EXR tone-map reads whatever R / G / B / A channels the file has (missing colour channels are 0, missing alpha is 1, as in the tool's PNGs for R and RG formats).
 
-**Why:** BasisLZ packs RGB into one DFD sample, so counting samples picked `r8` / `rg8` and produced red normals or dropped blue. Scrubbing a 1024² × 200–400 layer UASTC+Zstd array spawned dozens of parallel extracts, locked the machine and used tens of GB. A single slot fixed that but left scrubbing at ~10% CPU; a fixed 3 left wide hosts idle. Using `naturalWidth` made Fit fall back to 1:1 for a frame on every `src` change.
+**Why:** BasisLZ packs RGB into one DFD sample, so counting samples picked `r8` / `rg8` and produced red normals or dropped blue. Scrubbing a 1024² × 200–400 layer UASTC+Zstd array spawned dozens of parallel extracts, locked the machine and used tens of GB. A single slot fixed that but left scrubbing at ~10% CPU; a fixed 3 left wide hosts idle. Using `naturalWidth` made Fit fall back to 1:1 for a frame on every `src` change. Matching `R16G16B16` / `R32` as "HDR" sent 16-bit UNORM to the EXR reader, and an RGB-only EXR reader rejected single-channel float files.
 
-**Revised:** 2026-10-11 — one extract slot plus LRU 16 after the RAM blow-up. 2026-10-12 — 3 slots, then core-scaled slots, LRU 32, and idle warm of the full stack.
+**Revised:** 2026-10-11 — one extract slot plus LRU 16 after the RAM blow-up. 2026-10-12 — 3 slots, then core-scaled slots, LRU 32, and idle warm of the full stack. 2026-10-14 — EXR only for float formats; any-channel EXR tone-map.
 
 ## 2026-10-11 — The options rules engine lives in Rust
 
@@ -175,26 +178,26 @@ A staged-binary test runs resolved argv for every role and several hidden-value 
 
 ## 2026-10-12 — Official encode presets in Rust
 
-**Decided:** The default experience is "drop images, press Encode, get a good KTX2" without learning KTX or opening a terminal. An Official preset catalog in `ktx/presets.rs` makes that work: Color / Data / Normal / Mask × UASTC vs BasisLZ × RGBA/RGB where alpha applies. The new-session default is Color > UASTC RGBA (`R8G8B8A8_SRGB`, `--encode uastc`, Zstd 18). Rust owns definitions, apply and match; a preset writes format, encode, color/normal flags, codec settings and supercompression, and never touches inputs, role or container shape. Vue shows the breadcrumb in the encoder header and shows **Custom** when an owned field diverges. Source rules still win over a preset. User-saved presets, ASTC and HDR presets are deferred.
+**Decided:** The default experience is "drop images, press Encode, get a good KTX2" without learning KTX or opening a terminal. An Official preset catalog in `ktx/presets.rs` makes that work: Color / Data / Normal / Mask × UASTC vs BasisLZ × RGBA/RGB where alpha applies. The new-session default is Color > UASTC RGBA (`R8G8B8A8_SRGB`, `--encode uastc`, Zstd 18). Data, Normal and Mask presets (UNORM formats) own `--assign-tf linear`; Color presets own no transfer flag. Rust owns definitions, apply and match (the frontend keeps no copy); a preset writes format, encode, color/normal flags, codec settings and supercompression, and never touches inputs, role or container shape. Vue shows the breadcrumb in the encoder header and shows **Custom** when an owned field diverges. Source rules still win over a preset. User-saved presets, ASTC and HDR presets are deferred.
 
-**Why:** Uncompressed / no-encode defaults worked against the main reason people open the app. Artists need opinions on the common axes (alpha, quality vs size, color vs linear data vs normals vs masks); power users still get every control. Zstd 22 was the first default; 18 keeps most of the size win without the memory cost of levels above 20.
+**Why:** Uncompressed / no-encode defaults worked against the main reason people open the app. Artists need opinions on the common axes (alpha, quality vs size, color vs linear data vs normals vs masks); power users still get every control. Zstd 22 was the first default; 18 keeps most of the size win without the memory cost of levels above 20. `ktx create` reads an 8-bit PNG without a transfer chunk as sRGB and converts it to linear for a UNORM format, so the first linear presets turned mask value 13 into 1 and flattened normal maps; assigning `linear` stores the bytes as they are.
 
-**Revised:** 2026-10-12 — catalog grew to twelve leaves; selector moved to the header. Later — default Zstd 22 → 18.
+**Revised:** 2026-10-12 — catalog grew to twelve leaves; selector moved to the header. Later — default Zstd 22 → 18. 2026-10-14 — linear presets assign `linear` instead of letting `ktx` convert.
 
 ## 2026-10-11 — Shared viewer stack for encoder and inspector
 
 **Decided:** Both windows use the same viewer building blocks under `src/shared`:
 
-- `ImageViewport` + `useZoomPan`: checkerboard, Ctrl/Cmd+wheel zoom, drag pan, and a **sticky** window-scoped zoom mode (Fit, Actual, or manual) that survives output changes, scrubbing and remounts. Size changes never force Fit. In Actual mode a smaller mip shows smaller.
+- `ImageViewport` + `useZoomPan`: checkerboard, Ctrl/Cmd+wheel zoom, drag pan, and a **sticky** window-scoped zoom mode (Fit, Actual, or manual) that survives output changes, scrubbing and remounts. Size changes never force Fit. In Actual mode a smaller mip shows smaller. The layer translate is snapped so the image origin lands on a whole device pixel, measured from the frame's viewport position.
 - The encoder compares source and encoded output with a vertical wipe in one frame, not side by side. The wipe clips in frame space so the cut stays under the handle while panning. Both layers fill a shared canvas.
 - `composeCubemapCross` composites the classic face cross on a canvas (encoder: one cross per wipe side; inspector: **Cross** or a single face).
 - `DepthVolumeView` shows depth slices as a CSS 3D `preserve-3d` stack with drag orbit; the 2D viewport shows the highlighted slice. No WebGL.
 - View menu zoom actions go only to the focused window (`document.hasFocus()`).
 - Inspector-only display **Flip Y** (CSS, persisted with `useLocalStorage`, default off); export never bakes it in.
 
-**Why:** One transform implementation for both windows. A wipe is a clearer quality compare than two boxes scaled separately. Clip-path on the transformed image moved the cut away from the handle. Re-fitting on every size change threw away the user's zoom while scrubbing. A CSS stack gives a spatial overview without a second rendering stack.
+**Why:** One transform implementation for both windows. A wipe is a clearer quality compare than two boxes scaled separately. Clip-path on the transformed image moved the cut away from the handle. Re-fitting on every size change threw away the user's zoom while scrubbing. A CSS stack gives a spatial overview without a second rendering stack. Centring alone left the image at a fractional position (the frame itself sits at a sub-pixel layout offset), so Actual size resampled every texel.
 
-**Revised:** 2026-10-11 — role-aware preview, CSS3D volume, sticky zoom. 2026-10-13 — Flip Y. 2026-10-14 — inspector Cross vs single face; Flip Y default off.
+**Revised:** 2026-10-11 — role-aware preview, CSS3D volume, sticky zoom. 2026-10-13 — Flip Y. 2026-10-14 — inspector Cross vs single face; Flip Y default off; device-pixel snapping.
 
 ## 2026-10-11 — UI components and theme
 

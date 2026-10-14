@@ -105,12 +105,8 @@ pub fn preview_kind_from_vk_format(vk_format: &str) -> PreviewKind {
             reason: "integer formats cannot be previewed as color images".to_owned(),
         };
     }
-    if upper.contains("SFLOAT")
-        || upper.contains("UFLOAT")
-        || upper.contains("DFLOAT")
-        || upper.contains("R16G16B16")
-        || upper.contains("R32")
-    {
+    // `ktx extract` writes EXR for float formats only; 16-bit UNORM is a 16-bit PNG.
+    if upper.contains("SFLOAT") || upper.contains("UFLOAT") {
         return PreviewKind::TonemappedFromExr;
     }
     PreviewKind::Png

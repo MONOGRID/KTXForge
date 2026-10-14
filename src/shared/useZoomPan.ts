@@ -1,4 +1,9 @@
-import { useElementSize, useEventListener } from "@vueuse/core";
+import {
+  useDevicePixelRatio,
+  useElementBounding,
+  useElementSize,
+  useEventListener,
+} from "@vueuse/core";
 import {
   computed,
   ref,
@@ -19,12 +24,24 @@ export type ZoomPanTransformStyle = {
   transformOrigin: "0 0";
 };
 
+/** Viewport position of the transform origin (the frame's padding box) and the device pixel ratio. */
+export type PixelGrid = { x: number; y: number; dpr: number };
+
+/** Nearest offset from `origin` that lands on a whole device pixel. */
+function snapToDevicePixel(offset: number, origin: number, dpr: number): number {
+  return Math.round((origin + offset) * dpr) / dpr - origin;
+}
+
 /**
  * Frame-space place: scale from the content top-left, then translate so pan=0
  * centers the scaled bitmap. Do **not** use left/top 50% + translate(-50%) —
  * an absolutely positioned shrink-to-fit box with `left: 50%` gets a huge used
  * width (available space to the CB’s right edge), so %-translate + scale turns
  * a 1×1 mip into a wide rectangle stuck to a corner.
+ *
+ * The translate is snapped so the image's top-left sits on a device pixel:
+ * centring (and a frame at a fractional layout position) otherwise leaves a
+ * half-pixel offset, and Actual size would resample every texel.
  */
 export function zoomPanTransformStyle(
   panX: number,
@@ -34,9 +51,10 @@ export function zoomPanTransformStyle(
   naturalHeight: number,
   frameW: number,
   frameH: number,
+  grid: PixelGrid = { x: 0, y: 0, dpr: 1 },
 ): ZoomPanTransformStyle {
-  const tx = (frameW - naturalWidth * scale) / 2 + panX;
-  const ty = (frameH - naturalHeight * scale) / 2 + panY;
+  const tx = snapToDevicePixel((frameW - naturalWidth * scale) / 2 + panX, grid.x, grid.dpr);
+  const ty = snapToDevicePixel((frameH - naturalHeight * scale) / 2 + panY, grid.y, grid.dpr);
   return {
     transform: `translate(${String(tx)}px, ${String(ty)}px) scale(${String(scale)})`,
     transformOrigin: "0 0",
@@ -87,6 +105,8 @@ export function useZoomPan(
   const frameRef = ref<HTMLElement | null>(null);
   // content-box matches the absolute inset-0 child’s containing block (no padding).
   const { width: frameW, height: frameH } = useElementSize(frameRef);
+  const { left: frameLeft, top: frameTop } = useElementBounding(frameRef);
+  const { pixelRatio } = useDevicePixelRatio();
 
   const zoomMode = sharedZoomMode;
   const manualScale = sharedManualScale;
@@ -133,8 +153,10 @@ export function useZoomPan(
     return `${String(naturalWidth.value)}×${String(naturalHeight.value)} · ${String(pct)}%`;
   });
 
-  const transformStyle = computed((): ZoomPanTransformStyle =>
-    zoomPanTransformStyle(
+  const transformStyle = computed((): ZoomPanTransformStyle => {
+    // Layers are positioned in the padding box, inside the frame's border.
+    const frame = frameRef.value;
+    return zoomPanTransformStyle(
       panX.value,
       panY.value,
       scale.value,
@@ -142,8 +164,13 @@ export function useZoomPan(
       naturalHeight.value,
       frameW.value,
       frameH.value,
-    ),
-  );
+      {
+        x: frameLeft.value + (frame?.clientLeft ?? 0),
+        y: frameTop.value + (frame?.clientTop ?? 0),
+        dpr: pixelRatio.value,
+      },
+    );
+  });
 
   function clampScale(value: number): number {
     return Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
