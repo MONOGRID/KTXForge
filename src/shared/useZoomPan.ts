@@ -2,6 +2,7 @@ import { useElementSize, useEventListener } from "@vueuse/core";
 import {
   computed,
   ref,
+  watch,
   type ComputedRef,
   type Ref,
 } from "vue";
@@ -12,6 +13,35 @@ const MAX_SCALE = 64;
 
 /** Sticky View sizing rule until the user picks another or zooms freely. */
 export type ZoomMode = "fit" | "actual" | "manual";
+
+export type ZoomPanTransformStyle = {
+  transform: string;
+  transformOrigin: "0 0";
+};
+
+/**
+ * Frame-space place: scale from the content top-left, then translate so pan=0
+ * centers the scaled bitmap. Do **not** use left/top 50% + translate(-50%) —
+ * an absolutely positioned shrink-to-fit box with `left: 50%` gets a huge used
+ * width (available space to the CB’s right edge), so %-translate + scale turns
+ * a 1×1 mip into a wide rectangle stuck to a corner.
+ */
+export function zoomPanTransformStyle(
+  panX: number,
+  panY: number,
+  scale: number,
+  naturalWidth: number,
+  naturalHeight: number,
+  frameW: number,
+  frameH: number,
+): ZoomPanTransformStyle {
+  const tx = (frameW - naturalWidth * scale) / 2 + panX;
+  const ty = (frameH - naturalHeight * scale) / 2 + panY;
+  return {
+    transform: `translate(${String(tx)}px, ${String(ty)}px) scale(${String(scale)})`,
+    transformOrigin: "0 0",
+  };
+}
 
 /**
  * Window-scoped sticky zoom. Survives ImageViewport remounts (e.g. depth
@@ -32,7 +62,7 @@ export type ZoomPanApi = {
   panY: Ref<number>;
   dragging: Ref<boolean>;
   sizeLabel: ComputedRef<string | null>;
-  transformStyle: ComputedRef<{ transform: string }>;
+  transformStyle: ComputedRef<ZoomPanTransformStyle>;
   zoomIn: () => void;
   zoomOut: () => void;
   zoomActual: () => void;
@@ -55,6 +85,7 @@ export function useZoomPan(
   canInteract: () => boolean,
 ): ZoomPanApi {
   const frameRef = ref<HTMLElement | null>(null);
+  // content-box matches the absolute inset-0 child’s containing block (no padding).
   const { width: frameW, height: frameH } = useElementSize(frameRef);
 
   const zoomMode = sharedZoomMode;
@@ -102,9 +133,17 @@ export function useZoomPan(
     return `${String(naturalWidth.value)}×${String(naturalHeight.value)} · ${String(pct)}%`;
   });
 
-  const transformStyle = computed((): { transform: string } => ({
-    transform: `translate(${String(panX.value)}px, ${String(panY.value)}px) scale(${String(scale.value)})`,
-  }));
+  const transformStyle = computed((): ZoomPanTransformStyle =>
+    zoomPanTransformStyle(
+      panX.value,
+      panY.value,
+      scale.value,
+      naturalWidth.value,
+      naturalHeight.value,
+      frameW.value,
+      frameH.value,
+    ),
+  );
 
   function clampScale(value: number): number {
     return Math.min(MAX_SCALE, Math.max(MIN_SCALE, value));
@@ -124,6 +163,18 @@ export function useZoomPan(
     zoomMode.value = "actual";
     resetPan();
   }
+
+  // Fit/Actual mean centered for *this* content. Clear stale pan on size jumps
+  // (e.g. 5×4 → 2×2) so letterboxing changes don’t look like a ratio bug.
+  watch(
+    [naturalWidth, naturalHeight],
+    () => {
+      if (zoomMode.value === "fit" || zoomMode.value === "actual") {
+        resetPan();
+      }
+    },
+    { flush: "sync" },
+  );
 
   function zoomAt(nextScale: number, originX: number, originY: number): void {
     const frame = frameRef.value;

@@ -91,6 +91,19 @@ const canvasStyle = computed((): { width: string; height: string } | undefined =
   };
 });
 
+/** Transform layer: pinned top-left with explicit content size (never shrink-to-fit). */
+const layerStyle = computed((): Record<string, string> => {
+  const base = transformStyle.value;
+  if (canvasStyle.value === undefined) {
+    return base;
+  }
+  return {
+    ...base,
+    width: canvasStyle.value.width,
+    height: canvasStyle.value.height,
+  };
+});
+
 /** Full-frame width for the clipped left layer so its transform matches the right. */
 const revealInnerStyle = computed((): { width: string } => ({
   width: `${String(Math.max(frameW.value, 1))}px`,
@@ -320,20 +333,17 @@ onUnmounted(() => {
       {{ emptyLabel }}
     </div>
 
-    <!-- Single image: transform lives on the image stack -->
+    <!-- Single image: origin 0 0 + frame-space translate centers Fit/Actual -->
     <div
       v-else-if="!comparing || !compareSrc"
-      class="absolute inset-0 flex items-center justify-center"
+      class="absolute inset-0 overflow-hidden"
       :class="{ 'opacity-0': !imageSized }"
     >
       <div
-        class="will-change-transform"
-        :style="transformStyle"
+        class="absolute top-0 left-0 will-change-transform"
+        :style="layerStyle"
       >
-        <div
-          class="checkerboard relative"
-          :style="canvasStyle"
-        >
+        <div class="checkerboard relative size-full">
           <img
             :src="src"
             :alt="alt"

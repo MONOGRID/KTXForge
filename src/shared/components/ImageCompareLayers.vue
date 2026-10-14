@@ -1,12 +1,15 @@
 <script setup lang="ts">
-withDefaults(
+import { computed } from "vue";
+import type { ZoomPanTransformStyle } from "../useZoomPan";
+
+const props = withDefaults(
   defineProps<{
     src: string;
     compareSrc: string;
     alt: string;
     compareAlt: string;
     splitPct: number;
-    transformStyle: { transform: string };
+    transformStyle: ZoomPanTransformStyle;
     canvasStyle: { width: string; height: string } | undefined;
     revealInnerStyle: { width: string };
     originalLabel: string;
@@ -24,6 +27,18 @@ const emit = defineEmits<{
   splitPointerMove: [event: PointerEvent];
   splitPointerUp: [event: PointerEvent];
 }>();
+
+const layerStyle = computed((): Record<string, string> => {
+  const base = props.transformStyle;
+  if (props.canvasStyle === undefined) {
+    return base;
+  }
+  return {
+    ...base,
+    width: props.canvasStyle.width,
+    height: props.canvasStyle.height,
+  };
+});
 </script>
 
 <template>
@@ -31,15 +46,12 @@ const emit = defineEmits<{
     Compare wipe in *frame* space: both layers share the same transform, but the
     original is revealed through a left strip whose width is splitPct of the frame.
   -->
-  <div class="absolute inset-0 flex items-center justify-center overflow-hidden">
+  <div class="absolute inset-0 overflow-hidden">
     <div
-      class="will-change-transform"
-      :style="transformStyle"
+      class="absolute top-0 left-0 will-change-transform"
+      :style="layerStyle"
     >
-      <div
-        class="checkerboard relative"
-        :style="canvasStyle"
-      >
+      <div class="checkerboard relative size-full">
         <img
           :src="compareSrc"
           :alt="compareAlt"
@@ -57,17 +69,14 @@ const emit = defineEmits<{
     :style="{ width: `${String(splitPct)}%` }"
   >
     <div
-      class="absolute top-0 left-0 flex h-full items-center justify-center"
+      class="absolute top-0 left-0 h-full"
       :style="revealInnerStyle"
     >
       <div
-        class="will-change-transform"
-        :style="transformStyle"
+        class="absolute top-0 left-0 will-change-transform"
+        :style="layerStyle"
       >
-        <div
-          class="checkerboard relative"
-          :style="canvasStyle"
-        >
+        <div class="checkerboard relative size-full">
           <img
             :src="src"
             :alt="alt"
