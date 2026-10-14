@@ -91,6 +91,14 @@ fn suppress_encoder_window(app: &AppHandle, suppress: SuppressMain) {
         }
     };
     if drop {
+        // Detach the app menu before destroy. On Windows, DestroyWindow frees the
+        // window's HMENU; on GTK, tearing down the window destroys the menubar
+        // widgets. Either way the shared app-wide Menu becomes unusable and the
+        // inspector that opens next would have no menu bar.
+        #[cfg(desktop)]
+        {
+            let _ = main.remove_menu();
+        }
         let _ = main.destroy();
     }
 }

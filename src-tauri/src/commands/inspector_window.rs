@@ -66,6 +66,11 @@ pub async fn open_inspector_path(
         .build()
         .map_err(|e| AppError::io(format!("create inspector window: {e}")))?;
 
+    // Cold OS-open destroys hidden `main` first; if that tore down the shared
+    // native menu, the inspector would otherwise open with no menu bar.
+    #[cfg(desktop)]
+    crate::menu::ensure_app_menu_on_window(app, &window);
+
     // Fresh window may miss the first emit if listeners are not ready yet; it also
     // loads via `inspector_current_file` on mount.
     let _ = window.emit(INSPECTOR_FILE, payload);

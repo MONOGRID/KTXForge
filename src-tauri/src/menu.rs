@@ -1,6 +1,6 @@
 //! Native application menu (File / View / Help, plus macOS app/Edit menus).
 
-use tauri::{AppHandle, Emitter};
+use tauri::{AppHandle, Emitter, WebviewWindow};
 
 use crate::commands::encoder;
 use crate::error::AppError;
@@ -104,6 +104,40 @@ pub fn app_menu(app: &AppHandle) -> tauri::Result<tauri::menu::Menu<tauri::Wry>>
 
     #[cfg(not(target_os = "macos"))]
     Menu::with_items(app, &[&file, &view, &help])
+}
+
+/// After a cold OS-open destroys `main`, ensure `window` has a working app menu.
+///
+/// macOS keeps an app-wide menu bar, so this is a no-op there. On Windows/Linux
+/// the menu is per-window. When `main` is gone we always rebuild via
+/// [`AppHandle::set_menu`]: muda init errors are swallowed at window creation, so
+/// `window.menu()` can look set even when the native bar never attached (or was
+/// disposed with `main`).
+#[cfg(desktop)]
+pub fn ensure_app_menu_on_window(app: &AppHandle, window: &WebviewWindow) {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = (app, window);
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        use tauri::Manager;
+
+        // Encoder still up: only fill in a missing bar (warm inspector open).
+        if app.get_webview_window("main").is_some() {
+            if window.menu().is_some() {
+                return;
+            }
+        }
+        match app_menu(app) {
+            Ok(menu) => {
+                if let Err(e) = app.set_menu(menu) {
+                    eprintln!("set app menu on window: {e}");
+                }
+            }
+            Err(e) => eprintln!("build app menu: {e}"),
+        }
+    }
 }
 
 #[cfg(desktop)]
