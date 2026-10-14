@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, watch } from "vue";
-import { report, selection } from "../../store";
+import { cubemapViewMode, report, selection } from "../../store";
 
 const FACE_LABELS = [
   "+X",
@@ -75,8 +75,21 @@ const depthMax = computed((): number =>
   Math.max(0, (dims.value?.depthCount ?? 1) - 1),
 );
 
+function selectCross(): void {
+  cubemapViewMode.value = "cross";
+}
+
 function selectFace(face: number): void {
+  cubemapViewMode.value = "face";
   selection.value.face = face;
+}
+
+const crossActive = computed(
+  (): boolean => cubemapViewMode.value === "cross",
+);
+
+function faceActive(face: number): boolean {
+  return cubemapViewMode.value === "face" && selection.value.face === face;
 }
 
 function onLayerInput(event: Event): void {
@@ -122,12 +135,21 @@ watch(
       </span>
       <div class="flex min-w-0 flex-wrap gap-1">
         <button
+          type="button"
+          class="btn text-xs"
+          :class="{ 'btn-primary': crossActive }"
+          :aria-pressed="crossActive"
+          @click="selectCross"
+        >
+          Cross
+        </button>
+        <button
           v-for="(label, index) in FACE_LABELS"
           :key="label"
           type="button"
           class="btn font-mono text-xs"
-          :class="{ 'btn-primary': selection.face === index }"
-          :aria-pressed="selection.face === index"
+          :class="{ 'btn-primary': faceActive(index) }"
+          :aria-pressed="faceActive(index)"
           :disabled="dims !== null && index >= dims.faceCount"
           @click="selectFace(index)"
         >

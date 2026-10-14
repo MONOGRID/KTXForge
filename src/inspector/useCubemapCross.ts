@@ -63,13 +63,16 @@ async function resolveFaceUrls(
 }
 
 /**
- * Composites every face of a cubemap into the shared classic cross layout
- * (same canvas path as encoder Preview).
+ * When view mode is `"cross"`, composites every face into the shared classic
+ * cross layout (same canvas path as encoder Preview). Single-face mode leaves
+ * the flat viewport to load one extract.
  */
 export function useCubemapCross(args: {
   path: Ref<string | null>;
   report: Ref<InspectReport | null>;
   selection: Ref<ImageSelection>;
+  /** `"cross"` shows the composite; `"face"` shows a single face instead. */
+  cubemapViewMode: Ref<"cross" | "face">;
   previewUnavailable: Ref<string | null>;
   /** Depth volume wins when both could apply. */
   showDepthVolume: Ref<boolean>;
@@ -96,7 +99,8 @@ export function useCubemapCross(args: {
     (): boolean =>
       args.previewUnavailable.value === null &&
       !args.showDepthVolume.value &&
-      faceCount.value > 1,
+      faceCount.value > 1 &&
+      args.cubemapViewMode.value === "cross",
   );
 
   function clearCross(): void {
@@ -205,6 +209,7 @@ export function useCubemapCross(args: {
         args.selection.value.layer,
         args.selection.value.depthSlice,
         faceCount.value,
+        args.cubemapViewMode.value,
         args.showDepthVolume.value,
         args.previewUnavailable.value,
       ] as const,

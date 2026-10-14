@@ -24,6 +24,14 @@ export const report = shallowRef<InspectReport | null>(null);
 export const selection = ref<ImageSelection>({ ...DEFAULT_SELECTION });
 export const loading = ref(false);
 
+/**
+ * Cubemap viewport mode when `faceCount > 1`.
+ * `"cross"` shows the classic composite; `"face"` shows `selection.face` alone.
+ * Mutually exclusive with the Face / Cross toolbar buttons.
+ */
+export type CubemapViewMode = "cross" | "face";
+export const cubemapViewMode = ref<CubemapViewMode>("cross");
+
 /** Vertical flip for inspector previews (KTX/OpenGL-style origin). Default on. */
 export const flipY = useLocalStorage("ktxforge.inspector.flipY", false);
 
@@ -87,6 +95,7 @@ async function loadPath(nextPath: string): Promise<void> {
   try {
     report.value = await call("inspect", { path: nextPath });
     selection.value = { ...DEFAULT_SELECTION };
+    cubemapViewMode.value = "cross";
   } catch (err: unknown) {
     report.value = null;
     void alertAppError(toAppError(err));

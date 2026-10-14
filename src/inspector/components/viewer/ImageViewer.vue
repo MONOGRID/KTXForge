@@ -15,7 +15,7 @@ import {
   warmInspectorMipChain,
   type SubresourceDims,
 } from "../../imageCache";
-import { flipY, path, report, selection } from "../../store";
+import { cubemapViewMode, flipY, path, report, selection } from "../../store";
 import { useCubemapCross } from "../../useCubemapCross";
 import { useDepthVolume } from "../../useDepthVolume";
 
@@ -91,6 +91,7 @@ const {
   path,
   report,
   selection,
+  cubemapViewMode,
   previewUnavailable,
   showDepthVolume,
   preparePath,
@@ -332,7 +333,7 @@ function onSelectionChange(): void {
   preparePath(filePath);
 
   if (previewUnavailable.value !== null || showCubemapCross.value) {
-    // Cubemap preview is the shared cross; face buttons only affect export selection.
+    // Cross mode uses the shared composite; single-face mode loads a flat extract.
     clearFlatPreview();
     return;
   }
