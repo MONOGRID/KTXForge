@@ -33,15 +33,26 @@ pub fn cold_ktx_from_argv() -> bool {
 /// How aggressively to drop the encoder window when opening a KTX from the OS.
 #[derive(Clone, Copy)]
 enum SuppressMain {
-    /// Only if still hidden (Linux/Windows argv cold start after skip-restore).
+    /// Warm single-instance: only drop a never-shown zombie `main`.
     IfHidden,
-    /// Also if the app just launched (macOS `Opened` after window-state showed main).
+    /// Cold viewer launch: always drop `main` so only the inspector appears.
+    Always,
+    /// macOS `Opened`: always within launch grace, else if hidden.
     #[cfg(target_os = "macos")]
     IfHiddenOrLaunchGrace,
 }
 
-/// Open the first KTX path from argv-like strings (executable already skipped by caller).
-pub fn open_from_args<I, S>(app: &AppHandle, args: I)
+/// Cold start: argv named a KTX — destroy encoder and open inspector only.
+pub fn open_from_args_cold<I, S>(app: &AppHandle, args: I)
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<str>,
+{
+    open_ktx_paths(app, ktx_paths_from_open_args(args), SuppressMain::Always);
+}
+
+/// Warm single-instance activation: open inspector; leave a visible encoder alone.
+pub fn open_from_args_warm<I, S>(app: &AppHandle, args: I)
 where
     I: IntoIterator<Item = S>,
     S: AsRef<str>,
@@ -81,6 +92,7 @@ fn suppress_encoder_window(app: &AppHandle, suppress: SuppressMain) {
     };
     let visible = main.is_visible().unwrap_or(false);
     let drop = match suppress {
+        SuppressMain::Always => true,
         SuppressMain::IfHidden => !visible,
         #[cfg(target_os = "macos")]
         SuppressMain::IfHiddenOrLaunchGrace => {

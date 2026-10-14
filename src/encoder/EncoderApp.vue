@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/resizable";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { call } from "../api/commands";
 import { subscribe } from "../api/events";
 import { toAppError } from "../api/guards";
 import {
@@ -51,9 +52,6 @@ onMounted(() => {
   unbindMenu = bindEncoderMenu();
   unbindShortcuts = bindMenuShortcuts();
   unbindZoomFocus = bindMenuZoomFocusGate();
-  void initStore().catch((err: unknown) => {
-    void alertAppError(toAppError(err));
-  });
   stopDrops.push(
     subscribe("encoder://sources-added", (sources) => {
       void handleDroppedSources(sources, consumeCommittedDropZone());
@@ -66,6 +64,17 @@ onMounted(() => {
       void alertInvalidInput(`${payload.reason}${paths}`);
     }),
   );
+  void (async () => {
+    try {
+      await initStore();
+      const pending = await call("take_pending_encoder_sources", {});
+      if (pending !== null && pending.length > 0) {
+        await handleDroppedSources(pending, null);
+      }
+    } catch (err: unknown) {
+      void alertAppError(toAppError(err));
+    }
+  })();
 });
 
 onUnmounted(() => {

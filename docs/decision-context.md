@@ -595,3 +595,15 @@ elease.yml sets `lfs: true`. After converting blobs to pointers, push LFS object
 **Decided:** Inspector previews (flat viewport, depth volume slices, cubemap cross via the same viewport) apply a CSS vertical flip by default. A **Flip Y** switch in the Viewer header toggles it; the value is stored with VueUse `useLocalStorage` (`ktxforge.inspector.flipY`). Encoder previews stay unflipped. Export is unchanged (no display flip baked in). Spec: [requirements.md](requirements.md).
 
 **Why:** KTX samples often assume a bottom-left origin; without Flip Y the inspector looked upside-down relative to engines. A persistent switch covers top-left assets without making export surprising.
+
+## 2026-10-14 — File → Open images restores encoder
+
+**Decided:** File → Open… that returns images always shows and focuses the encoder window. If cold OS-open had destroyed `main`, Rust recreates it (`encoder_window::deliver_sources`) and queues sources in `PendingEncoderSources` for `take_pending_encoder_sources` on mount (same miss-first-emit pattern as `inspector_current_file`). When `main` already exists, Open shows/unminimizes/focuses it and emits `encoder://sources-added` as before. KTX picks from Open still only open the inspector. Extends the 2026-10-13 “OS open KTX is inspector-only” entry. Spec: [requirements.md](requirements.md).
+
+**Why:** After an inspector-only cold start, Open emitted sources with no encoder listener, so picking a PNG from the inspector File menu did nothing.
+
+## 2026-10-14 — Cold OS-open always destroys encoder
+
+**Decided:** Split OS-open suppress modes: `open_from_args_cold` (setup argv) always destroys `main` before opening the inspector, even if window-state already showed it; `open_from_args_warm` (single-instance) still only drops a hidden zombie and leaves a visible encoder alone. macOS `Opened` keeps the 2s launch-grace destroy. Launch-time `OnceLock` is recorded on every desktop OS (not only macOS). Does not change File → Open image restore. Replaces the “only if still hidden” cold path in the 2026-10-13 inspector-only entry. Spec: [requirements.md](requirements.md).
+
+**Why:** Cold suppress used `IfHidden`; when window-state restored `VISIBLE` before argv handling (or `cold_ktx_from_argv` filter missed), the encoder stayed up beside the inspector. Always-destroy on cold keeps Viewer association inspector-only while File → Open can still recreate `main` later.

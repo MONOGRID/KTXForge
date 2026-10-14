@@ -15,6 +15,7 @@ mod updater;
 mod window_bounds;
 mod workspace;
 
+use commands::encoder_window::PendingEncoderSources;
 use state::{AppState, PendingUpdate};
 use tauri::Manager;
 
@@ -36,7 +37,8 @@ pub fn run() {
                     let _ = window.set_focus();
                 }
             }
-            os_open::open_from_args(app, rest);
+            // Warm: leave a visible encoder alone; still drop a hidden zombie main.
+            os_open::open_from_args_warm(app, rest);
         }));
     }
 
@@ -51,6 +53,7 @@ pub fn run() {
         .plugin(tauri_plugin_process::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .manage(AppState::default())
+        .manage(PendingEncoderSources::default())
         .manage(PendingUpdate::default())
         .on_window_event(|window, event| {
             drop::on_window_event(window, event);
@@ -91,8 +94,9 @@ pub fn run() {
             window_bounds::restore_open_windows(app.handle());
             updater::setup_updater(app.handle());
             // Windows / Linux cold start: OS passes the path on argv.
+            // Always destroy `main` so Viewer association is inspector-only.
             #[cfg(desktop)]
-            os_open::open_from_args(app.handle(), std::env::args().skip(1));
+            os_open::open_from_args_cold(app.handle(), std::env::args().skip(1));
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -115,6 +119,7 @@ pub fn run() {
             commands::encode::encoded_preview,
             commands::encode::save_encoded,
             commands::encode::save_encoded_batch,
+            commands::encoder_window::take_pending_encoder_sources,
             commands::inspector_window::open_inspector,
             commands::inspector_window::inspector_current_file,
             commands::inspect::inspect,

@@ -2,11 +2,9 @@
 
 use tauri::{AppHandle, Emitter, WebviewWindow};
 
-use crate::commands::encoder;
+use crate::commands::{encoder, encoder_window};
 use crate::error::AppError;
-use crate::events::{
-    DropRejectedPayload, MenuAction, ENCODER_DROP_REJECTED, ENCODER_SOURCES_ADDED, MENU_ACTION,
-};
+use crate::events::{DropRejectedPayload, MenuAction, ENCODER_DROP_REJECTED, MENU_ACTION};
 use crate::updater;
 
 /// Menu item ids (also used by `set_menu_item_enabled`).
@@ -124,10 +122,8 @@ pub fn ensure_app_menu_on_window(app: &AppHandle, window: &WebviewWindow) {
         use tauri::Manager;
 
         // Encoder still up: only fill in a missing bar (warm inspector open).
-        if app.get_webview_window("main").is_some() {
-            if window.menu().is_some() {
-                return;
-            }
+        if app.get_webview_window("main").is_some() && window.menu().is_some() {
+            return;
         }
         match app_menu(app) {
             Ok(menu) => {
@@ -157,7 +153,15 @@ pub fn handle_menu_id(app: &AppHandle, item: &str) {
         tauri::async_runtime::spawn(async move {
             match encoder::pick_sources(app.clone()).await {
                 Ok(sources) if !sources.is_empty() => {
-                    let _ = app.emit(ENCODER_SOURCES_ADDED, sources);
+                    if let Err(e) = encoder_window::deliver_sources(&app, sources).await {
+                        let _ = app.emit(
+                            ENCODER_DROP_REJECTED,
+                            DropRejectedPayload {
+                                paths: Vec::new(),
+                                reason: e.to_string(),
+                            },
+                        );
+                    }
                 }
                 Ok(_) => {}
                 Err(e) => {

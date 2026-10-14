@@ -63,6 +63,10 @@ export type Commands = {
     args: { jobIds: string[] };
     result: number | null;
   };
+  take_pending_encoder_sources: {
+    args: EmptyArgs;
+    result: SourceInfo[] | null;
+  };
   open_inspector: { args: { path: string }; result: null };
   inspector_current_file: { args: EmptyArgs; result: string | null };
   inspect: { args: { path: string }; result: InspectReport };

@@ -1,6 +1,7 @@
 pub mod app;
 pub mod encode;
 pub mod encoder;
+pub mod encoder_window;
 pub mod export;
 pub mod inspect;
 pub mod inspector_window;
