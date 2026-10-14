@@ -331,7 +331,7 @@ onUnmounted(() => {
         :style="transformStyle"
       >
         <div
-          class="checkerboard relative inline-block"
+          class="checkerboard relative"
           :style="canvasStyle"
         >
           <img
