@@ -3,7 +3,7 @@
 Before choosing or changing an approach for this app, read these:
 
 - [docs/requirements.md](docs/requirements.md) is the product spec.
-- [docs/decision-context.md](docs/decision-context.md) is the decision log. Read every entry. When a decision is made, append a dated entry there (date, what was decided, why) and leave earlier entries in place.
+- [docs/decision-context.md](docs/decision-context.md) is the architectural decision log. Read every entry. Log only architectural choices and constraints that explain the code, not individual fixes or UI tweaks (those go in the git log). When a decision changes an existing entry, update that entry and add a dated line to its **Revised** list; otherwise append a new dated entry (date, what was decided, why).
 
 ## Where work lives
 

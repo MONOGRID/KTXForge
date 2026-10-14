@@ -316,7 +316,7 @@ When `pixelDepth` at the selected mip is greater than 1, the inspector shows the
 
 ### Cubemap cross preview
 
-When `faceCount` is greater than 1, the inspector shows the same classic face **cross** composite as the encoder Preview (shared `composeCubemapCross`). Face buttons still set the export / subresource selection; the viewport stays on the full cross.
+When `faceCount` is greater than 1, the inspector Face toolbar offers **Cross** or a single face (`+X` … `−Z`). Those choices are mutually exclusive: **Cross** shows the same classic face composite as the encoder Preview (shared `composeCubemapCross`); a face button shows only that face and sets the export / subresource selection. Opening a file defaults to Cross.
 
 ### Multi-frame
 
