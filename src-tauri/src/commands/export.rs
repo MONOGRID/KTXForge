@@ -8,7 +8,7 @@ use crate::commands::{ExportFormat, ExportRequest, ExportResult, ExportSelection
 use crate::dialog;
 use crate::error::AppError;
 use crate::image::export::png_to_jpeg;
-use crate::ktx::extract_args::expected_output_name;
+use crate::ktx::extract_args::{expected_output_name, Dims};
 use crate::ktx::extract_ops::{ensure_ktx2, run_extract, texture_meta_via_info, TextureMeta};
 use crate::ktx::info_types::{ImageSelection, PreviewKind};
 use crate::ktx::sidecar::CancellationHandle;
@@ -95,37 +95,7 @@ pub async fn export_to(
         .unwrap_or("output");
 
     let dims = meta.dims;
-    let (selections, dest_is_file): (Vec<ImageSelection>, bool) = match selection {
-        ExportSelection::One { selection } => (vec![selection.clone()], true),
-        ExportSelection::AllFrames { level } => (
-            (0..dims.layers)
-                .map(|layer| ImageSelection {
-                    level: *level,
-                    layer,
-                    ..Default::default()
-                })
-                .collect(),
-            false,
-        ),
-        ExportSelection::All => {
-            let mut all = Vec::new();
-            for level in 0..dims.levels {
-                for face in 0..dims.faces {
-                    for layer in 0..dims.layers {
-                        for depth_slice in 0..dims.depth {
-                            all.push(ImageSelection {
-                                level,
-                                face,
-                                layer,
-                                depth_slice,
-                            });
-                        }
-                    }
-                }
-            }
-            (all, false)
-        }
-    };
+    let (selections, dest_is_file) = expand_export_selections(selection, dims);
     if !dest_is_file {
         if dest.is_file() {
             return Err(AppError::invalid_input(
@@ -312,12 +282,85 @@ async fn copy_out(src: &Path, dest: &Path) -> Result<(), AppError> {
         .map_err(|e| AppError::io(format!("{}: {e}", dest.display())))
 }
 
+/// Expand an export scope into concrete image selections.
+///
+/// `AllFrames` keeps the mip level fixed and walks every face × layer × depth
+/// at that level (cubemap faces, animation frames / array layers, 3D slices).
+fn expand_export_selections(
+    selection: &ExportSelection,
+    dims: Dims,
+) -> (Vec<ImageSelection>, bool) {
+    match selection {
+        ExportSelection::One { selection } => (vec![selection.clone()], true),
+        ExportSelection::AllFrames { level } => {
+            (collect_subresources(*level..*level + 1, dims), false)
+        }
+        ExportSelection::All => (collect_subresources(0..dims.levels, dims), false),
+    }
+}
+
+fn collect_subresources(levels: impl IntoIterator<Item = u32>, dims: Dims) -> Vec<ImageSelection> {
+    let mut out = Vec::new();
+    for level in levels {
+        for face in 0..dims.faces {
+            for layer in 0..dims.layers {
+                for depth_slice in 0..dims.depth {
+                    out.push(ImageSelection {
+                        level,
+                        face,
+                        layer,
+                        depth_slice,
+                    });
+                }
+            }
+        }
+    }
+    out
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use crate::ktx::extract_args::{build_extract_args, Dims};
     use crate::test_support::{fixtures, staged_ktx};
     use std::process::Command;
+
+    #[test]
+    fn all_frames_at_level_includes_every_cubemap_face() {
+        let dims = Dims::from_ktx2_counts(2, 6, 0, 0);
+        let (sels, dest_is_file) =
+            expand_export_selections(&ExportSelection::AllFrames { level: 1 }, dims);
+        assert!(!dest_is_file);
+        assert_eq!(sels.len(), 6);
+        assert!(sels
+            .iter()
+            .all(|s| s.level == 1 && s.layer == 0 && s.depth_slice == 0));
+        let faces: Vec<u32> = sels.iter().map(|s| s.face).collect();
+        assert_eq!(faces, vec![0, 1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn all_frames_at_level_includes_array_layers() {
+        let dims = Dims::from_ktx2_counts(1, 1, 4, 0);
+        let (sels, _) = expand_export_selections(&ExportSelection::AllFrames { level: 0 }, dims);
+        assert_eq!(sels.len(), 4);
+        assert_eq!(
+            sels.iter().map(|s| s.layer).collect::<Vec<_>>(),
+            vec![0, 1, 2, 3]
+        );
+    }
+
+    #[test]
+    fn all_walks_every_level_face_layer_depth() {
+        let dims = Dims {
+            levels: 2,
+            faces: 2,
+            layers: 2,
+            depth: 2,
+        };
+        let (sels, _) = expand_export_selections(&ExportSelection::All, dims);
+        assert_eq!(sels.len(), 2 * 2 * 2 * 2);
+    }
 
     #[test]
     fn export_anim_frames_as_jpeg_via_staged_binary() {

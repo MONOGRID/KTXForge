@@ -20,16 +20,40 @@ type ScopeKind = "one" | "allFrames" | "all";
 type FormatKind = "png" | "jpeg" | "exr";
 
 const SCOPE_OPTIONS = [
-  { value: "one", label: "Current image" },
-  { value: "allFrames", label: "All frames at current level" },
-  { value: "all", label: "Everything" },
-] as const satisfies ReadonlyArray<{ value: ScopeKind; label: string }>;
+  {
+    value: "one",
+    label: "Current image",
+    help: "Save only the image currently shown (selected mip, face, layer, and depth) as a single file.",
+  },
+  {
+    value: "allFrames",
+    label: "All frames at current level",
+    help: "At the selected mip level, write every face, array layer, and depth slice as separate files into a folder. Cubemap → all six faces; animation/array → every frame; 3D → every depth slice.",
+  },
+  {
+    value: "all",
+    label: "Everything",
+    help: "Write every mip level, face, array layer, and depth slice as separate files into a folder.",
+  },
+] as const satisfies ReadonlyArray<EnumSelectOption & { value: ScopeKind }>;
 
 const FORMAT_OPTIONS = [
-  { value: "png", label: "PNG" },
-  { value: "jpeg", label: "JPEG" },
-  { value: "exr", label: "EXR" },
-] as const satisfies ReadonlyArray<{ value: FormatKind; label: string }>;
+  {
+    value: "png",
+    label: "PNG",
+    help: "Lossless LDR. One PNG per selected image.",
+  },
+  {
+    value: "jpeg",
+    label: "JPEG",
+    help: "Lossy LDR. Quality is set by Q. One JPEG per selected image.",
+  },
+  {
+    value: "exr",
+    label: "EXR",
+    help: "OpenEXR float. Use for HDR or any format that cannot be written as PNG/JPEG.",
+  },
+] as const satisfies ReadonlyArray<EnumSelectOption & { value: FormatKind }>;
 
 const HDR_LDR_REASON =
   "HDR data is extracted as EXR; PNG and JPEG are not available";
