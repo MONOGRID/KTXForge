@@ -25,7 +25,7 @@ export const selection = ref<ImageSelection>({ ...DEFAULT_SELECTION });
 export const loading = ref(false);
 
 /** Vertical flip for inspector previews (KTX/OpenGL-style origin). Default on. */
-export const flipY = useLocalStorage("ktxforge.inspector.flipY", true);
+export const flipY = useLocalStorage("ktxforge.inspector.flipY", false);
 
 export const ktx2Info = computed((): Ktx2Info | null => {
   const current = report.value;
