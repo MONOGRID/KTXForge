@@ -5,10 +5,20 @@ description = "KTXForge — desktop GUI for KTX encode and inspect"
 authors = ["MONOGRID"]
 license = "MIT"
 edition = "2021"
+default-run = "ktxforge"
 
 [lib]
 name = "ktxforge_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
+
+[features]
+# Headless driver for the end-to-end suite (`npm run e2e`); never in release builds.
+e2e = ["tauri/test", "dep:base64"]
+
+[[bin]]
+name = "ktxforge-e2e"
+path = "src/bin/ktxforge-e2e.rs"
+required-features = ["e2e"]
 
 [package.metadata.cargo-machete]
 # build-dependencies are invisible to machete's graph; keep the Tauri build script linked.
@@ -45,6 +55,7 @@ uuid = { version = "1", features = ["v4"] }
 tokio = { version = "1", features = ["sync", "fs", "process", "time", "macros", "rt"] }
 tauri-plugin-notification = "2"
 tauri-plugin-wayland-nvidia-quirk = "0.1.0"
+base64 = { version = "0.22", optional = true }
 
 [profile.release]
 codegen-units = 1

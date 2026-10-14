@@ -9,16 +9,19 @@
     "check": "npm run check:rust && npm run check:web && npm run check:fallow",
     "check:fallow": "fallow dead-code --fail-on-issues && fallow dupes --threshold 3 && fallow health --min-score 85 --min-severity high",
     "precheck:rust": "npm run ensure-tools && npm run fetch-ktx",
-    "check:rust": "cargo fmt --check --manifest-path src-tauri/Cargo.toml && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml && cargo machete --with-metadata src-tauri",
-    "check:web": "npm run build && npm run lint && npm run lint:style && npm run test",
+    "check:rust": "cargo fmt --check --manifest-path src-tauri/Cargo.toml && cargo clippy --manifest-path src-tauri/Cargo.toml --all-targets --all-features -- -D warnings && cargo test --manifest-path src-tauri/Cargo.toml && cargo machete --with-metadata src-tauri",
+    "check:web": "npm run build && npm run typecheck:e2e && npm run lint && npm run lint:style && npm run test",
     "dev": "vite",
+    "pree2e": "npm run fetch-ktx",
+    "e2e": "playwright test -c e2e/playwright.config.ts",
     "ensure-tools": "node scripts/ensure-tools.mjs",
     "fallow": "fallow",
     "fallow:audit": "fallow audit --format json --quiet",
     "fetch-ktx": "node scripts/fetch-ktx.mjs",
     "icons": "node scripts/generate-icons.mjs",
-    "lint": "eslint src",
+    "lint": "eslint src e2e",
     "lint:style": "stylelint \"src/**/*.{css,scss,vue}\"",
+    "typecheck:e2e": "tsc -p e2e/tsconfig.json --noEmit",
     "prepare": "node scripts/prepare-git.mjs",
     "preview": "vite preview",
     "release": "semantic-release",
@@ -47,6 +50,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.1",
     "@semantic-release/changelog": "^7.0.0",
     "@semantic-release/exec": "^7.1.0",
     "@semantic-release/git": "^11.0.1",
@@ -60,6 +64,7 @@
     "globals": "^17.13.0",
     "sass": "^1.105.1",
     "semantic-release": "^25.0.9",
+    "sharp": "^0.35.5",
     "stylelint": "^17.16.0",
     "stylelint-config-recommended-vue": "^2.0.0",
     "stylelint-config-standard-scss": "^17.0.0",
@@ -71,7 +76,8 @@
     "unocss-preset-shadcn": "^1.0.1",
     "vite": "^8.3.4",
     "vitest": "^5.0.4",
-    "vue-tsc": "^3.3.13"
+    "vue-tsc": "^3.3.13",
+    "zod": "^4.6.7"
   },
   "allowScripts": {
     "@parcel/watcher@2.6.0": true

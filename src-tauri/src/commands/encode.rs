@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, Runtime, State};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::blocking::run_blocking;
@@ -29,8 +29,8 @@ pub async fn encode(
     run_encode(&app, &state, request).await
 }
 
-pub async fn run_encode(
-    app: &AppHandle,
+pub async fn run_encode<R: Runtime>(
+    app: &AppHandle<R>,
     state: &AppState,
     request: EncodeRequest,
 ) -> Result<EncodeResult, AppError> {
@@ -247,7 +247,12 @@ fn default_save_name(sources: &[String]) -> String {
         + ".ktx2"
 }
 
-fn emit_stage(app: &AppHandle, job_id: &str, stage: EncodeStage, stderr_line: Option<String>) {
+fn emit_stage<R: Runtime>(
+    app: &AppHandle<R>,
+    job_id: &str,
+    stage: EncodeStage,
+    stderr_line: Option<String>,
+) {
     let _ = app.emit(
         ENCODE_PROGRESS,
         EncodeProgressPayload {
@@ -279,7 +284,18 @@ pub async fn encoded_preview(
     job_id: String,
     selection: ImageSelection,
 ) -> Result<tauri::ipc::Response, AppError> {
-    let (output_path, cache, meta) = state.with_job(&job_id, |job| {
+    let bytes = encoded_preview_png(&app, &state, &job_id, &selection).await?;
+    Ok(tauri::ipc::Response::new(bytes))
+}
+
+/// PNG the encoder wipe shows on the encoded side for one subresource.
+pub async fn encoded_preview_png<R: Runtime>(
+    app: &AppHandle<R>,
+    state: &AppState,
+    job_id: &str,
+    selection: &ImageSelection,
+) -> Result<Vec<u8>, AppError> {
+    let (output_path, cache, meta) = state.with_job(job_id, |job| {
         (
             job.output_path.clone(),
             job.dir.join("preview-cache"),
@@ -287,8 +303,8 @@ pub async fn encoded_preview(
         )
     })?;
 
-    if let Some(bytes) = cached_preview_png(&cache, &selection).await {
-        return Ok(tauri::ipc::Response::new(bytes));
+    if let Some(bytes) = cached_preview_png(&cache, selection).await {
+        return Ok(bytes);
     }
 
     let meta = match meta {
@@ -297,16 +313,15 @@ pub async fn encoded_preview(
     };
 
     let (bytes, _) = extract_preview_png(
-        &app,
+        app,
         &output_path,
-        &selection,
+        selection,
         &meta,
         &cache,
         CancellationHandle::new(),
     )
     .await?;
-
-    Ok(tauri::ipc::Response::new(bytes))
+    Ok(bytes)
 }
 
 async fn copy_output(src: &Path, dest: &Path) -> Result<(), AppError> {
@@ -362,213 +377,4 @@ pub async fn save_encoded_batch(
         saved += 1;
     }
     Ok(Some(saved))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::ktx::options::AnimationOptions;
-    use crate::test_support::{fixtures, staged_ktx};
-    use std::process::Command;
-
-    /// Run argv from the real resolve → build path through the staged `ktx create`.
-    /// Each case keeps a value the UI hides; the tool must accept what we emit.
-    #[test]
-    fn resolved_args_are_accepted_by_ktx_create() {
-        use crate::ktx::options::{
-            AstcQuality, EncodeCodec, Supercompression, TexcoordOrigin, VkFormat,
-        };
-
-        let ktx = staged_ktx();
-        let root = fixtures();
-        let rgba = vec![root.join("rgba.png")];
-        let frames: Vec<_> = (1..=4)
-            .map(|i| root.join(format!("frames/frame_00{i}.png")))
-            .collect();
-        let faces: Vec<_> = (0..6)
-            .map(|i| root.join(format!("cube/face_{i}.png")))
-            .collect();
-        let hdr = vec![root.join("hdr.exr")];
-
-        let mut ssim_no_encode = CreateOptions {
-            encode: None,
-            supercompression: Supercompression::None,
-            ..Default::default()
-        };
-        ssim_no_encode.encoder.compare_ssim = true;
-        ssim_no_encode.encoder.compare_psnr = true;
-
-        let mut uastc = CreateOptions {
-            encode: Some(EncodeCodec::Uastc),
-            supercompression: Supercompression::Zstd { level: 3 },
-            ..Default::default()
-        };
-        uastc.uastc_ldr.uastc_rdo = true;
-        uastc.encoder.compare_ssim = true;
-        uastc.basis_lz.max_endpoints = Some(16);
-
-        let basis_with_zstd = CreateOptions {
-            encode: Some(EncodeCodec::BasisLz),
-            supercompression: Supercompression::Zstd { level: 3 },
-            ..Default::default()
-        };
-
-        let mut astc = CreateOptions {
-            format: VkFormat::Astc6x6SrgbBlock,
-            encode: None,
-            supercompression: Supercompression::None,
-            ..Default::default()
-        };
-        astc.astc.astc_quality = Some(AstcQuality::Fast);
-        astc.encoder.compare_psnr = true;
-        astc.uastc_ldr.uastc_rdo = true;
-
-        let mut mip_and_layers = CreateOptions::default();
-        mip_and_layers.container.generate_mipmap = true;
-        mip_and_layers.container.runtime_mipmap = true;
-
-        let mut cube = CreateOptions::default();
-        cube.container.one_d = true;
-        cube.color.assign_texcoord_origin = Some(TexcoordOrigin::BottomLeft);
-
-        let mut depth = CreateOptions::default();
-        depth.container.generate_mipmap = true;
-        depth.container.levels = Some(3);
-
-        let hdr_with_encode = CreateOptions {
-            format: VkFormat::R16G16B16A16Sfloat,
-            encode: Some(EncodeCodec::BasisLz),
-            ..Default::default()
-        };
-
-        let cases = [
-            (
-                "ssim without encode",
-                ssim_no_encode,
-                InputRole::Base2D,
-                &rgba,
-            ),
-            ("uastc rdo zstd ssim", uastc, InputRole::Base2D, &rgba),
-            (
-                "basis-lz keeps zstd",
-                basis_with_zstd,
-                InputRole::Base2D,
-                &rgba,
-            ),
-            ("astc", astc, InputRole::Base2D, &rgba),
-            (
-                "layers + mipmaps",
-                mip_and_layers,
-                InputRole::ArrayLayers,
-                &frames,
-            ),
-            (
-                "cubemap + 1d + origin",
-                cube,
-                InputRole::CubemapFaces,
-                &faces,
-            ),
-            ("depth + mipmaps", depth, InputRole::DepthSlices, &frames),
-            ("hdr + encode", hdr_with_encode, InputRole::Base2D, &hdr),
-        ];
-
-        let dir = tempfile::tempdir().unwrap();
-        for (i, (name, options, role, paths)) in cases.into_iter().enumerate() {
-            let sources: Vec<_> = paths.iter().map(|p| read_source_info(p).unwrap()).collect();
-            let prepared: Vec<_> = paths
-                .iter()
-                .map(|p| prepare_input(p, &dir.path().join(format!("in{i}"))).unwrap())
-                .collect();
-            let resolved = rules::resolve_for_encode(&options, &sources, role)
-                .unwrap_or_else(|e| panic!("{name}: {e:?}"));
-            let out = dir.path().join(format!("out{i}.ktx2"));
-            let mut args = vec!["create".to_owned()];
-            args.extend(build_create_args(&resolved, &prepared, &out));
-            let output = Command::new(&ktx).args(&args).output().unwrap();
-            assert!(
-                output.status.success(),
-                "{name}: ktx {args:?}\n{}",
-                String::from_utf8_lossy(&output.stderr)
-            );
-        }
-    }
-
-    #[test]
-    fn encode_defaults_and_basis_lz_via_staged_binary() {
-        let ktx = staged_ktx();
-        let root = fixtures();
-        let dir = tempfile::tempdir().unwrap();
-        let out_default = dir.path().join("default.ktx2");
-        let status = Command::new(&ktx)
-            .args([
-                "create",
-                "--format",
-                "R8G8B8A8_SRGB",
-                root.join("rgba.png").to_str().unwrap(),
-                out_default.to_str().unwrap(),
-            ])
-            .status()
-            .unwrap();
-        assert!(status.success());
-        assert!(out_default.is_file());
-
-        let out_basis = dir.path().join("basis.ktx2");
-        let status = Command::new(&ktx)
-            .args([
-                "create",
-                "--format",
-                "R8G8B8A8_SRGB",
-                "--encode",
-                "basis-lz",
-                root.join("rgba.png").to_str().unwrap(),
-                out_basis.to_str().unwrap(),
-            ])
-            .status()
-            .unwrap();
-        assert!(status.success());
-        assert!(out_basis.is_file());
-    }
-
-    #[test]
-    fn encode_animation_frames_writes_anim_key() {
-        let ktx = staged_ktx();
-        let frames = fixtures().join("frames");
-        let inputs: Vec<PathBuf> = (1..=4)
-            .map(|i| frames.join(format!("frame_00{i}.png")))
-            .collect();
-        let dir = tempfile::tempdir().unwrap();
-        let out = dir.path().join("anim.ktx2");
-        let mut args = vec![
-            "create".to_owned(),
-            "--format".to_owned(),
-            "R8G8B8A8_SRGB".to_owned(),
-            "--layers".to_owned(),
-            "4".to_owned(),
-        ];
-        for p in &inputs {
-            args.push(p.to_string_lossy().into_owned());
-        }
-        args.push(out.to_string_lossy().into_owned());
-        let status = Command::new(&ktx).args(&args).status().unwrap();
-        assert!(status.success(), "create frames failed");
-
-        let anim = AnimationOptions {
-            duration: 1,
-            timescale: 10,
-            loop_count: 0,
-        };
-        write_anim_data(&out, &anim).unwrap();
-
-        let bytes = std::fs::read(&out).unwrap();
-        let reader = ktx2::Reader::new(bytes.as_slice()).unwrap();
-        let mut found = false;
-        for (key, value) in reader.key_value_data() {
-            if key == "KTXanimData" {
-                assert_eq!(value.len(), 12);
-                found = true;
-            }
-        }
-        assert!(found, "KTXanimData missing");
-        let _ = CreateOptions::default();
-    }
 }

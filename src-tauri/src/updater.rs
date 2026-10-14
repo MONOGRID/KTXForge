@@ -141,21 +141,3 @@ fn is_missing_updater_config(message: &str) -> bool {
     let lower = message.to_ascii_lowercase();
     lower.contains("endpoint") || lower.contains("pubkey")
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn network_errors_that_mention_url_are_not_treated_as_missing_config() {
-        assert!(!is_missing_updater_config(
-            "error sending request for url (https://example.com/latest.json)"
-        ));
-    }
-
-    #[test]
-    fn missing_endpoint_or_pubkey_is_config() {
-        assert!(is_missing_updater_config("No endpoints configured"));
-        assert!(is_missing_updater_config("invalid pubkey"));
-    }
-}

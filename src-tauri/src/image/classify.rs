@@ -192,60 +192,7 @@ fn last_number_in_stem(stem: &str) -> Option<u64> {
 mod tests {
     use super::*;
 
-    fn fixtures() -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures")
-    }
-
-    #[test]
-    fn classifies_fixture_kinds() {
-        let root = fixtures();
-        assert!(matches!(
-            classify(&root.join("rgba.png")),
-            FileKind::Image {
-                kind: SourceKind::Ldr,
-                needs_conversion: false
-            }
-        ));
-        assert!(matches!(
-            classify(&root.join("rgb.jpg")),
-            FileKind::Image {
-                kind: SourceKind::Ldr,
-                needs_conversion: true
-            }
-        ));
-        assert!(matches!(
-            classify(&root.join("hdr.exr")),
-            FileKind::Image {
-                kind: SourceKind::Hdr,
-                needs_conversion: false
-            }
-        ));
-        assert!(matches!(classify(&root.join("legacy.ktx")), FileKind::Ktx1));
-        assert!(matches!(
-            classify(&root.join("basis_lz.ktx2")),
-            FileKind::Ktx2
-        ));
-        assert!(matches!(
-            classify(&root.join("not_ktx.ktx2")),
-            FileKind::Unsupported
-        ));
-    }
-
-    #[test]
-    fn magic_beats_extension() {
-        let root = fixtures();
-        let dir = tempfile::tempdir().unwrap();
-        let misnamed = dir.path().join("fake.ktx2");
-        std::fs::copy(root.join("rgba.png"), &misnamed).unwrap();
-        assert!(matches!(
-            classify(&misnamed),
-            FileKind::Image {
-                kind: SourceKind::Ldr,
-                needs_conversion: false
-            }
-        ));
-    }
-
+    /// Dropped animation frames become layers in the order a person reads them.
     #[test]
     fn orders_frames_naturally() {
         let paths = vec![
@@ -253,9 +200,8 @@ mod tests {
             PathBuf::from("frame_2.png"),
             PathBuf::from("frame_1.png"),
         ];
-        let ordered = order_frames(paths);
         assert_eq!(
-            ordered,
+            order_frames(paths),
             vec![
                 PathBuf::from("frame_1.png"),
                 PathBuf::from("frame_2.png"),

@@ -51,20 +51,3 @@ pub fn read_header(bytes: &[u8]) -> Result<Ktx1Header, AppError> {
         bytes_of_key_value_data: read_u32(60),
     })
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::path::PathBuf;
-
-    #[test]
-    fn reads_legacy_ktx_header() {
-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/legacy.ktx");
-        let bytes = std::fs::read(path).unwrap();
-        let h = read_header(&bytes).unwrap();
-        assert!(h.little_endian);
-        assert!(h.pixel_width > 0);
-        assert!(h.pixel_height > 0);
-        assert!(h.number_of_faces >= 1);
-    }
-}

@@ -2,6 +2,8 @@ mod blocking;
 mod commands;
 mod dialog;
 mod drop;
+#[cfg(feature = "e2e")]
+pub mod e2e;
 mod error;
 mod events;
 mod image;
@@ -9,8 +11,6 @@ mod ktx;
 mod menu;
 mod os_open;
 mod state;
-#[cfg(test)]
-mod test_support;
 mod updater;
 mod window_bounds;
 mod workspace;

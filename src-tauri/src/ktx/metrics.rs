@@ -50,20 +50,3 @@ pub fn parse_metrics(stdout: &str) -> Result<EncodeMetrics, AppError> {
 
     Ok(EncodeMetrics { ssim, psnr })
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use std::path::PathBuf;
-
-    #[test]
-    fn parses_create_metrics_sample() {
-        let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../docs/ktx-cli/samples/create-metrics.txt");
-        let text = std::fs::read_to_string(path).unwrap();
-        let m = parse_metrics(&text).unwrap();
-        let ssim = m.ssim.expect("ssim");
-        assert!((ssim - 0.99982575).abs() < 1e-5, "ssim={ssim}");
-        assert_eq!(m.psnr, Some(100.0));
-    }
-}

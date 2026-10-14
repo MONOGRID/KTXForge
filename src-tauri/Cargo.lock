@@ -2143,6 +2143,7 @@ dependencies = [
 name = "ktxforge"
 version = "1.1.0"
 dependencies = [
+ "base64 0.22.1",
  "exr",
  "gtk",
  "image",

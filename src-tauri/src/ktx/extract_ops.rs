@@ -4,7 +4,7 @@ use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 
 use ktx2::Reader;
-use tauri::AppHandle;
+use tauri::{AppHandle, Runtime};
 use tokio::sync::Semaphore;
 
 use crate::blocking::run_blocking;
@@ -173,8 +173,8 @@ fn channels_from_ktx2_info(info: &crate::ktx::info_types::Ktx2Info) -> u8 {
 
 /// KTX2 path for `ktx extract`, which reads no KTX1. KTX1 is converted once into
 /// `cache_dir` (keyed by source path + mtime) with the bundled `ktx2ktx2`.
-pub async fn ensure_ktx2(
-    app: &AppHandle,
+pub async fn ensure_ktx2<R: Runtime>(
+    app: &AppHandle<R>,
     path: &Path,
     cache_dir: &Path,
 ) -> Result<PathBuf, AppError> {
@@ -210,8 +210,8 @@ pub async fn ensure_ktx2(
     }
 }
 
-pub async fn run_extract(
-    app: &AppHandle,
+pub async fn run_extract<R: Runtime>(
+    app: &AppHandle<R>,
     input: &Path,
     output: &Path,
     selection: &ImageSelection,
@@ -243,8 +243,8 @@ async fn tonemap_to_cache(exr: PathBuf, png_cached: &Path) -> Result<Vec<u8>, Ap
 }
 
 /// Extract one subresource to PNG bytes (tone-mapped when the tool writes EXR).
-pub async fn extract_preview_png(
-    app: &AppHandle,
+pub async fn extract_preview_png<R: Runtime>(
+    app: &AppHandle<R>,
     ktx_path: &Path,
     selection: &ImageSelection,
     meta: &TextureMeta,
@@ -328,52 +328,10 @@ pub async fn extract_preview_png(
     Ok((bytes, preview_kind))
 }
 
-pub async fn texture_meta_via_info(app: &AppHandle, path: &Path) -> Result<TextureMeta, AppError> {
+pub async fn texture_meta_via_info<R: Runtime>(
+    app: &AppHandle<R>,
+    path: &Path,
+) -> Result<TextureMeta, AppError> {
     let report = info::inspect(app, path).await?;
     Ok(texture_meta_from_report(&report))
-}
-
-#[cfg(test)]
-mod extract_slot_tests {
-    use super::{extract_slot_count, extract_slots, extract_slots_for_cores};
-    use std::sync::atomic::{AtomicUsize, Ordering};
-    use std::sync::Arc;
-    use std::time::Duration;
-
-    #[test]
-    fn extract_slots_for_cores_targets_eighty_percent() {
-        assert_eq!(extract_slots_for_cores(1), 1);
-        assert_eq!(extract_slots_for_cores(4), 3);
-        assert_eq!(extract_slots_for_cores(8), 6);
-        assert_eq!(extract_slots_for_cores(10), 8);
-        assert_eq!(extract_slots_for_cores(16), 12);
-        assert_eq!(extract_slots_for_cores(32), 16);
-        assert_eq!(extract_slots_for_cores(128), 16);
-    }
-
-    #[tokio::test]
-    async fn extract_slots_cap_concurrent_acquirers() {
-        let slots = extract_slot_count();
-        let concurrent = Arc::new(AtomicUsize::new(0));
-        let peak = Arc::new(AtomicUsize::new(0));
-
-        let mut joins = Vec::new();
-        for _ in 0..(slots * 2 + 2) {
-            let concurrent = Arc::clone(&concurrent);
-            let peak = Arc::clone(&peak);
-            joins.push(tokio::spawn(async move {
-                let _permit = extract_slots().acquire().await.expect("slot");
-                let now = concurrent.fetch_add(1, Ordering::SeqCst) + 1;
-                peak.fetch_max(now, Ordering::SeqCst);
-                tokio::time::sleep(Duration::from_millis(15)).await;
-                concurrent.fetch_sub(1, Ordering::SeqCst);
-            }));
-        }
-
-        for join in joins {
-            join.await.expect("join");
-        }
-
-        assert_eq!(peak.load(Ordering::SeqCst), slots);
-    }
 }

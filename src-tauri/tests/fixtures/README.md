@@ -1,6 +1,6 @@
 # Test fixtures (KTX-Software v4.4.2)
 
-Small (≤ 64×64) inputs and KTX outputs for unit and ignored integration tests. Generated against the official Windows x64 `ktx` from v4.4.2. Do not hand-edit binaries; regenerate from a scratch script if a fixture must change.
+Small (≤ 64×64) inputs and KTX outputs for the end-to-end suite (`e2e/`). Generated against the official Windows x64 `ktx` from v4.4.2. Do not hand-edit binaries; regenerate from a scratch script if a fixture must change.
 
 Total size is under 2 MB (~90 KiB as of Wave 0).
 
@@ -13,6 +13,7 @@ Total size is under 2 MB (~90 KiB as of Wave 0).
 | `gray.png` | Synthetic 32×32 greyscale PNG |
 | `hdr.exr` | Minimal OpenEXR float RGBA 32×32 with alphabetically sorted channels, **scanline** ZIP (rewritten Wave 3 for channel order; re-encoded 2026-10-12 with `oiiotool --nosoftwareattrib hdr.exr -d float --scanline --compression zip`, pixels unchanged per `idiff`, because the Linux v4.4.2 `ktx create` segfaults on the earlier tiled RLE layout) |
 | `odd_size.png` | Synthetic 37×19 RGBA PNG |
+| `tiled.exr` | 32×32 **tiled** RLE OpenEXR, every texel (0.25, 4, 8, 0.5), written with the `exr` crate. The Linux v4.4.2 `ktx create` segfaults on tiled EXR; the app must re-stage it as scanline. |
 | `frames/frame_001.png` … `frame_004.png` | 32×32 solid colors |
 | `cube/face_0.png` … `face_5.png` | Cubemap faces in +X…−Z order |
 

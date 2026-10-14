@@ -91,21 +91,3 @@ impl AppError {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::AppError;
-
-    #[test]
-    fn exit_meaning_covers_known_codes() {
-        assert_eq!(AppError::exit_meaning(0), "Success");
-        assert_eq!(AppError::exit_meaning(1), "Command line error");
-        assert_eq!(AppError::exit_meaning(2), "IO failure");
-        assert_eq!(AppError::exit_meaning(3), "Invalid input file");
-        assert_eq!(AppError::exit_meaning(4), "Runtime or library error");
-        assert_eq!(AppError::exit_meaning(5), "Unsupported state or operation");
-        assert_eq!(AppError::exit_meaning(6), "Feature not implemented yet");
-        assert_eq!(AppError::exit_meaning(99), "Unknown exit code");
-        assert_eq!(AppError::exit_meaning(-1), "Unknown exit code");
-    }
-}

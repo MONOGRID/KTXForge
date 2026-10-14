@@ -1,0 +1,16 @@
+{
+  "header": {
+    "vkFormat": "VK_FORMAT_R8G8B8A8_SRGB",
+    "pixelWidth": 64,
+    "pixelHeight": 64,
+    "pixelDepth": 0,
+    "layerCount": 4,
+    "faceCount": 1,
+    "levelCount": 1,
+    "supercompressionScheme": "KTX_SS_ZSTD"
+  },
+  "colorModel": "KHR_DF_MODEL_RGBSDA",
+  "transfer": "KHR_DF_TRANSFER_SRGB",
+  "primaries": "KHR_DF_PRIMARIES_BT709",
+  "keyValue": {}
+}

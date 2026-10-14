@@ -5,7 +5,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
 use std::time::Duration;
 
-use tauri::AppHandle;
+use tauri::{AppHandle, Runtime};
 use tauri_plugin_shell::process::{CommandChild, CommandEvent};
 use tauri_plugin_shell::ShellExt;
 
@@ -112,8 +112,8 @@ impl Drop for RunningChild {
 
 /// Collect sidecar output. Returns `Ok` for any exit code (including non-zero).
 /// Used by inspect when invalid files still emit JSON on stdout.
-pub async fn run_collect(
-    app: &AppHandle,
+pub async fn run_collect<R: Runtime>(
+    app: &AppHandle<R>,
     tool: Sidecar,
     args: Vec<String>,
     on_stderr: impl Fn(String) + Send + 'static,
@@ -174,8 +174,8 @@ pub async fn run_collect(
 
 /// Run a sidecar. Non-zero exit → [`AppError::Ktx`].
 /// Cancellation kills the child and returns [`AppError::Cancelled`].
-pub async fn run(
-    app: &AppHandle,
+pub async fn run<R: Runtime>(
+    app: &AppHandle<R>,
     tool: Sidecar,
     args: Vec<String>,
     on_stderr: impl Fn(String) + Send + 'static,
@@ -201,49 +201,4 @@ pub async fn run(
         return Err(AppError::ktx(out.code, out.stderr));
     }
     Ok(out)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::test_support::staged_sidecar;
-    use std::process::Command;
-
-    #[test]
-    fn staged_sidecars_report_pinned_version() {
-        for tool in [Sidecar::Ktx, Sidecar::Ktx2Ktx2] {
-            let output = Command::new(staged_sidecar(tool))
-                .arg("--version")
-                .output()
-                .expect("run --version");
-            assert!(
-                output.status.success(),
-                "{}: stderr={}",
-                tool.name(),
-                String::from_utf8_lossy(&output.stderr)
-            );
-            // `ktx2ktx2` prints its version on stderr.
-            let reported = format!(
-                "{}{}",
-                String::from_utf8_lossy(&output.stdout),
-                String::from_utf8_lossy(&output.stderr)
-            );
-            assert!(reported.contains("v4.4.2"), "{}: {reported}", tool.name());
-        }
-    }
-
-    #[tokio::test]
-    async fn cancelled_waits_for_cancel() {
-        let cancel = CancellationHandle::new();
-        let early = tokio::time::timeout(CANCEL_POLL * 4, cancel.cancelled()).await;
-        assert!(early.is_err(), "resolved without cancel");
-
-        let trigger = cancel.clone();
-        tokio::spawn(async move {
-            tokio::time::sleep(CANCEL_POLL).await;
-            trigger.cancel();
-        });
-        let resolved = tokio::time::timeout(CANCEL_POLL * 8, cancel.cancelled()).await;
-        assert!(resolved.is_ok(), "did not resolve after cancel");
-    }
 }

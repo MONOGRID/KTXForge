@@ -24,3 +24,6 @@ src-tauri/binaries/
 *.sln
 *.sw?
 .fallow/
+
+# End-to-end suite outputs
+e2e-results/

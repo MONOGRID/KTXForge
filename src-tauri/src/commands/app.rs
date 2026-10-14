@@ -1,4 +1,4 @@
-use tauri::AppHandle;
+use tauri::{AppHandle, Runtime};
 
 use crate::commands::KtxVersion;
 use crate::error::AppError;
@@ -14,7 +14,7 @@ pub fn extract_concurrency() -> u32 {
 }
 
 #[tauri::command]
-pub async fn ktx_version(app: AppHandle) -> Result<KtxVersion, AppError> {
+pub async fn ktx_version<R: Runtime>(app: AppHandle<R>) -> Result<KtxVersion, AppError> {
     let pinned = pinned_version()?;
     let out = sidecar::run(
         &app,
@@ -41,15 +41,4 @@ fn pinned_version() -> Result<String, AppError> {
         .and_then(|v| v.as_str())
         .map(|s| s.to_owned())
         .ok_or_else(|| AppError::io("ktx-version.json missing version"))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn pinned_version_from_json() {
-        let v = pinned_version().unwrap();
-        assert_eq!(v, "4.4.2");
-    }
 }

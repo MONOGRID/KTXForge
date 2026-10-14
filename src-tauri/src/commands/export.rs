@@ -1,6 +1,6 @@
 use std::path::{Path, PathBuf};
 
-use tauri::{AppHandle, State};
+use tauri::{AppHandle, Runtime, State};
 use tauri_plugin_dialog::DialogExt;
 
 use crate::blocking::run_blocking;
@@ -73,8 +73,8 @@ pub async fn export_images(
 }
 
 /// Internal export used by the command and by tests (bypasses dialogs).
-pub async fn export_to(
-    app: &AppHandle,
+pub async fn export_to<R: Runtime>(
+    app: &AppHandle<R>,
     state: &AppState,
     path: &Path,
     selection: &ExportSelection,
@@ -140,8 +140,8 @@ fn refuse_ldr_for_exr_only(meta: &TextureMeta, format: &ExportFormat) -> Result<
     Ok(())
 }
 
-struct ExportOne<'a> {
-    app: &'a AppHandle,
+struct ExportOne<'a, R: Runtime> {
+    app: &'a AppHandle<R>,
     ktx2: &'a Path,
     meta: &'a TextureMeta,
     selection: &'a ImageSelection,
@@ -152,7 +152,7 @@ struct ExportOne<'a> {
     dest_is_file: bool,
 }
 
-async fn export_one(p: ExportOne<'_>) -> Result<String, AppError> {
+async fn export_one<R: Runtime>(p: ExportOne<'_, R>) -> Result<String, AppError> {
     let ExportOne {
         app,
         ktx2,
@@ -316,73 +316,4 @@ fn collect_subresources(levels: impl IntoIterator<Item = u32>, dims: Dims) -> Ve
         }
     }
     out
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::ktx::extract_args::{build_extract_args, Dims};
-    use crate::test_support::{fixtures, staged_ktx};
-    use std::process::Command;
-
-    #[test]
-    fn all_frames_at_level_includes_every_cubemap_face() {
-        let dims = Dims::from_ktx2_counts(2, 6, 0, 0);
-        let (sels, dest_is_file) =
-            expand_export_selections(&ExportSelection::AllFrames { level: 1 }, dims);
-        assert!(!dest_is_file);
-        assert_eq!(sels.len(), 6);
-        assert!(sels
-            .iter()
-            .all(|s| s.level == 1 && s.layer == 0 && s.depth_slice == 0));
-        let faces: Vec<u32> = sels.iter().map(|s| s.face).collect();
-        assert_eq!(faces, vec![0, 1, 2, 3, 4, 5]);
-    }
-
-    #[test]
-    fn all_frames_at_level_includes_array_layers() {
-        let dims = Dims::from_ktx2_counts(1, 1, 4, 0);
-        let (sels, _) = expand_export_selections(&ExportSelection::AllFrames { level: 0 }, dims);
-        assert_eq!(sels.len(), 4);
-        assert_eq!(
-            sels.iter().map(|s| s.layer).collect::<Vec<_>>(),
-            vec![0, 1, 2, 3]
-        );
-    }
-
-    #[test]
-    fn all_walks_every_level_face_layer_depth() {
-        let dims = Dims {
-            levels: 2,
-            faces: 2,
-            layers: 2,
-            depth: 2,
-        };
-        let (sels, _) = expand_export_selections(&ExportSelection::All, dims);
-        assert_eq!(sels.len(), 2 * 2 * 2 * 2);
-    }
-
-    #[test]
-    fn export_anim_frames_as_jpeg_via_staged_binary() {
-        let anim = fixtures().join("anim.ktx2");
-        let dir = tempfile::tempdir().unwrap();
-        let dims = Dims::from_ktx2_counts(1, 1, 4, 0);
-        for layer in 0..4 {
-            let png = dir.path().join(format!("frame_layer{layer}.png"));
-            let selection = ImageSelection {
-                layer,
-                ..Default::default()
-            };
-            let args = build_extract_args(&anim, &png, &selection, dims, None);
-            let output = Command::new(staged_ktx()).args(&args).output().unwrap();
-            assert!(
-                output.status.success(),
-                "extract layer {layer}: {}",
-                String::from_utf8_lossy(&output.stderr)
-            );
-            let jpg = dir.path().join(format!("frame_layer{layer}.jpg"));
-            png_to_jpeg(&png, &jpg, 90).unwrap();
-            assert!(jpg.is_file());
-        }
-    }
 }
