@@ -34,8 +34,9 @@ impl ResolvedOptions {
 /// known to fail `ktx create`. When current options are invalid, [`OptionReport::suggestion`]
 /// tells Vue what to apply.
 pub fn describe(opts: &CreateOptions, sources: &[SourceInfo], role: InputRole) -> OptionReport {
-    let sources_class = classify_sources(sources);
-    let resolution = resolve(opts, sources_class, role, sources.len().max(1));
+    let ctx = Context::new(sources, role);
+    let sources_class = ctx.class;
+    let resolution = resolve(opts, ctx, sources.len().max(1));
     let effective = &resolution.options;
     let fields = resolution
         .states
@@ -54,7 +55,7 @@ pub fn describe(opts: &CreateOptions, sources: &[SourceInfo], role: InputRole) -
             ),
         })
         .collect();
-    let mut warnings = Vec::new();
+    let mut warnings = resolution.notes;
     warn_nonlinear_mipmap(effective, &mut warnings);
     warn_encode_color_space(effective, &mut warnings);
     warn_srgb_to_linear_lossy(effective, &mut warnings);
@@ -87,9 +88,9 @@ pub fn resolve_for_encode(
     errors.extend(input_role::pack_validation_errors(
         &input_role::validate_pack_inputs(role, sources),
     ));
-    let class = classify_sources(sources);
-    let effective = resolve(opts, class, role, sources.len()).options;
-    reject_source_format_mismatch(&effective, class, &mut errors);
+    let ctx = Context::new(sources, role);
+    let effective = resolve(opts, ctx, sources.len()).options;
+    reject_source_format_mismatch(&effective, ctx.class, &mut errors);
     reject_raw_missing_size(&effective, &mut errors);
     reject_tf_format_mismatch(&effective, &mut errors);
     reject_role_origins(&effective, role, &mut errors);
@@ -100,53 +101,160 @@ pub fn resolve_for_encode(
     }
 }
 
+/// What the rules know about one output besides its options.
+#[derive(Clone, Copy)]
+struct Context {
+    class: SourcesClass,
+    role: InputRole,
+    /// Level-0 size of the first input (`None` before any input is added).
+    base: Option<(u32, u32)>,
+}
+
+impl Context {
+    fn new(sources: &[SourceInfo], role: InputRole) -> Self {
+        Self {
+            class: classify_sources(sources),
+            role,
+            base: sources.first().map(|s| (s.width, s.height)),
+        }
+    }
+}
+
 struct Resolution {
     options: CreateOptions,
     /// `None` = enabled, `Some(reason)` = hidden in the UI and omitted from argv.
     states: Vec<(OptionKey, Option<String>)>,
+    /// Values corrected to fit the source size, shown as warnings.
+    notes: Vec<OptionWarning>,
 }
 
-/// Apply the role, then clear every disabled field until nothing changes. Clearing one field
-/// can disable another (encode cleared for HDR → BasisLZ settings), hence the loop. Each pass
-/// only moves values toward "omitted", so it terminates.
-fn resolve(
-    opts: &CreateOptions,
-    class: SourcesClass,
-    role: InputRole,
-    input_count: usize,
-) -> Resolution {
+/// Apply the role, then fit values and clear every disabled field until nothing
+/// changes. Clearing one field can disable another (encode cleared for HDR → BasisLZ settings),
+/// hence the loop. Each pass only moves values toward "omitted" or a smaller level count, so it
+/// terminates.
+fn resolve(opts: &CreateOptions, ctx: Context, input_count: usize) -> Resolution {
     let mut options = opts.clone();
-    input_role::apply_role(&mut options, role, input_count);
+    let mut notes = Vec::new();
+    input_role::apply_role(&mut options, ctx.role, input_count);
     loop {
+        let mut changed = fit_values(&mut options, ctx, &mut notes);
         let states: Vec<_> = OptionKey::iter()
-            .map(|key| (key, disabled_reason(&options, key, class, role)))
+            .map(|key| (key, disabled_reason(&options, key, ctx)))
             .collect();
-        let mut changed = false;
         for (key, reason) in &states {
             // Role-owned keys are hidden but carry the value `apply_role` wrote.
-            if reason.is_some() && !input_role::hidden_for_role(role, *key) {
+            if reason.is_some() && !input_role::hidden_for_role(ctx.role, *key) {
                 changed |= clear_field(&mut options, *key);
             }
         }
         if !changed {
-            return Resolution { options, states };
+            return Resolution {
+                options,
+                states,
+                notes,
+            };
         }
     }
 }
 
-fn disabled_reason(
-    opts: &CreateOptions,
-    key: OptionKey,
-    class: SourcesClass,
-    role: InputRole,
-) -> Option<String> {
-    if input_role::hidden_for_role(role, key) {
+fn disabled_reason(opts: &CreateOptions, key: OptionKey, ctx: Context) -> Option<String> {
+    if input_role::hidden_for_role(ctx.role, key) {
         return Some("set by the input role on the Inputs panel".to_owned());
     }
-    if let Some(gate) = gates(key).iter().find(|gate| !eval_pred(gate.pred, opts)) {
+    if let Some(gate) = gates(key)
+        .iter()
+        .find(|gate| !eval_pred(gate.pred, opts, ctx))
+    {
         return Some(gate.reason.to_owned());
     }
-    source_disabled_reason(key, class).map(str::to_owned)
+    source_disabled_reason(key, ctx.class).map(str::to_owned)
+}
+
+/// Level-0 size `ktx create` resamples the first input to: `--scale`, else `--width` /
+/// `--height` (the `--scale` gate keeps them apart).
+fn target_size(opts: &CreateOptions, (width, height): (u32, u32)) -> (u32, u32) {
+    let c = &opts.container;
+    match c.scale {
+        Some(scale) if c.width.is_none() && c.height.is_none() => {
+            (scaled(width, scale), scaled(height, scale))
+        }
+        _ => (c.width.unwrap_or(width), c.height.unwrap_or(height)),
+    }
+}
+
+/// `static_cast<uint32_t>(size * scale)`, as `ktx create` computes it.
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss
+)]
+fn scaled(size: u32, scale: f32) -> u32 {
+    (size as f32 * scale) as u32
+}
+
+/// Correct values `ktx create` rejects or fails on, toward what it accepts, and note each
+/// correction. Returns whether anything changed.
+fn fit_values(opts: &mut CreateOptions, ctx: Context, notes: &mut Vec<OptionWarning>) -> bool {
+    // The resampler can end up with no samples for a pixel below 1 (box fails even at 0.9).
+    if let Some(scale) = opts.filter.mipmap_filter_scale.filter(|s| *s < 1.0) {
+        opts.filter.mipmap_filter_scale = Some(1.0);
+        notes.push(note(
+            OptionKey::MipmapFilterScale,
+            format!("filter scale {scale} can leave the resampler without samples; using 1"),
+        ));
+        return true;
+    }
+    let Some(base) = ctx.base else {
+        return false;
+    };
+    let (width, height) = target_size(opts, base);
+    if let Some(scale) = opts.container.scale.filter(|_| width == 0 || height == 0) {
+        opts.container.scale = None;
+        notes.push(note(
+            OptionKey::Scale,
+            format!(
+                "--scale {scale} shrinks {}×{} to nothing; encoding at the source size",
+                base.0, base.1
+            ),
+        ));
+        return true;
+    }
+    let max = input_role::max_mip_levels(width, height);
+    let c = &mut opts.container;
+    match c.levels {
+        // Without a resize, a chain longer than its base is a pack error, not a correction.
+        Some(levels)
+            if levels > max
+                && ctx.role == InputRole::MipChain
+                && (c.width.is_some() || c.height.is_some() || c.scale.is_some()) =>
+        {
+            c.width = None;
+            c.height = None;
+            c.scale = None;
+            notes.push(note(
+                OptionKey::Scale,
+                format!("a {levels}-level mip chain cannot be resampled to {width}×{height} ({max} levels at most); encoding at the source size"),
+            ));
+            true
+        }
+        Some(levels) if levels > max && c.generate_mipmap => {
+            c.levels = Some(max);
+            notes.push(note(
+                OptionKey::Levels,
+                format!("{width}×{height} has at most {max} mip levels; generating {max}"),
+            ));
+            true
+        }
+        _ => false,
+    }
+}
+
+fn note(key: OptionKey, message: String) -> OptionWarning {
+    OptionWarning {
+        key: Some(key),
+        level: WarningLevel::Info,
+        message,
+    }
 }
 
 fn source_disabled_reason(key: OptionKey, class: SourcesClass) -> Option<&'static str> {
@@ -293,13 +401,14 @@ fn suggestion_for(opts: &CreateOptions, class: SourcesClass) -> Option<OptionSug
     } else {
         default_format_for(class)
     };
-    let encode = if class == SourcesClass::Hdr {
+    // ASTC formats are compressed by the ASTC encoder; `--encode` needs an 8-bit format.
+    let encode = if class == SourcesClass::Hdr || format.is_astc() {
         None
     } else {
         opts.encode
     };
     let convert_tf = sanitize_convert_tf(format, opts.color.convert_tf);
-    let assign_tf = sanitize_assign_tf(format, opts.color.assign_tf);
+    let assign_tf = sanitize_assign_tf(format, convert_tf, opts.color.assign_tf);
     if format == opts.format
         && encode == opts.encode
         && convert_tf == opts.color.convert_tf
@@ -331,8 +440,9 @@ fn filter_choices(
             OptionKey::Encode => source_disabled_reason(key, class).is_none(),
             OptionKey::ConvertTf => ConvertTransferFunction::iter()
                 .any(|tf| tf.cli() == value && convert_tf_allowed(opts.format, tf)),
-            OptionKey::AssignTf => TransferFunction::iter()
-                .any(|tf| tf.cli() == value && assign_tf_allowed(opts.format, tf)),
+            OptionKey::AssignTf => TransferFunction::iter().any(|tf| {
+                tf.cli() == value && assign_tf_allowed(opts.format, opts.color.convert_tf, tf)
+            }),
             OptionKey::AssignTexcoordOrigin | OptionKey::ConvertTexcoordOrigin => {
                 TexcoordOrigin::iter()
                     .any(|o| o.cli() == value && input_role::origin_allowed(role, o))
@@ -373,7 +483,28 @@ enum Pred {
     EncodeUastc,
     EncodeSet,
     AstcFormat,
+    /// R8 formats: one channel.
+    SingleChannelFormat,
     AssignPrimariesNone,
+    AssignPrimariesSet,
+    AssignTfSet,
+    ConvertTfSet,
+    ConvertPrimariesSet,
+    ConvertOriginSet,
+    /// `--assign-tf` unset or one `ktx create` can convert from.
+    AssignTfDecodable,
+    /// Output transfer function is linear or sRGB, the only ones `ktx create` encodes to.
+    OutputTfEncodable,
+    OutputLinear,
+    FailOnColorConversions,
+    FailOnOriginChanges,
+    NoEndpointRdo,
+    NoSelectorRdo,
+    HdrSources,
+    /// The first input resamples to 1 px tall (true while there is no input).
+    TargetHeightOne,
+    /// Every input level stays taller than 1 px (true while there is no input).
+    LevelsTallerThanOne,
     Not(&'static Pred),
     Any(&'static [Pred]),
 }
@@ -391,6 +522,29 @@ const NOT_GENERATE_MIPMAP: Pred = Pred::Not(&Pred::GenerateMipmap);
 const NOT_RUNTIME_MIPMAP: Pred = Pred::Not(&Pred::RuntimeMipmap);
 const NOT_DEPTH_SET: Pred = Pred::Not(&Pred::DepthSet);
 const NOT_ASSIGN_PRIMARIES_NONE: Pred = Pred::Not(&Pred::AssignPrimariesNone);
+const NOT_ASTC_FORMAT: Pred = Pred::Not(&Pred::AstcFormat);
+const NOT_NO_ENDPOINT_RDO: Pred = Pred::Not(&Pred::NoEndpointRdo);
+const NOT_NO_SELECTOR_RDO: Pred = Pred::Not(&Pred::NoSelectorRdo);
+const NOT_CONVERT_TF_SET: Pred = Pred::Not(&Pred::ConvertTfSet);
+const NOT_CONVERT_PRIMARIES_SET: Pred = Pred::Not(&Pred::ConvertPrimariesSet);
+const NOT_SIZE_SET: Pred = Pred::Not(&Pred::Any(&[Pred::WidthSet, Pred::HeightSet]));
+/// Cubemap faces must stay square, so only `--scale` resizes them (raw needs a size).
+const NOT_CUBEMAP_OR_RAW: Pred = Pred::Any(&[Pred::Not(&Pred::Cubemap), Pred::Raw]);
+/// EXR inputs carry no primaries; converting them needs `--assign-primaries`.
+const PRIMARIES_KNOWN: Pred = Pred::Any(&[Pred::Not(&Pred::HdrSources), Pred::AssignPrimariesSet]);
+
+const BASIS_LZ_GATE: Gate = Gate {
+    pred: Pred::EncodeBasisLz,
+    reason: "ignored unless BasisLZ is selected",
+};
+const NOT_RAW_GATE: Gate = Gate {
+    pred: NOT_RAW,
+    reason: "not valid with raw",
+};
+const DECODABLE_GATE: Gate = Gate {
+    pred: Pred::AssignTfDecodable,
+    reason: "ktx cannot convert from the assigned transfer function",
+};
 
 const CUBEMAP_OR_DEPTH: &[Pred] = &[Pred::Cubemap, Pred::DepthSet];
 const ONE_D_OR_DEPTH: &[Pred] = &[Pred::OneD, Pred::DepthSet];
@@ -446,9 +600,23 @@ fn gates(key: OptionKey) -> &'static [Gate] {
                 reason: "not valid with BasisLZ, UASTC, or ASTC encoding",
             },
         ],
-        OptionKey::Scale => &[Gate {
-            pred: NOT_RAW,
-            reason: "cannot be used with raw",
+        OptionKey::Scale => &[
+            Gate {
+                pred: NOT_RAW,
+                reason: "cannot be used with raw",
+            },
+            Gate {
+                pred: NOT_SIZE_SET,
+                reason: "cannot be used with --width or --height",
+            },
+        ],
+        OptionKey::Width | OptionKey::Height => &[Gate {
+            pred: NOT_CUBEMAP_OR_RAW,
+            reason: "cubemap faces must stay square; resize them with --scale",
+        }],
+        OptionKey::Levels => &[Gate {
+            pred: Pred::GenerateMipmap,
+            reason: "needs --generate-mipmap; an explicit mip chain is an Inputs role",
         }],
         OptionKey::MipmapFilter | OptionKey::MipmapFilterScale | OptionKey::MipmapWrap => &[
             Gate {
@@ -461,31 +629,88 @@ fn gates(key: OptionKey) -> &'static [Gate] {
                     "ignored unless --generate-mipmap, --scale, --width or --height are specified",
             },
         ],
-        OptionKey::ConvertTf | OptionKey::ConvertTexcoordOrigin | OptionKey::Normalize => &[Gate {
-            pred: NOT_RAW,
-            reason: "not valid with raw",
-        }],
-        OptionKey::ConvertPrimaries => &[
+        OptionKey::ConvertTexcoordOrigin => &[
+            NOT_RAW_GATE,
             Gate {
-                pred: NOT_RAW,
-                reason: "not valid with raw",
+                pred: Pred::LevelsTallerThanOne,
+                reason: "ktx crashes flipping 1-pixel-tall images (1D or a mip chain down to 1×1)",
             },
+        ],
+        OptionKey::ConvertTf => &[NOT_RAW_GATE, DECODABLE_GATE],
+        OptionKey::Normalize => &[
+            NOT_RAW_GATE,
+            Gate {
+                pred: Pred::OutputLinear,
+                reason: "needs a linear output: not with sRGB formats or an sRGB transfer function",
+            },
+        ],
+        OptionKey::ConvertPrimaries => &[
+            NOT_RAW_GATE,
             Gate {
                 pred: NOT_ASSIGN_PRIMARIES_NONE,
                 reason: "not valid when assigned primaries are none",
             },
+            DECODABLE_GATE,
+            Gate {
+                pred: Pred::OutputTfEncodable,
+                reason: "needs a linear or sRGB output transfer function",
+            },
+            Gate {
+                pred: PRIMARIES_KNOWN,
+                reason: "HDR inputs carry no primaries; set --assign-primaries first",
+            },
         ],
-        OptionKey::Qlevel
-        | OptionKey::Clevel
-        | OptionKey::MaxEndpoints
-        | OptionKey::MaxSelectors
-        | OptionKey::EndpointRdoThreshold
-        | OptionKey::SelectorRdoThreshold
-        | OptionKey::NoEndpointRdo
-        | OptionKey::NoSelectorRdo => &[Gate {
-            pred: Pred::EncodeBasisLz,
-            reason: "ignored unless BasisLZ is selected",
+        OptionKey::FailOnColorConversions => &[
+            Gate {
+                pred: Pred::AssignTfSet,
+                reason: "needs --assign-tf; otherwise the input's own transfer function may be converted",
+            },
+            Gate {
+                pred: NOT_CONVERT_TF_SET,
+                reason: "--convert-tf converts the input",
+            },
+            Gate {
+                pred: NOT_CONVERT_PRIMARIES_SET,
+                reason: "--convert-primaries converts the input",
+            },
+        ],
+        OptionKey::WarnOnColorConversions => &[Gate {
+            pred: Pred::Not(&Pred::FailOnColorConversions),
+            reason: "mutually exclusive with --fail-on-color-conversions",
         }],
+        OptionKey::FailOnOriginChanges => &[Gate {
+            pred: Pred::Not(&Pred::ConvertOriginSet),
+            reason: "--convert-texcoord-origin changes the origin",
+        }],
+        OptionKey::WarnOnOriginChanges => &[Gate {
+            pred: Pred::Not(&Pred::FailOnOriginChanges),
+            reason: "mutually exclusive with --fail-on-origin-changes",
+        }],
+        OptionKey::NormalMode => &[Gate {
+            pred: Pred::Not(&Pred::SingleChannelFormat),
+            reason: "needs a format with two or more channels",
+        }],
+        OptionKey::Encode => &[Gate {
+            pred: NOT_ASTC_FORMAT,
+            reason: "ASTC formats are compressed by the ASTC encoder",
+        }],
+        OptionKey::Qlevel | OptionKey::Clevel | OptionKey::NoEndpointRdo | OptionKey::NoSelectorRdo => {
+            &[BASIS_LZ_GATE]
+        }
+        OptionKey::MaxEndpoints | OptionKey::EndpointRdoThreshold => &[
+            BASIS_LZ_GATE,
+            Gate {
+                pred: NOT_NO_ENDPOINT_RDO,
+                reason: "not valid while endpoint RDO is disabled",
+            },
+        ],
+        OptionKey::MaxSelectors | OptionKey::SelectorRdoThreshold => &[
+            BASIS_LZ_GATE,
+            Gate {
+                pred: NOT_NO_SELECTOR_RDO,
+                reason: "not valid while selector RDO is disabled",
+            },
+        ],
         OptionKey::UastcQuality | OptionKey::UastcRdo => &[Gate {
             pred: Pred::EncodeUastc,
             reason: "ignored unless UASTC is selected",
@@ -513,14 +738,30 @@ fn gates(key: OptionKey) -> &'static [Gate] {
             pred: BASIS_OR_UASTC_ANY,
             reason: "BasisLZ and UASTC only",
         }],
-        OptionKey::CompareSsim | OptionKey::ComparePsnr => &[Gate {
-            pred: ENCODE_OR_ASTC_ANY,
-            reason: "requires BasisLZ, UASTC, or ASTC encoding",
-        }],
-        OptionKey::OneD => &[Gate {
-            pred: NOT_CUBEMAP_OR_DEPTH,
-            reason: "not valid with cubemap or 3D",
-        }],
+        OptionKey::CompareSsim | OptionKey::ComparePsnr => &[
+            Gate {
+                pred: ENCODE_OR_ASTC_ANY,
+                reason: "requires BasisLZ, UASTC, or ASTC encoding",
+            },
+            Gate {
+                pred: Pred::Any(&[NOT_ASTC_FORMAT, NOT_DEPTH_SET]),
+                reason: "ktx cannot measure ASTC 3D textures",
+            },
+        ],
+        OptionKey::OneD => &[
+            Gate {
+                pred: NOT_CUBEMAP_OR_DEPTH,
+                reason: "not valid with cubemap or 3D",
+            },
+            Gate {
+                pred: NOT_ENCODE_OR_ASTC,
+                reason: "BasisLZ, UASTC and ASTC files cannot be 1D",
+            },
+            Gate {
+                pred: Pred::TargetHeightOne,
+                reason: "needs 1-pixel-tall images (or --height 1)",
+            },
+        ],
         OptionKey::Cubemap => &[Gate {
             pred: NOT_ONE_D_OR_DEPTH,
             reason: "not valid with 1D or 3D",
@@ -529,29 +770,21 @@ fn gates(key: OptionKey) -> &'static [Gate] {
             pred: NOT_ONE_D_OR_CUBEMAP,
             reason: "not valid with 1D or cubemap",
         }],
-        OptionKey::Width
-        | OptionKey::Height
-        | OptionKey::Raw
+        OptionKey::Raw
         | OptionKey::Layers
-        | OptionKey::Levels
         | OptionKey::AssignTf
         | OptionKey::AssignPrimaries
         | OptionKey::AssignTexcoordOrigin
-        | OptionKey::FailOnColorConversions
-        | OptionKey::WarnOnColorConversions
         | OptionKey::NoWarnOnColorConversions
-        | OptionKey::FailOnOriginChanges
-        | OptionKey::WarnOnOriginChanges
         | OptionKey::Swizzle
         | OptionKey::InputSwizzle
-        | OptionKey::NormalMode
         | OptionKey::Format
-        | OptionKey::Encode
         | OptionKey::Threads => &[],
     }
 }
 
-fn eval_pred(pred: Pred, opts: &CreateOptions) -> bool {
+fn eval_pred(pred: Pred, opts: &CreateOptions, ctx: Context) -> bool {
+    let color = &opts.color;
     match pred {
         Pred::Raw => opts.container.raw,
         Pred::OneD => opts.container.one_d,
@@ -567,9 +800,38 @@ fn eval_pred(pred: Pred, opts: &CreateOptions) -> bool {
         Pred::EncodeUastc => opts.encode == Some(EncodeCodec::Uastc),
         Pred::EncodeSet => opts.encode.is_some(),
         Pred::AstcFormat => opts.format.is_astc(),
-        Pred::AssignPrimariesNone => opts.color.assign_primaries == Some(ColorPrimaries::None),
-        Pred::Not(inner) => !eval_pred(*inner, opts),
-        Pred::Any(parts) => parts.iter().any(|p| eval_pred(*p, opts)),
+        Pred::SingleChannelFormat => matches!(opts.format, VkFormat::R8Unorm | VkFormat::R8Srgb),
+        Pred::AssignPrimariesNone => color.assign_primaries == Some(ColorPrimaries::None),
+        Pred::AssignPrimariesSet => color.assign_primaries.is_some(),
+        Pred::AssignTfSet => color.assign_tf.is_some(),
+        Pred::ConvertTfSet => color.convert_tf.is_some(),
+        Pred::ConvertPrimariesSet => color.convert_primaries.is_some(),
+        Pred::ConvertOriginSet => color.convert_texcoord_origin.is_some(),
+        Pred::AssignTfDecodable => color.assign_tf.is_none_or(is_decodable_tf),
+        Pred::OutputTfEncodable => {
+            color.convert_tf.is_some()
+                || color
+                    .assign_tf
+                    .is_none_or(|tf| tf == TransferFunction::Linear || is_srgb_assign_tf(tf))
+        }
+        Pred::OutputLinear => output_is_linear(opts),
+        Pred::FailOnColorConversions => color.fail_on_color_conversions,
+        Pred::FailOnOriginChanges => color.fail_on_origin_changes,
+        Pred::NoEndpointRdo => opts.basis_lz.no_endpoint_rdo,
+        Pred::NoSelectorRdo => opts.basis_lz.no_selector_rdo,
+        Pred::HdrSources => ctx.class == SourcesClass::Hdr,
+        Pred::TargetHeightOne => ctx.base.is_none_or(|base| target_size(opts, base).1 == 1),
+        Pred::LevelsTallerThanOne => ctx.base.is_none_or(|base| {
+            // Only a mip chain brings its own smaller levels; generated mips are not flipped.
+            let levels = match ctx.role {
+                InputRole::MipChain => opts.container.levels.unwrap_or(1),
+                _ => 1,
+            };
+            let height = target_size(opts, base).1;
+            height.checked_shr(levels.saturating_sub(1)).unwrap_or(0) > 1
+        }),
+        Pred::Not(inner) => !eval_pred(*inner, opts, ctx),
+        Pred::Any(parts) => parts.iter().any(|p| eval_pred(*p, opts, ctx)),
     }
 }
 
@@ -598,9 +860,53 @@ fn convert_tf_allowed(format: VkFormat, tf: ConvertTransferFunction) -> bool {
     }
 }
 
-/// `*_SRGB` formats require an sRGB assign-tf when the flag is set.
-fn assign_tf_allowed(format: VkFormat, tf: TransferFunction) -> bool {
-    !format.is_srgb() || is_srgb_assign_tf(tf)
+/// `*_SRGB` formats require an sRGB assign-tf when the flag is set. With `--convert-tf` the
+/// input is converted from the assigned function, so it must be decodable. Otherwise formats
+/// with an sRGB twin reject an sRGB assign-tf and the ASTC encoder accepts only a linear one.
+fn assign_tf_allowed(
+    format: VkFormat,
+    convert_tf: Option<ConvertTransferFunction>,
+    tf: TransferFunction,
+) -> bool {
+    if format.is_srgb() {
+        return is_srgb_assign_tf(tf);
+    }
+    if convert_tf.is_some() {
+        return is_decodable_tf(tf);
+    }
+    if format.is_astc() {
+        return tf == TransferFunction::Linear;
+    }
+    !(format.has_srgb_twin() && is_srgb_assign_tf(tf))
+}
+
+/// Transfer functions `ktx create` can decode when converting from them.
+fn is_decodable_tf(tf: TransferFunction) -> bool {
+    matches!(
+        tf,
+        TransferFunction::Linear
+            | TransferFunction::Itu
+            | TransferFunction::ItuOetf
+            | TransferFunction::Bt601
+            | TransferFunction::Bt601Oetf
+            | TransferFunction::Bt709
+            | TransferFunction::Bt709Oetf
+            | TransferFunction::Bt2020
+            | TransferFunction::Bt2020Oetf
+            | TransferFunction::Smpte170m
+            | TransferFunction::Smpte170mOetf
+            | TransferFunction::Smpte170mEotf
+            | TransferFunction::PqEotf
+    ) || is_srgb_assign_tf(tf)
+}
+
+/// Output transfer function: `--convert-tf`, else `--assign-tf`, else the format's own.
+fn output_is_linear(opts: &CreateOptions) -> bool {
+    match (opts.color.convert_tf, opts.color.assign_tf) {
+        (Some(tf), _) => !is_srgb_convert_tf(tf),
+        (None, Some(tf)) => tf == TransferFunction::Linear,
+        (None, None) => !opts.format.is_srgb(),
+    }
 }
 
 fn sanitize_convert_tf(
@@ -610,8 +916,12 @@ fn sanitize_convert_tf(
     tf.filter(|value| convert_tf_allowed(format, *value))
 }
 
-fn sanitize_assign_tf(format: VkFormat, tf: Option<TransferFunction>) -> Option<TransferFunction> {
-    tf.filter(|value| assign_tf_allowed(format, *value))
+fn sanitize_assign_tf(
+    format: VkFormat,
+    convert_tf: Option<ConvertTransferFunction>,
+    tf: Option<TransferFunction>,
+) -> Option<TransferFunction> {
+    tf.filter(|value| assign_tf_allowed(format, convert_tf, *value))
 }
 
 fn is_nonlinear_non_srgb(tf: TransferFunction) -> bool {
@@ -709,8 +1019,12 @@ fn reject_tf_format_mismatch(opts: &CreateOptions, errors: &mut Vec<String>) {
         }
     }
     if let Some(tf) = opts.color.assign_tf {
-        if !assign_tf_allowed(opts.format, tf) {
-            errors.push("--assign-tf must be sRGB for *_SRGB formats".to_owned());
+        if !assign_tf_allowed(opts.format, opts.color.convert_tf, tf) {
+            errors.push(if opts.format.is_srgb() {
+                "--assign-tf must be sRGB for *_SRGB formats".to_owned()
+            } else {
+                "--assign-tf sRGB is invalid for non-sRGB formats that have an sRGB twin".to_owned()
+            });
         }
     }
 }

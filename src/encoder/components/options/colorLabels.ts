@@ -32,7 +32,7 @@ export const transferFunctionLabels = {
   hlg_oetf: "hlg_oetf",
   hlg_eotf: "hlg_eotf",
   pq_oetf: "pq_oetf",
-  pg_eotf: "pg_eotf",
+  pq_eotf: "pq_eotf",
   dcip3: "dcip3",
   dcip3_eotf: "dcip3_eotf",
   pal_oetf: "pal_oetf",
@@ -44,7 +44,7 @@ export const transferFunctionLabels = {
   acescc_oetf: "acescc_oetf",
   acescct: "acescct",
   acescct_oetf: "acescct_oetf",
-  abobergb: "abobergb",
+  adobergb: "adobergb",
   adobergb_eotf: "adobergb_eotf",
 } satisfies Record<TransferFunction, string>;
 

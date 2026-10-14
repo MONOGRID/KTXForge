@@ -188,7 +188,7 @@ pub fn validate_arity(role: InputRole, input_count: usize) -> Result<(), String>
 }
 
 /// Max mip levels for a base image: `floor(log2(max(w,h))) + 1` (matches `ktx create`).
-fn max_mip_levels(width: u32, height: u32) -> u32 {
+pub fn max_mip_levels(width: u32, height: u32) -> u32 {
     let max_dim = width.max(height).max(1);
     max_dim.ilog2() + 1
 }

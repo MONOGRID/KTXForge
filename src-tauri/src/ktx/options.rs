@@ -153,7 +153,7 @@ cli_enum! {
         HlgOetf = "hlg_oetf",
         HlgEotf = "hlg_eotf",
         PqOetf = "pq_oetf",
-        PgEotf = "pg_eotf",
+        PqEotf = "pq_eotf",
         Dcip3 = "dcip3",
         Dcip3Eotf = "dcip3_eotf",
         PalOetf = "pal_oetf",
@@ -165,7 +165,7 @@ cli_enum! {
         AcesccOetf = "acescc_oetf",
         Acescct = "acescct",
         AcescctOetf = "acescct_oetf",
-        Abobergb = "abobergb",
+        Adobergb = "adobergb",
         AdobergbEotf = "adobergb_eotf",
     }
 }

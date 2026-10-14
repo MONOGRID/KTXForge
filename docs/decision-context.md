@@ -42,9 +42,11 @@ Binding the missing surface from libktx means reimplementing `ktx create`'s colo
 - `ktx convert`. KTX1 → KTX2 uses the legacy `ktx2ktx2` binary (see sidecar packaging).
 - Half-float `ktx extract --transcode` targets. Only `r8|rg8|rgb8|rgba8` exist.
 
-v4.4.2 spellings that look wrong are real and stay: ASTC `--format` values carry the Vulkan `_BLOCK` suffix; `pg_eotf` and `abobergb` are the tool's names. `ktx extract` fails on an explicit `--layer 0` for a non-array texture, so `build_extract_args` omits `--layer` / `--face` / `--depth` (and `--level` for a single-level file) when the dimension is 1.
+v4.4.2 spellings that look wrong are real and stay: ASTC `--format` values carry the Vulkan `_BLOCK` suffix. The help text's `pg_eotf` and `abobergb` are typos; the parser rejects them and accepts `pq_eotf` and `adobergb`, which the app uses. `ktx extract` fails on an explicit `--layer 0` for a non-array texture, so `build_extract_args` omits `--layer` / `--face` / `--depth` (and `--level` for a single-level file) when the dimension is 1.
 
 **Why:** 5.0.0 was a release candidate when the pin was set; the user chose a stable pin over the missing options. Names that only exist in 5.0 would fail at runtime. The gap list came from comparing every UI option with `ktx create --help` from the official 4.4.2 build.
+
+**Revised:** 2026-10-14 — `pq_eotf` / `adobergb` replace the help-text typos after the e2e sweep showed `ktx create` rejects them.
 
 ## 2026-10-04 — Rust owns the work; Vue renders
 
@@ -127,8 +129,8 @@ The rpath step is idempotent and runs on already-staged binaries. Darwin `.pkg` 
 
 **Decided:** All `ktx create` option knowledge is in Rust (`ktx/rules.rs`, `ktx/option_help.rs`, `ktx/presets.rs`):
 
-- `rules::resolve` is the only place rules apply. It applies the output's input role to a copy of `CreateOptions`, then clears every field a gate or source rule disables, looping to a fixed point (HDR clears `--encode`, which disables BasisLZ fields).
-- Enablement is a declarative table: each `OptionKey` has `Gate`s (`Pred` + reason). Several gates are AND; `Any` is OR (mip filters need generate-mipmap **or** scale **or** width **or** height).
+- `rules::resolve` is the only place rules apply. It applies the output's input role to a copy of `CreateOptions`, then, looping to a fixed point, corrects values that only fail for the source size (`fit_values`) and clears every field a gate or source rule disables (HDR clears `--encode`, which disables BasisLZ fields). Each correction becomes an info warning in the report.
+- Enablement is a declarative table: each `OptionKey` has `Gate`s (`Pred` + reason). Several gates are AND; `Any` is OR (mip filters need generate-mipmap **or** scale **or** width **or** height). Predicates see the options plus a `Context` (source class, role, level-0 size of the first input), so size rules such as "1D needs a 1-px-tall result" are gates too.
 - `describe_options` reports per-field `enabled`, filtered `choices`, `help` per option and per choice, an `OptionSuggestion` when current values are invalid for the sources, and the source-aware `default_format`.
 - `rules::resolve_for_encode` returns `ResolvedOptions` (its only constructor), and `build_create_args` accepts only that and emits every set field with no conditionals. A value hidden in the UI is never sent; it stays in the store and returns if the field reappears.
 - Vue only renders: it shows a field when `FieldState.enabled` is true, treats a missing entry as disabled, applies suggestions, and keeps no predicate, help catalog, role mirror, or arity/compatibility logic. Unavailable options are hidden, not dimmed.
@@ -137,7 +139,7 @@ A staged-binary test runs resolved argv for every role and several hidden-value 
 
 **Why:** Rules had spread across five places and drifted. Enabling SSIM under UASTC and then setting encode to none hid the field but still emitted `--compare-ssim`, which `ktx create` rejects. A TS role mirror wrote `--levels N` into persistent options, so leaving Mip chain broke later single-image encodes. A predicate graph shipped to Vue would duplicate the engine.
 
-**Revised:** 2026-10-11 — gate table; help text moved from TS to Rust; hide instead of dim. 2026-10-12 — single `resolve` pass and `ResolvedOptions`.
+**Revised:** 2026-10-11 — gate table; help text moved from TS to Rust; hide instead of dim. 2026-10-12 — single `resolve` pass and `ResolvedOptions`. 2026-10-14 — gates see a source `Context`; `fit_values` corrections inside the fixed-point loop.
 
 ## 2026-10-11 — Never offer a known-invalid encode
 
@@ -146,11 +148,16 @@ A staged-binary test runs resolved argv for every role and several hidden-value 
 - **Source vs format:** HDR sources offer only `R16G16B16[A16]_SFLOAT` and no ASTC or `--encode`; LDR sources hide half-float formats. LDR and HDR never mix in one output.
 - **Transfer function vs format:** `*_SRGB` formats drop `--convert-tf linear` and list only sRGB aliases for `--assign-tf`; UNORM formats with an sRGB twin offer only `linear`. `VkFormat` has typed `is_srgb` / `has_srgb_twin` / `is_astc` / `is_hdr_float`.
 - **Packs:** `validate_pack_inputs` returns an `InputValidationReport` (panel-level and per-input errors): role arity, same LDR/HDR, same level-0 size for array/cubemap/depth, square cubemap faces, mip-chain sizes `max(1, base >> i)` and count ≤ `floor(log2(max(w, h))) + 1`. Vue marks the Inputs panel, rows and Outputs queue; Encode all requires every report to be clean.
+- **Resize and mips:** `--scale` is hidden while `--width` / `--height` are set (scale defaults to 1, so it would always clash). Cubemap faces resize only with `--scale`. `--levels` needs `--generate-mipmap` (otherwise `ktx` expects one input per level) and is capped at the resampled size's level count; a mip chain that would not fit its resampled size drops the resize. A `--scale` that shrinks the input to 0 px is dropped. `--mipmap-filter-scale` is raised to 1: below that the resampler can find no samples for a pixel and fails, depending on filter and size.
+- **1D:** only when the resampled first input is 1 px tall, and not with `--encode` or ASTC (ASTC refuses 1D; BasisLZ / UASTC write a file `ktx validate` and `ktx extract` reject).
+- **Codecs:** `--encode` is hidden and cleared (also by the suggestion) for ASTC formats. `--normal-mode` needs two or more channels (libktx refuses R8). The BasisLZ endpoint / selector limits and RDO thresholds are hidden while that RDO is disabled. Compare metrics are hidden for ASTC 3D textures.
+- **Color:** `--normalize` needs a linear output transfer function. `--convert-tf` and `--convert-primaries` need an `--assign-tf` that `ktx` can decode (linear, sRGB, ITU family, PQ EOTF); `--convert-primaries` also needs a linear or sRGB output and, for HDR (EXR carries no primaries), `--assign-primaries`. With `--convert-tf` set, only decodable `--assign-tf` values are offered. Without it, ASTC UNORM formats accept only `--assign-tf linear` and formats with an sRGB twin no sRGB assign. `--fail-on-color-conversions` is offered only with `--assign-tf` and no conversion flag, since the app cannot read an input's own transfer function; `--fail-on-origin-changes` only without `--convert-texcoord-origin`. Each warn flag is hidden while its fail flag is set.
+- **Origin:** `--convert-texcoord-origin` is hidden when any input level is 1 px tall (a 1×1 mip tail, an N×1 image): v4.4.2 segfaults flipping it.
 - Soft `ktx create` warnings (for example an 8-bit PNG with no transfer function) do not block encode. Tone-mapping HDR to LDR for compression is out of scope.
 
 **Why:** Each of these was a sidecar fatal the user had to decode from stderr: an EXR with `R8G8B8A8_SRGB`, `--convert-tf linear` with an sRGB format, mismatched screenshots packed into one array. The app already classifies sources, so it can prevent them. Also stated in [AGENTS.md](../AGENTS.md).
 
-**Revised:** 2026-10-11 — sRGB/TF pairing became a hard rule. 2026-10-13 — pack validation.
+**Revised:** 2026-10-11 — sRGB/TF pairing became a hard rule. 2026-10-13 — pack validation. 2026-10-14 — resize, 1D, codec, color and origin rules from the e2e options sweep and the v4.4.2 `ktx create` / libktx sources.
 
 ## 2026-10-11 — Known option defaults are real values
 

@@ -250,7 +250,7 @@ fn transfer_fn_choice(v: TransferFunction) -> OptionChoice {
         TransferFunction::HlgOetf => choice(v.cli(), "Hybrid Log-Gamma OETF."),
         TransferFunction::HlgEotf => choice(v.cli(), "Hybrid Log-Gamma EOTF."),
         TransferFunction::PqOetf => choice(v.cli(), "Perceptual Quantizer (PQ) OETF."),
-        TransferFunction::PgEotf => choice(v.cli(), "PG EOTF (tool spelling)."),
+        TransferFunction::PqEotf => choice(v.cli(), "Perceptual Quantizer (PQ) EOTF."),
         TransferFunction::Dcip3 => choice(v.cli(), "DCI-P3 transfer."),
         TransferFunction::Dcip3Eotf => choice(v.cli(), "DCI-P3 EOTF."),
         TransferFunction::PalOetf => choice(v.cli(), "PAL OETF."),
@@ -262,9 +262,7 @@ fn transfer_fn_choice(v: TransferFunction) -> OptionChoice {
         TransferFunction::AcesccOetf => choice(v.cli(), "ACEScc OETF."),
         TransferFunction::Acescct => choice(v.cli(), "ACEScct transfer."),
         TransferFunction::AcescctOetf => choice(v.cli(), "ACEScct OETF."),
-        TransferFunction::Abobergb => {
-            choice(v.cli(), "Adobe RGB transfer (tool spelling abobergb).")
-        }
+        TransferFunction::Adobergb => choice(v.cli(), "Adobe RGB transfer."),
         TransferFunction::AdobergbEotf => choice(v.cli(), "Adobe RGB EOTF."),
     }
 }
