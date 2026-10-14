@@ -14,6 +14,7 @@ import EnumSelect from "../../shared/components/EnumSelect.vue";
 import type { EnumSelectOption } from "../../shared/enumSelect";
 import { alertAppError } from "../../shared/alertAppError";
 import { path, report, selection } from "../store";
+import ExportResultModal from "./ExportResultModal.vue";
 
 type ScopeKind = "one" | "allFrames" | "all";
 type FormatKind = "png" | "jpeg" | "exr";
@@ -81,6 +82,8 @@ const formatKind = ref<FormatKind>("png");
 const jpegQuality = ref(90);
 const busy = ref(false);
 const writtenFiles = ref<string[]>([]);
+const resultOpen = ref(false);
+const resultSummary = ref("");
 
 const pngJpegDisabledReason = computed((): string | null =>
   ldrExportBlockReason(report.value?.preview),
@@ -151,12 +154,36 @@ function onJpegQualityUpdate(value: string | number): void {
   jpegQuality.value = Math.min(100, Math.max(1, Math.round(n)));
 }
 
+function formatLabel(kind: FormatKind): string {
+  const found = FORMAT_OPTIONS.find((option) => option.value === kind);
+  return found?.label ?? kind.toUpperCase();
+}
+
+function scopeLabel(kind: ScopeKind): string {
+  const found = SCOPE_OPTIONS.find((option) => option.value === kind);
+  return found?.label ?? kind;
+}
+
+function buildResultSummary(
+  scopeKind: ScopeKind,
+  format: FormatKind,
+  quality: number,
+): string {
+  const formatText =
+    format === "jpeg"
+      ? `${formatLabel(format)} (quality ${String(quality)})`
+      : formatLabel(format);
+  return `${scopeLabel(scopeKind)} · ${formatText}`;
+}
+
+function closeResult(): void {
+  resultOpen.value = false;
+}
+
 async function onExport(): Promise<void> {
   if (!canExport.value) {
     return;
   }
-
-  writtenFiles.value = [];
 
   const filePath = path.value;
   if (filePath === null || !fileReady.value) {
@@ -173,6 +200,12 @@ async function onExport(): Promise<void> {
       },
     });
     writtenFiles.value = result.files;
+    resultSummary.value = buildResultSummary(
+      scope.value,
+      formatKind.value,
+      jpegQuality.value,
+    );
+    resultOpen.value = result.files.length > 0;
   } catch (err: unknown) {
     await alertAppError(toAppError(err));
   } finally {
@@ -205,7 +238,7 @@ watchEffect(() => {
 </script>
 
 <template>
-  <div class="flex w-full flex-col gap-1.5">
+  <div class="w-full">
     <div
       class="panel flex w-full flex-wrap items-center justify-end gap-2 px-2.5 py-1.5"
       role="group"
@@ -261,17 +294,13 @@ watchEffect(() => {
       </Button>
     </div>
 
-    <ul
-      v-if="writtenFiles.length > 0"
-      class="m-0 max-h-20 w-full list-none overflow-auto p-0 text-right text-sm text-ink"
-    >
-      <li
-        v-for="file in writtenFiles"
-        :key="file"
-        class="break-all py-0.5 font-mono text-xs text-ink-muted"
-      >
-        {{ file }}
-      </li>
-    </ul>
+    <Teleport to="body">
+      <ExportResultModal
+        :open="resultOpen"
+        :files="writtenFiles"
+        :summary="resultSummary"
+        @close="closeResult"
+      />
+    </Teleport>
   </div>
 </template>

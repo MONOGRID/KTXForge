@@ -323,7 +323,10 @@ export async function saveEncoded(): Promise<void> {
     return;
   }
   try {
-    await call("save_encoded", { jobId });
+    const saved = await call("save_encoded", { jobId });
+    if (saved !== null) {
+      await notifyText("Save complete", "1 texture saved");
+    }
   } catch (err: unknown) {
     await alertAppError(toAppError(err));
   }
@@ -347,14 +350,23 @@ export async function saveAllEncoded(): Promise<void> {
   }
   if (jobIds.length === 1) {
     try {
-      await call("save_encoded", { jobId: jobIds[0] });
+      const saved = await call("save_encoded", { jobId: jobIds[0] });
+      if (saved !== null) {
+        await notifyText("Save complete", "1 texture saved");
+      }
     } catch (err: unknown) {
       await alertAppError(toAppError(err));
     }
     return;
   }
   try {
-    await call("save_encoded_batch", { jobIds });
+    const saved = await call("save_encoded_batch", { jobIds });
+    if (saved !== null && saved > 0) {
+      await notifyText(
+        "Save complete",
+        `${String(saved)} textures saved`,
+      );
+    }
   } catch (err: unknown) {
     await alertAppError(toAppError(err));
   }

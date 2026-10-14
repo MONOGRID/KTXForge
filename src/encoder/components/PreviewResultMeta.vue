@@ -102,7 +102,9 @@ const chips = computed((): MetaChip[] => {
 </script>
 
 <template>
-  <ScrollArea class="max-h-40 shrink-0">
+  <ScrollArea
+    class="min-h-0 max-h-[300px] shrink-0 [&_[data-reka-scroll-area-viewport]]:max-h-[300px]"
+  >
     <div class="flex flex-col gap-2 pr-2">
       <ul class="m-0 flex list-none flex-wrap gap-1.5 p-0">
         <li
@@ -126,7 +128,7 @@ const chips = computed((): MetaChip[] => {
 
       <ul
         v-if="result && result.warnings.length > 0"
-        class="m-0 list-disc pl-4 text-xs text-ink-muted"
+        class="m-0 list-disc break-words pl-4 text-xs text-ink-muted"
       >
         <li
           v-for="(warning, index) in result.warnings"

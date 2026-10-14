@@ -221,11 +221,11 @@ A staged-binary test runs resolved argv for every role and several hidden-value 
 
 ## 2026-10-11 — Error and job feedback surfaces
 
-**Decided:** No toasts (Sonner removed). Encode job outcomes use OS notifications: success → notification; failure → notification plus one native `dialog.message` alert. Other failures (save, inspect, rejected drop, invalid input) use a native alert only. Preview load failures stay silent in the viewer.
+**Decided:** No toasts (Sonner removed). Encode job outcomes use OS notifications: success → notification; failure → notification plus one native `dialog.message` alert. Other failures (save, inspect, rejected drop, invalid input) use a native alert only. Preview load failures stay silent in the viewer. Multi-file inspector export success opens a scrollable Vue modal (count, scope/format summary, written paths) instead of an inline path list in the footer — long “Export everything” results must not shift or crush the viewer layout.
 
-**Why:** One encode failure used to appear as an exit code, a stderr dump and a toast. Notifications reach the user when the window is unfocused during a batch; modals are for errors that need acknowledgment.
+**Why:** One encode failure used to appear as an exit code, a stderr dump and a toast. Notifications reach the user when the window is unfocused during a batch; modals are for errors that need acknowledgment. Requirements also forbid layout shift when results arrive; dumping dozens of export paths under the export bar broke that.
 
-**Revised:** 2026-10-12 — Sonner removed entirely.
+**Revised:** 2026-10-12 — Sonner removed entirely. 2026-10-14 — inspector export success → scrollable result modal (not inline footer list).
 
 ## 2026-10-10 — One quality gate: `npm run check`
 
