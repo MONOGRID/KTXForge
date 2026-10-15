@@ -245,7 +245,7 @@ A staged-binary test runs resolved argv for every role and several hidden-value 
 
 **Why:** Catch drift while the change is small; parallel agents especially duplicate helpers. Fallow covers TS, Vue and CSS only, so Rust relies on clippy and `cargo machete`. A hook that calls a global `fallow` breaks without a global install. A clean machine failed at `cargo machete` and at builds with no staged sidecar. Vitest replaced hand-run Node self-tests so those contracts run in CI.
 
-**Revised:** 2026-10-12 — Vitest; `ensure-tools`. 2026-10-14 — the e2e code is typechecked, linted and fallow-checked here; the e2e run itself (`npm run e2e`) is not part of the gate yet.
+**Revised:** 2026-10-12 — Vitest; `ensure-tools`. 2026-10-14 — the e2e code is typechecked, linted and fallow-checked here; the e2e run itself (`npm run e2e`) is not part of the gate yet. 2026-10-15 — Vitest removed; `npm test` is the single Playwright runner (unit + e2e) and is part of `check:web`; `tsc` checks `tests/` via `typecheck:tests`.
 
 ## 2026-10-10 — Releases and updater signing
 
@@ -273,13 +273,13 @@ A staged-binary test runs resolved argv for every role and several hidden-value 
 
 ## 2026-10-14 — End-to-end suite instead of unit tests
 
-**Decided:** Behaviour is tested end to end in `e2e/` with Playwright Test (`npm run e2e`), and the Rust unit tests are removed except the few that check behaviour the suite cannot reach (OS "Open with" argv, workspace cleanup, natural frame order on drop). The suite checks outcomes, not functions:
+**Decided:** Behaviour is tested end to end in `tests/e2e/` with Playwright Test (`npm test`; frontend logic specs live in `tests/unit/`, same runner, `unit` project), and the Rust unit tests are removed except the few that check behaviour the suite cannot reach (OS "Open with" argv, workspace cleanup, natural frame order on drop). The suite checks outcomes, not functions:
 
 1. Seeded random sessions click only the controls `describe_options` shows, pick only offered values, apply every suggestion like the store, and press Encode. `ktx create` must accept the command line.
 2. Valid packs encode to the shape their role promises; invalid packs are flagged by `validate_pack_inputs` and refused before the sidecar.
 3. A corpus written by Khronos' own `ktx create` (formats, codecs, shapes) plus fixtures (KTX1, animation, broken files) is inspected, previewed and exported; LDR previews must equal `ktx extract` texel for texel.
 4. The real frontend runs in Chromium (Vite dev server) with `window.__TAURI_INTERNALS__` bridged to the same Rust: Fit, Actual, Zoom In/Out, Ctrl+wheel, pan, sticky zoom while scrubbing mips, Flip Y, and drop → Encode all → Save in the encoder.
-5. Each option set in the rail must show up in the file (`ktx info`), the encoder preview must equal the file, and goldens (decoded images, header summaries) live in `e2e/__snapshots__` so a `ktx` pin bump shows every change.
+5. Each option set in the rail must show up in the file (`ktx info`), the encoder preview must equal the file, and goldens (decoded images, header summaries) live in `tests/__snapshots__` so a `ktx` pin bump shows every change.
 
 The Rust side runs headless as `ktxforge-e2e` (cargo feature `e2e`, never in release builds): a `MockRuntime` app with the real shell plugin serving the app's commands by their IPC names over stdin/stdout, with `e2e_*` twins only for commands that open a native dialog. The pipeline functions (`sidecar`, `extract_ops`, `info::inspect`, `run_encode`, `export_to`, preview PNG helpers) are generic over `tauri::Runtime` so the same code runs under Wry and the mock. Khronos' `ktx` next to the driver is the oracle; tests never call app code to check app output.
 

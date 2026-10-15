@@ -1,10 +1,10 @@
-import { describe, expect, it } from "vitest";
+import { expect, test } from "@playwright/test";
 import { ref } from "vue";
 import {
   useZoomPan,
   zoomPanTransformStyle,
   type ZoomMode,
-} from "./useZoomPan";
+} from "../../src/shared/useZoomPan";
 
 /**
  * Module-level shared zoom state survives across useZoomPan() calls.
@@ -16,8 +16,8 @@ function api() {
   return useZoomPan(width, height, () => true);
 }
 
-describe("zoomPanTransformStyle", () => {
-  it("centers pan=0 content in the frame at any Fit scale", () => {
+test.describe("zoomPanTransformStyle", () => {
+  test("centers pan=0 content in the frame at any Fit scale", () => {
     const frameW = 800;
     const frameH = 600;
     // Tiny mip, large Fit upscale.
@@ -35,7 +35,7 @@ describe("zoomPanTransformStyle", () => {
     expect(ty).toBe(4);
   });
 
-  it("keeps 1×1 square centering (no %-translate shrink-to-fit trap)", () => {
+  test("keeps 1×1 square centering (no %-translate shrink-to-fit trap)", () => {
     const frameW = 770;
     const frameH = 618;
     const scale = Math.min((frameW - 8) / 1, (frameH - 8) / 1);
@@ -51,14 +51,14 @@ describe("zoomPanTransformStyle", () => {
     expect(frameW - scale - 2 * tx).toBeCloseTo(0, 5);
   });
 
-  it("adds pan on top of the centering offset", () => {
+  test("adds pan on top of the centering offset", () => {
     const style = zoomPanTransformStyle(10, -20, 2, 100, 50, 400, 300);
     expect(style.transform).toBe("translate(110px, 80px) scale(2)");
   });
 });
 
-describe("useZoomPan Fit pan vs content size", () => {
-  it("clears pan when content size changes while in Fit", () => {
+test.describe("useZoomPan Fit pan vs content size", () => {
+  test("clears pan when content size changes while in Fit", () => {
     const width = ref(5);
     const height = ref(4);
     const zoom = useZoomPan(width, height, () => true);
@@ -75,8 +75,8 @@ describe("useZoomPan Fit pan vs content size", () => {
   });
 });
 
-describe("useZoomPan sticky modes", () => {
-  it("Fit and Actual are sticky and mutually exclusive; wheel clears both", () => {
+test.describe("useZoomPan sticky modes", () => {
+  test("Fit and Actual are sticky and mutually exclusive; wheel clears both", () => {
     const zoom = api();
     zoom.zoomFit();
     expect(zoom.zoomMode.value).toBe("fit" satisfies ZoomMode);
@@ -97,7 +97,7 @@ describe("useZoomPan sticky modes", () => {
     expect(zoom.zoomMode.value).toBe("manual");
   });
 
-  it("Actual is 1:1 and Fit follows frame; manual keeps a free scale", () => {
+  test("Actual is 1:1 and Fit follows frame; manual keeps a free scale", () => {
     const width = ref(200);
     const height = ref(100);
     const zoom = useZoomPan(width, height, () => true);

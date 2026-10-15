@@ -5,12 +5,12 @@ import { defineConfig, devices } from "@playwright/test";
 import { repoRoot, resultsDir } from "./support/paths";
 
 /**
- * End-to-end suite: real inputs → the app's Rust pipeline + the bundled `ktx` →
+ * Test suite (`tests/unit` for frontend logic, `tests/e2e` for the rest): real inputs → the app's Rust pipeline + the bundled `ktx` →
  * real output files, checked with Khronos' own `ktx`; plus the real frontend in
  * Chromium with its IPC bridged to the same Rust (`gui.*.spec.ts`).
  */
 export default defineConfig({
-  testDir: "./tests",
+  testDir: ".",
   outputDir: join(resultsDir, "artifacts"),
   globalSetup: "./global-setup.ts",
   fullyParallel: true,
@@ -24,17 +24,19 @@ export default defineConfig({
   ],
   // Snapshots are created on first run and compared afterwards.
   updateSnapshots: "missing",
-  snapshotPathTemplate: "{testDir}/../__snapshots__/{testFilePath}/{arg}{ext}",
+  snapshotPathTemplate: "{testDir}/__snapshots__/{testFilePath}/{arg}{ext}",
   expect: {
     toMatchSnapshot: { maxDiffPixelRatio: 0.01 },
   },
   projects: [
+    // Pure frontend logic (src/); no app, no browser.
+    { name: "unit", testMatch: /unit\/.*\.spec\.ts/ },
     // Inputs → Rust → files; no browser.
-    { name: "pipeline", testIgnore: /gui\./ },
+    { name: "pipeline", testMatch: /e2e\/(?!gui\.).*\.spec\.ts/ },
     // The real frontend in Chromium, IPC bridged to the same Rust.
     {
       name: "gui",
-      testMatch: /gui\..*\.spec\.ts/,
+      testMatch: /e2e\/gui\..*\.spec\.ts/,
       use: { ...devices["Desktop Chrome"], baseURL: "http://127.0.0.1:1420" },
     },
   ],

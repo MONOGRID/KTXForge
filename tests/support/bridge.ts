@@ -17,7 +17,6 @@ declare global {
     /** Delivers an app event to the page's listeners, as Rust's `emit` would. */
     __e2eEmit?: (event: string, payload: unknown) => void;
     __TAURI_INTERNALS__?: unknown;
-    __TAURI_EVENT_PLUGIN_INTERNALS__?: unknown;
   }
 }
 

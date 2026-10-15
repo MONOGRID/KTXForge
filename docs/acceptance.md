@@ -2,7 +2,7 @@
 
 Spec coverage and smoke results for [requirements.md](requirements.md). UI chrome is **accepted** as shipped on `dev` (see decision-context “UI components and theme”). Deferred CLI gaps stay on KTX-Software v4.4.2 per [ktx-cli/README.md](ktx-cli/README.md).
 
-Verified: 2026-10-12. Quality gate: `npm run check` (includes `vitest run`). `fallow suppressions`: none.
+Verified: 2026-10-12. Quality gate: `npm run check` (includes `npm test`). `fallow suppressions`: none.
 
 ---
 

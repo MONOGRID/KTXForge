@@ -1,4 +1,3 @@
-/// <reference types="vitest/config" />
 import vue from "@vitejs/plugin-vue";
 import { resolve } from "node:path";
 import process from "node:process";
@@ -39,9 +38,5 @@ export default defineConfig(() => ({
     watch: {
       ignored: ["**/src-tauri/**"],
     },
-  },
-  test: {
-    environment: "node",
-    include: ["src/**/*.test.ts"],
   },
 }));

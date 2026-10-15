@@ -1,12 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { expect, test } from "@playwright/test";
 import {
   createImageMemoryLru,
   extractSlotsForCores,
   MAX_MEMORY_ENTRIES,
-} from "./imageMemoryLru";
+} from "../../src/inspector/imageMemoryLru";
 
-describe("createImageMemoryLru", () => {
-  it("evicts oldest unpinned entries past the soft cap", () => {
+test.describe("createImageMemoryLru", () => {
+  test("evicts oldest unpinned entries past the soft cap", () => {
     const lru = createImageMemoryLru(MAX_MEMORY_ENTRIES, () => {});
     for (let i = 0; i < 40; i += 1) {
       lru.remember(`k${String(i)}`, `blob:${String(i)}`);
@@ -16,7 +16,7 @@ describe("createImageMemoryLru", () => {
     expect(lru.has("k39")).toBe(true);
   });
 
-  it("lets pinned keys exceed the soft cap until released", () => {
+  test("lets pinned keys exceed the soft cap until released", () => {
     const lru = createImageMemoryLru(MAX_MEMORY_ENTRIES, () => {});
     for (let i = 0; i < 20; i += 1) {
       lru.retain(`p${String(i)}`);
@@ -31,8 +31,8 @@ describe("createImageMemoryLru", () => {
   });
 });
 
-describe("extractSlotsForCores", () => {
-  it("scales to ~80% of cores with floor 1 and cap 16", () => {
+test.describe("extractSlotsForCores", () => {
+  test("scales to ~80% of cores with floor 1 and cap 16", () => {
     expect(extractSlotsForCores(0)).toBe(1);
     expect(extractSlotsForCores(1)).toBe(1);
     expect(extractSlotsForCores(4)).toBe(3);

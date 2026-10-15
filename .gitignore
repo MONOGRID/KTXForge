@@ -26,4 +26,4 @@ src-tauri/binaries/
 .fallow/
 
 # End-to-end suite outputs
-e2e-results/
+test-results/

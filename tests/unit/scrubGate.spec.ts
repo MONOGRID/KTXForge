@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { createScrubGate } from "./scrubGate";
+import { expect, test } from "@playwright/test";
+import { createScrubGate } from "../../src/shared/scrubGate";
 
 function sleep(ms: number): Promise<void> {
   return new Promise((r) => {
@@ -7,8 +7,8 @@ function sleep(ms: number): Promise<void> {
   });
 }
 
-describe("createScrubGate", () => {
-  it("coalesces a stampede to the first run plus the latest key", async () => {
+test.describe("createScrubGate", () => {
+  test("coalesces a stampede to the first run plus the latest key", async () => {
     const gate = createScrubGate();
     let maxInflight = 0;
     let started = 0;

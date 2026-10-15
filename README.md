@@ -68,24 +68,17 @@ On Linux you also need the usual Tauri system packages (`libwebkit2gtk-4.1-dev`,
 
 The same tool install + fetch runs via `precheck:rust` before `npm run check`; `pretauri` only runs `fetch-ktx` (host triple) so release cross-builds stay fast.
 
-Quality gate before commit (Rust fmt/clippy/machete, Vue build/lint/style, Vitest, fallow):
+Quality gate before commit (Rust fmt/clippy/machete, Vue build/lint/style, tests, fallow):
 
 ```bash
 npm run check
 ```
 
-End-to-end tests: real inputs through the app's Rust commands and the bundled `ktx`, checked with Khronos' own `ktx`, plus the real frontend in Chromium bridged to the same Rust. Results and the HTML report land in `e2e-results/`:
+Tests: one Playwright runner, one command. `tests/unit` covers frontend logic; `tests/e2e` runs real inputs through the app's Rust commands and the bundled `ktx`, checked with Khronos' own `ktx`, plus the real frontend in Chromium bridged to the same Rust. Results and the HTML report land in `test-results/`:
 
 ```bash
 npx playwright install chromium   # once per machine
-npm run e2e
-```
-
-Frontend unit tests alone:
-
-```bash
-npm run test          # vitest run
-npm run test:watch    # vitest
+npm test
 ```
 
 Acceptance checklist: [`docs/acceptance.md`](docs/acceptance.md).

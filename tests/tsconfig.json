@@ -1,0 +1,8 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": ["node"]
+  },
+  "include": [".", "../src/bindings", "../src/api/guards.ts", "../src/shared", "../src/inspector/imageMemoryLru.ts", "../src/encoder/presets.ts"]
+}

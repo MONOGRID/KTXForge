@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { matchMenuShortcut } from "./menuShortcuts";
+import { expect, test } from "@playwright/test";
+import { matchMenuShortcut } from "../../src/shared/menuShortcuts";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 
@@ -28,12 +28,8 @@ function chord(
   };
 }
 
-describe("matchMenuShortcut", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it("maps Ctrl chords to menu ids", () => {
+test.describe("matchMenuShortcut", () => {
+  test("maps Ctrl chords to menu ids", () => {
     expect(matchMenuShortcut(chord("KeyO"))).toBe("open");
     expect(matchMenuShortcut(chord("Enter"))).toBe("encode");
     expect(matchMenuShortcut(chord("Period"))).toBe("cancel-encode");
@@ -45,7 +41,7 @@ describe("matchMenuShortcut", () => {
     expect(matchMenuShortcut(chord("Numpad0"))).toBe("zoom-fit");
   });
 
-  it("requires Shift for export and ignores Shift for zoom", () => {
+  test("requires Shift for export and ignores Shift for zoom", () => {
     expect(matchMenuShortcut(chord("KeyE"))).toBeNull();
     expect(matchMenuShortcut(chord("KeyE", { shift: true }))).toBe("export");
     expect(matchMenuShortcut(chord("Equal", { shift: true }))).toBe("zoom-in");
@@ -54,32 +50,41 @@ describe("matchMenuShortcut", () => {
     expect(matchMenuShortcut(chord("NumpadSubtract"))).toBe("zoom-out");
   });
 
-  it("ignores non-primary-mod-only modifiers on non-Mac", () => {
+  test("ignores non-primary-mod-only modifiers on non-Mac", () => {
     expect(matchMenuShortcut(chord("KeyO", { ctrl: false }))).toBeNull();
     expect(matchMenuShortcut(chord("KeyO", { meta: true }))).toBeNull();
     expect(matchMenuShortcut(chord("KeyO", { alt: true }))).toBeNull();
   });
 
-  it("accepts Cmd-only chords on macOS user agents", () => {
-    vi.stubGlobal("navigator", { userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X)" });
-    expect(
-      matchMenuShortcut(
-        chord("Digit0", { ctrl: false, meta: true }),
-      ),
-    ).toBe("zoom-fit");
-    expect(
-      matchMenuShortcut(
-        chord("Equal", { ctrl: false, meta: true }),
-      ),
-    ).toBe("zoom-in");
-    expect(
-      matchMenuShortcut(chord("Digit0", { ctrl: true, meta: false })),
-    ).toBeNull();
+  test("accepts Cmd-only chords on macOS user agents", () => {
+    const original = Object.getOwnPropertyDescriptor(globalThis, "navigator");
+    Object.defineProperty(globalThis, "navigator", {
+      value: { userAgent: "Mozilla/5.0 (Macintosh; Intel Mac OS X)" },
+      configurable: true,
+    });
+    try {
+      expect(
+        matchMenuShortcut(
+          chord("Digit0", { ctrl: false, meta: true }),
+        ),
+      ).toBe("zoom-fit");
+      expect(
+        matchMenuShortcut(
+          chord("Equal", { ctrl: false, meta: true }),
+        ),
+      ).toBe("zoom-in");
+      expect(
+        matchMenuShortcut(chord("Digit0", { ctrl: true, meta: false })),
+      ).toBeNull();
+    } finally {
+      if (original) Object.defineProperty(globalThis, "navigator", original);
+      else Reflect.deleteProperty(globalThis, "navigator");
+    }
   });
 });
 
-describe("menu shortcut wiring", () => {
-  it("keeps SHORTCUT_LOOKUP entries, menu.rs accelerators, and app binds in sync", () => {
+test.describe("menu shortcut wiring", () => {
+  test("keeps SHORTCUT_LOOKUP entries, menu.rs accelerators, and app binds in sync", () => {
     const shortcutTs = read("src/shared/menuShortcuts.ts");
     const requiredEntries = [
       '["KeyO:0", "open"]',

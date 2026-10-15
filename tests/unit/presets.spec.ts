@@ -1,11 +1,11 @@
-import { describe, expect, it } from "vitest";
-import type { EncodePresetOwned } from "../bindings/EncodePresetOwned";
+import { expect, test } from "@playwright/test";
+import type { EncodePresetOwned } from "../../src/bindings/EncodePresetOwned";
 import {
   DEFAULT_ENCODE_PRESET_ID,
   presetsByCategory,
   presetBreadcrumb,
-} from "./presets";
-import type { EncodePresetInfo } from "../bindings/EncodePresetInfo";
+} from "../../src/encoder/presets";
+import type { EncodePresetInfo } from "../../src/bindings/EncodePresetInfo";
 
 function colorOwned(): EncodePresetOwned {
   return {
@@ -39,12 +39,12 @@ function colorOwned(): EncodePresetOwned {
   };
 }
 
-describe("encode presets helpers", () => {
-  it("keeps the stable default id", () => {
+test.describe("encode presets helpers", () => {
+  test("keeps the stable default id", () => {
     expect(DEFAULT_ENCODE_PRESET_ID).toBe("official.color.uastc-rgba");
   });
 
-  it("groups by category and builds breadcrumbs", () => {
+  test("groups by category and builds breadcrumbs", () => {
     const presets = [
       {
         id: "official.color.uastc-rgba",

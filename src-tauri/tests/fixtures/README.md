@@ -1,6 +1,6 @@
 # Test fixtures (KTX-Software v4.4.2)
 
-Small (≤ 64×64) inputs and KTX outputs for the end-to-end suite (`e2e/`). Generated against the official Windows x64 `ktx` from v4.4.2. Do not hand-edit binaries; regenerate from a scratch script if a fixture must change.
+Small (≤ 64×64) inputs and KTX outputs for the end-to-end suite (`tests/`). Generated against the official Windows x64 `ktx` from v4.4.2. Do not hand-edit binaries; regenerate from a scratch script if a fixture must change.
 
 Total size is under 2 MB (~90 KiB as of Wave 0).
 
