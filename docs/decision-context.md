@@ -213,7 +213,7 @@ A staged-binary test runs resolved argv for every role and several hidden-value 
 
 **Why:** Desktop apps expose every primary action with accelerators. Predefined Quit is unsupported on Linux. A macOS menu bar without the app and Edit menus loses copy, paste and hide. WebView2 swallows keys before `TranslateAcceleratorW`, so Windows accelerators shown in the menu did nothing (wry#451 / tauri#6365). Routing the fallback through Rust keeps enablement in one place.
 
-**Revised:** 2026-10-11 — full action set; Windows accelerator fallback.
+**Revised:** 2026-10-11 — full action set; Windows accelerator fallback. 2026-10-15 — every window detaches the menu on `CloseRequested` (`menu::on_window_event`): all windows share one native menu (one HMENU on Windows), and destroying a window with it attached freed it, so a re-opened inspector had no menu bar.
 
 ## 2026-10-04 — Window bounds persistence
 
@@ -229,7 +229,7 @@ A staged-binary test runs resolved argv for every role and several hidden-value 
 
 **Why:** An "Open with" restored the encoder next to the inspector. A never-shown hidden `main` kept the process alive after the inspector closed. When window-state had already shown `main`, the "only if hidden" rule left it up. After an inspector-only start, Open emitted sources to a window that did not exist.
 
-**Revised:** 2026-10-13 — inspector-only cold open. 2026-10-14 — cold open always destroys `main`; File → Open recreates the encoder.
+**Revised:** 2026-10-13 — inspector-only cold open. 2026-10-14 — cold open always destroys `main`; File → Open recreates the encoder. 2026-10-15 — `main` is destroyed only after the inspector window exists: destroying the last window exits the app, and on Windows the inspector was still being built, so a cold open flashed and quit.
 
 ## 2026-10-11 — Error and job feedback surfaces
 
@@ -249,11 +249,11 @@ A staged-binary test runs resolved argv for every role and several hidden-value 
 
 ## 2026-10-10 — Releases and updater signing
 
-**Decided:** semantic-release runs on push to `main`. Development happens on `dev`; `beta` publishes prereleases. Conventional Commits pick the version (`feat` minor, `fix`/`perf` patch, `!` major), but nothing lint-enforces them. semantic-release writes `CHANGELOG.md`, bumps `package.json` (Tauri reads the version there) and `Cargo.toml`, tags, and creates a **draft** GitHub Release; the tauri-action matrix uploads to it and a final job publishes. The updater checks `releases/latest/download/latest.json`. The minisign private key lives in 1Password (vault Tech, item "KTXForge Tauri updater signing key", no password) and is mirrored to the `TAURI_SIGNING_PRIVATE_KEY` GitHub secret; local signed builds read it with `op` (`npm run tauri:build:signed`). Only the public key is committed. Flow: [updater-signing.md](updater-signing.md). `plugins.updater` in `tauri.conf.json` must be an object even when empty, or plugin init panics.
+**Decided:** semantic-release runs on push to `main`. Development happens on `dev`; `beta` publishes prereleases. Conventional Commits pick the version (`feat` minor, `fix`/`perf` patch, `!` major), but nothing lint-enforces them. semantic-release writes `CHANGELOG.md`, bumps `package.json` (Tauri reads the version there) and `Cargo.toml`, tags, and creates a **draft** GitHub Release; the tauri-action matrix uploads to it and a final job publishes. The updater checks `releases/latest/download/latest.json`. The minisign private key lives in 1Password (vault Tech, item "KTXForge Tauri updater signing key", no password) and is mirrored to the `TAURI_SIGNING_PRIVATE_KEY` GitHub secret; local signed builds read it with `op` (`npm run tauri:build:signed`). Only the public key is committed. Flow: [updater-signing.md](updater-signing.md). `plugins.updater` in `tauri.conf.json` must be an object even when empty, or plugin init panics. The launch-time check only logs failures (offline, private repo, no release); Help → Check for Updates reports them. The banner offers Install only when an update was actually found, and can be dismissed.
 
 **Why:** The user wanted commit-driven changelogs with a familiar tool; release-please adds a release-PR step nobody asked for. The draft stays unpublished until every platform has built, so `releases/latest` never lacks artifacts. commitlint's line-length rule failed on semantic-release's own changelog commit and blocked a release. A GitHub-only secret could not be recovered for local signed builds.
 
-**Revised:** 2026-10-11 — CI/release workflows; key generated. 2026-10-12 — key moved to 1Password. 2026-10-13 — husky and commitlint removed.
+**Revised:** 2026-10-11 — CI/release workflows; key generated. 2026-10-12 — key moved to 1Password. 2026-10-13 — husky and commitlint removed. 2026-10-15 — launch check silent on failure; Install only for a found update.
 
 ## 2026-10-12 — Git LFS for binaries
 

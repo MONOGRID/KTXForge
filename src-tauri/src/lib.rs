@@ -58,6 +58,8 @@ pub fn run() {
         .on_window_event(|window, event| {
             drop::on_window_event(window, event);
             window_bounds::on_window_event(window, event);
+            #[cfg(desktop)]
+            menu::on_window_event(window, event);
         });
 
     #[cfg(desktop)]

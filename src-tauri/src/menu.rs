@@ -136,6 +136,22 @@ pub fn ensure_app_menu_on_window(app: &AppHandle, window: &WebviewWindow) {
     }
 }
 
+/// Detach the app menu from a window that is about to close.
+///
+/// Every window shares one native menu (a single HMENU on Windows, one item set
+/// on GTK). Destroying a window with the menu still attached frees it, so the
+/// next window (a re-opened inspector) came up with no menu bar. Close-requested
+/// handlers run synchronously before the window is destroyed.
+#[cfg(desktop)]
+pub fn on_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
+    #[cfg(not(target_os = "macos"))]
+    if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
+        let _ = window.remove_menu();
+    }
+    #[cfg(target_os = "macos")]
+    let _ = (window, event);
+}
+
 #[cfg(desktop)]
 pub fn on_menu_event(app: &AppHandle, event: &tauri::menu::MenuEvent) {
     handle_menu_id(app, event.id().as_ref());
@@ -215,9 +231,7 @@ pub fn handle_menu_id(app: &AppHandle, item: &str) {
     }
     if item == id::CHECK_UPDATE {
         let app = app.clone();
-        tauri::async_runtime::spawn(async move {
-            let _ = updater::run_update_check(app).await;
-        });
+        tauri::async_runtime::spawn(updater::run_update_check(app));
     }
 }
 

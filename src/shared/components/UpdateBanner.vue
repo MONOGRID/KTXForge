@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Download } from "@lucide/vue";
+import { Download, X } from "@lucide/vue";
 import { computed, onMounted, onUnmounted, ref } from "vue";
 import { call } from "../../api/commands";
 import { subscribe } from "../../api/events";
@@ -11,20 +11,16 @@ const status = ref<UpdateStatusPayload | null>(null);
 const retainedVersion = ref<string | null>(null);
 const retainedNotes = ref<string | null>(null);
 const installing = ref(false);
+const dismissed = ref(false);
 
 let stopStatus: (() => void) | undefined;
 
-const visible = computed((): boolean => {
-  const current = status.value;
-  if (current === null) {
-    return false;
-  }
-  return (
-    current.state === "available" ||
-    current.state === "downloading" ||
-    current.state === "error"
-  );
-});
+const visible = computed(
+  (): boolean =>
+    !dismissed.value &&
+    status.value !== null &&
+    status.value.state !== "installed",
+);
 
 const displayVersion = computed((): string | null => {
   const fromStatus = status.value?.version ?? null;
@@ -55,6 +51,15 @@ const errorMessage = computed((): string | null => {
   return current.message ?? "Update failed";
 });
 
+/** An update was actually found; a failed check alone offers nothing to install. */
+const canInstall = computed((): boolean => {
+  const state = status.value?.state;
+  return (
+    retainedVersion.value !== null &&
+    (state === "available" || state === "error")
+  );
+});
+
 const installDisabled = computed((): boolean => {
   return installing.value || status.value?.state === "downloading";
 });
@@ -64,6 +69,7 @@ function applyStatus(payload: UpdateStatusPayload): void {
   retainedVersion.value = payload.version ?? retainedVersion.value;
   retainedNotes.value = payload.notes ?? retainedNotes.value;
   installing.value = payload.state === "downloading";
+  dismissed.value = false;
 }
 
 onMounted(() => {
@@ -106,7 +112,7 @@ async function onInstall(): Promise<void> {
             Update {{ displayVersion }} available
           </template>
           <template v-else>
-            Update available
+            Could not check for updates
           </template>
         </div>
         <p
@@ -116,19 +122,33 @@ async function onInstall(): Promise<void> {
           {{ displayNotes }}
         </p>
       </div>
-      <Button
-        v-if="status?.state === 'available' || status?.state === 'error'"
-        variant="primary"
-        type="button"
-        :disabled="installDisabled"
-        @click="onInstall"
-      >
-        <Download
-          class="size-4 shrink-0"
-          aria-hidden="true"
-        />
-        Install and restart
-      </Button>
+      <div class="flex shrink-0 items-center gap-2">
+        <Button
+          v-if="canInstall"
+          variant="primary"
+          type="button"
+          :disabled="installDisabled"
+          @click="onInstall"
+        >
+          <Download
+            class="size-4 shrink-0"
+            aria-hidden="true"
+          />
+          Install and restart
+        </Button>
+        <button
+          type="button"
+          class="btn shrink-0 px-1.5 py-0.5"
+          aria-label="Dismiss"
+          :disabled="status?.state === 'downloading'"
+          @click="dismissed = true"
+        >
+          <X
+            class="size-3.5"
+            aria-hidden="true"
+          />
+        </button>
+      </div>
     </div>
 
     <ProgressBar

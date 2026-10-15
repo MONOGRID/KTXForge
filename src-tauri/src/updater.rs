@@ -13,16 +13,36 @@ pub fn setup_updater<R: Runtime>(app: &AppHandle<R>) {
         return;
     }
 
+    // A failed launch check (offline, private repo, no release yet) is not
+    // something the user asked about: log it and stay quiet.
     let handle = app.clone();
     tauri::async_runtime::spawn(async move {
-        let _ = run_update_check(handle).await;
+        if let Err(msg) = check_and_announce(&handle).await {
+            eprintln!("ktxforge: update check failed: {msg}");
+        }
     });
 }
 
+/// Help → Check for Updates: same check, but a failure is reported to the user.
+pub async fn run_update_check<R: Runtime>(app: AppHandle<R>) {
+    if let Err(msg) = check_and_announce(&app).await {
+        let _ = app.emit(
+            UPDATE_STATUS,
+            UpdateStatusPayload {
+                state: UpdateState::Error,
+                version: None,
+                notes: None,
+                downloaded: None,
+                total: None,
+                message: Some(msg),
+            },
+        );
+    }
+}
+
 /// Check GitHub Releases and emit `update://status` when an update is available.
-pub async fn run_update_check<R: Runtime>(app: AppHandle<R>) -> Result<(), String> {
+async fn check_and_announce<R: Runtime>(app: &AppHandle<R>) -> Result<(), String> {
     if cfg!(debug_assertions) {
-        let _ = app;
         return Ok(());
     }
     let updater = match app.updater() {
@@ -39,18 +59,7 @@ pub async fn run_update_check<R: Runtime>(app: AppHandle<R>) -> Result<(), Strin
             if is_missing_updater_config(&msg) {
                 return Ok(());
             }
-            let _ = app.emit(
-                UPDATE_STATUS,
-                UpdateStatusPayload {
-                    state: UpdateState::Error,
-                    version: None,
-                    notes: None,
-                    downloaded: None,
-                    total: None,
-                    message: Some(msg),
-                },
-            );
-            return Ok(());
+            return Err(msg);
         }
     };
 

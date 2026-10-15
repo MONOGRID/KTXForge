@@ -75,13 +75,16 @@ fn open_ktx_paths(app: &AppHandle, paths: Vec<PathBuf>, suppress: SuppressMain) 
     let Some(path) = paths.into_iter().next() else {
         return;
     };
-    suppress_encoder_window(app, suppress);
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
         let state = app.state::<AppState>();
         if let Err(e) = inspector_window::open_inspector_path(&app, state.inner(), path).await {
             eprintln!("os open inspector: {e}");
         }
+        // Only after the inspector exists: destroying the last window exits the
+        // app. On Windows `main` was gone before the inspector finished building,
+        // so a cold open flashed the inspector and quit.
+        suppress_encoder_window(&app, suppress);
     });
 }
 
@@ -103,10 +106,10 @@ fn suppress_encoder_window(app: &AppHandle, suppress: SuppressMain) {
         }
     };
     if drop {
-        // Detach the app menu before destroy. On Windows, DestroyWindow frees the
-        // window's HMENU; on GTK, tearing down the window destroys the menubar
-        // widgets. Either way the shared app-wide Menu becomes unusable and the
-        // inspector that opens next would have no menu bar.
+        // Detach the app menu before destroy (`destroy` skips CloseRequested, so
+        // `menu::on_window_event` does not run). On Windows, DestroyWindow frees
+        // the shared HMENU; on GTK, tearing down the window destroys the menubar
+        // widgets. Either way the inspector would lose its menu bar.
         #[cfg(desktop)]
         {
             let _ = main.remove_menu();
