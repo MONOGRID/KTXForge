@@ -17,7 +17,6 @@ import ImageViewer from "./components/viewer/ImageViewer.vue";
 import MipStrip from "./components/viewer/MipStrip.vue";
 import SubresourceSelectors from "./components/viewer/SubresourceSelectors.vue";
 import { bindMenuShortcuts } from "../shared/menuShortcuts";
-import { bindMenuZoomFocusGate } from "../shared/menuZoomFocus";
 import { bindInspectorMenu } from "./menuBridge";
 import {
   displayValue,
@@ -57,19 +56,16 @@ const isLoading = computed((): boolean => loading.value);
 
 let unbindMenu: (() => void) | undefined;
 let unbindShortcuts: (() => void) | undefined;
-let unbindZoomFocus: (() => void) | undefined;
 
 onMounted(() => {
   unbindMenu = bindInspectorMenu();
   unbindShortcuts = bindMenuShortcuts();
-  unbindZoomFocus = bindMenuZoomFocusGate();
   void initInspectorStore();
 });
 
 onUnmounted(() => {
   unbindMenu?.();
   unbindShortcuts?.();
-  unbindZoomFocus?.();
 });
 </script>
 

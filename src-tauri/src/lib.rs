@@ -55,6 +55,7 @@ pub fn run() {
         .manage(AppState::default())
         .manage(PendingEncoderSources::default())
         .manage(PendingUpdate::default())
+        .manage(menu::ZoomTarget::default())
         .on_window_event(|window, event| {
             drop::on_window_event(window, event);
             window_bounds::on_window_event(window, event);

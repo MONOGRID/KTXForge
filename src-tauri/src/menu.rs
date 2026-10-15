@@ -1,7 +1,10 @@
 //! Native application menu (File / View / Help, plus macOS app/Edit menus).
 
-use tauri::{AppHandle, Emitter, WebviewWindow};
+use std::sync::Mutex;
 
+use tauri::{AppHandle, Emitter, Manager, WebviewWindow};
+
+use crate::commands::inspector_window::INSPECTOR_LABEL;
 use crate::commands::{encoder, encoder_window};
 use crate::error::AppError;
 use crate::events::{DropRejectedPayload, MenuAction, ENCODER_DROP_REJECTED, MENU_ACTION};
@@ -136,6 +139,41 @@ pub fn ensure_app_menu_on_window(app: &AppHandle, window: &WebviewWindow) {
     }
 }
 
+/// Label of the window View → Zoom applies to: the last app window to gain focus.
+///
+/// Tracked from Rust window events, which exist from the window's first frame.
+/// The webview used to track this itself and started out ineligible when its
+/// first focus landed before the listener did (an inspector opened from the OS),
+/// so zoom did nothing until a dialog bounced focus.
+#[derive(Default)]
+pub struct ZoomTarget(Mutex<Option<String>>);
+
+pub fn set_zoom_target(app: &AppHandle, label: &str) {
+    if let Some(target) = app.try_state::<ZoomTarget>() {
+        if let Ok(mut guard) = target.0.lock() {
+            *guard = Some(label.to_owned());
+        }
+    }
+}
+
+/// The stored target if that window still exists, else the first visible viewer.
+fn zoom_target(app: &AppHandle) -> Option<String> {
+    let stored = app
+        .try_state::<ZoomTarget>()
+        .and_then(|target| target.0.lock().ok().and_then(|guard| guard.clone()));
+    stored
+        .filter(|label| app.get_webview_window(label).is_some())
+        .or_else(|| {
+            [INSPECTOR_LABEL, "main"]
+                .into_iter()
+                .find(|label| {
+                    app.get_webview_window(label)
+                        .is_some_and(|w| w.is_visible().unwrap_or(false))
+                })
+                .map(str::to_owned)
+        })
+}
+
 /// Detach the app menu from a window that is about to close.
 ///
 /// Every window shares one native menu (a single HMENU on Windows, one item set
@@ -144,12 +182,15 @@ pub fn ensure_app_menu_on_window(app: &AppHandle, window: &WebviewWindow) {
 /// handlers run synchronously before the window is destroyed.
 #[cfg(desktop)]
 pub fn on_window_event(window: &tauri::Window, event: &tauri::WindowEvent) {
+    // Only focus gains move the target: a native menu (GTK) blurs the window
+    // while open, and that blur must not move zoom elsewhere.
+    if matches!(event, tauri::WindowEvent::Focused(true)) {
+        set_zoom_target(window.app_handle(), window.label());
+    }
     #[cfg(not(target_os = "macos"))]
     if matches!(event, tauri::WindowEvent::CloseRequested { .. }) {
         let _ = window.remove_menu();
     }
-    #[cfg(target_os = "macos")]
-    let _ = (window, event);
 }
 
 #[cfg(desktop)]
@@ -214,19 +255,19 @@ pub fn handle_menu_id(app: &AppHandle, item: &str) {
         return;
     }
     if item == id::ZOOM_IN {
-        emit_action(app, MenuAction::ZoomIn);
+        emit_zoom(app, MenuAction::ZoomIn);
         return;
     }
     if item == id::ZOOM_OUT {
-        emit_action(app, MenuAction::ZoomOut);
+        emit_zoom(app, MenuAction::ZoomOut);
         return;
     }
     if item == id::ZOOM_ACTUAL {
-        emit_action(app, MenuAction::ZoomActual);
+        emit_zoom(app, MenuAction::ZoomActual);
         return;
     }
     if item == id::ZOOM_FIT {
-        emit_action(app, MenuAction::ZoomFit);
+        emit_zoom(app, MenuAction::ZoomFit);
         return;
     }
     if item == id::CHECK_UPDATE {
@@ -238,6 +279,14 @@ pub fn handle_menu_id(app: &AppHandle, item: &str) {
 #[cfg(desktop)]
 fn emit_action(app: &AppHandle, action: MenuAction) {
     let _ = app.emit(MENU_ACTION, action);
+}
+
+/// Zoom goes to one window only, so encoder and inspector never zoom together.
+#[cfg(desktop)]
+fn emit_zoom(app: &AppHandle, action: MenuAction) {
+    if let Some(label) = zoom_target(app) {
+        let _ = app.emit_to(label.as_str(), MENU_ACTION, action);
+    }
 }
 
 fn find_menu_item(app: &AppHandle, id: &str) -> Option<tauri::menu::MenuItem<tauri::Wry>> {
@@ -271,7 +320,13 @@ pub fn set_menu_item_enabled(app: AppHandle, id: String, enabled: bool) -> Resul
 /// (wry#451). The frontend keydown fallback calls this so enablement and
 /// handlers stay identical to a real menu activation.
 #[tauri::command]
-pub fn dispatch_menu_action(app: AppHandle, id: String) -> Result<(), AppError> {
+pub fn dispatch_menu_action(
+    app: AppHandle,
+    window: WebviewWindow,
+    id: String,
+) -> Result<(), AppError> {
+    // The keydown came from this window, whatever focus events said.
+    set_zoom_target(&app, window.label());
     let Some(mi) = find_menu_item(&app, id.as_str()) else {
         return Ok(());
     };

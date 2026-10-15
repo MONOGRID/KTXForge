@@ -5,6 +5,8 @@
  * menus, dialogs, notifications, window focus) is answered here.
  */
 import type { Page } from "@playwright/test";
+// Declares `window.__TAURI_EVENT_PLUGIN_INTERNALS__`, which the bridge fakes.
+import type {} from "@tauri-apps/api/event";
 import type { MenuAction } from "../../src/bindings/MenuAction";
 import type { Ipc, Json, Outcome } from "./ipc";
 

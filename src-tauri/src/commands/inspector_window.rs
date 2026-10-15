@@ -49,6 +49,10 @@ pub async fn open_inspector_path(
         path: path.to_string_lossy().into_owned(),
     };
 
+    // Opening the inspector is where the user is looking now, even if the OS
+    // never reports focus for it (a drop keeps the encoder active on Windows).
+    crate::menu::set_zoom_target(app, INSPECTOR_LABEL);
+
     if let Some(window) = app.get_webview_window(INSPECTOR_LABEL) {
         let _ = window.set_title(&title);
         let _ = window.set_focus();

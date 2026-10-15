@@ -23,6 +23,7 @@ pub async fn deliver_sources(app: &AppHandle, sources: Vec<SourceInfo>) -> Resul
     if sources.is_empty() {
         return Ok(());
     }
+    crate::menu::set_zoom_target(app, ENCODER_LABEL);
 
     if let Some(window) = app.get_webview_window(ENCODER_LABEL) {
         clear_pending(app)?;

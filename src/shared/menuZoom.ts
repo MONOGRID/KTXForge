@@ -1,5 +1,4 @@
 import type { MenuAction } from "../bindings/MenuAction";
-import { isMenuZoomWindowFocused } from "./menuZoomFocus";
 import { getViewerControls, type ViewerControls } from "./viewerControls";
 
 const ZOOM_BY_ACTION = {
@@ -24,16 +23,13 @@ function isZoomMenuAction(action: MenuAction): action is ZoomMenuAction {
 }
 
 /**
- * Handle View-menu zoom actions when this window is the menu-zoom target
- * (last focused among app windows; see `menuZoomFocus`).
- * Returns true when `action` was a zoom command (handled or ignored).
+ * Handle View-menu zoom actions. Rust emits them only to the target window
+ * (`menu::ZoomTarget`), so receiving one means this window should zoom.
+ * Returns true when `action` was a zoom command.
  */
 export function applyZoomMenuAction(action: MenuAction): boolean {
   if (!isZoomMenuAction(action)) {
     return false;
-  }
-  if (!isMenuZoomWindowFocused()) {
-    return true;
   }
   const viewer = getViewerControls();
   if (viewer !== null) {

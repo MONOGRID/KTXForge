@@ -192,12 +192,12 @@ A staged-binary test runs resolved argv for every role and several hidden-value 
 - The encoder compares source and encoded output with a vertical wipe in one frame, not side by side. The wipe clips in frame space so the cut stays under the handle while panning. Both layers fill a shared canvas.
 - `composeCubemapCross` composites the classic face cross on a canvas (encoder: one cross per wipe side; inspector: **Cross** or a single face).
 - `DepthVolumeView` shows depth slices as a CSS 3D `preserve-3d` stack with drag orbit; the 2D viewport shows the highlighted slice. No WebGL.
-- View menu zoom actions go only to the focused window (`document.hasFocus()`).
+- View menu zoom actions go to one window, chosen in Rust (`menu::ZoomTarget`): the last window whose `Focused(true)` event fired, the window that sent a keyboard shortcut (`dispatch_menu_action`), or the window just opened by an inspector open or an encoder Open; `emit_to` delivers only there. Blur never moves the target, because a GTK menu blurs its window while open.
 - Inspector-only display **Flip Y** (CSS, persisted with `useLocalStorage`, default off); export never bakes it in.
 
 **Why:** One transform implementation for both windows. A wipe is a clearer quality compare than two boxes scaled separately. Clip-path on the transformed image moved the cut away from the handle. Re-fitting on every size change threw away the user's zoom while scrubbing. A CSS stack gives a spatial overview without a second rendering stack. Centring alone left the image at a fractional position (the frame itself sits at a sub-pixel layout offset), so Actual size resampled every texel.
 
-**Revised:** 2026-10-11 — role-aware preview, CSS3D volume, sticky zoom. 2026-10-13 — Flip Y. 2026-10-14 — inspector Cross vs single face; Flip Y default off; device-pixel snapping.
+**Revised:** 2026-10-11 — role-aware preview, CSS3D volume, sticky zoom. 2026-10-13 — Flip Y. 2026-10-14 — inspector Cross vs single face; Flip Y default off; device-pixel snapping. 2026-10-15 — zoom routing moved from a webview focus gate to Rust: the webview read focus on mount and then relied on focus-change events, so a new inspector (OS open or drop) that got focus before its listener existed never zoomed until a dialog bounced focus.
 
 ## 2026-10-11 — UI components and theme
 

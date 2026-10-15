@@ -119,19 +119,9 @@ test.describe("menu shortcut wiring", () => {
     expect(read("src/inspector/InspectorApp.vue")).toContain(
       "bindMenuShortcuts",
     );
-    expect(read("src/encoder/EncoderApp.vue")).toContain(
-      "bindMenuZoomFocusGate",
-    );
-    expect(read("src/inspector/InspectorApp.vue")).toContain(
-      "bindMenuZoomFocusGate",
-    );
-    expect(read("src/shared/menuZoom.ts")).toContain(
-      "isMenuZoomWindowFocused",
-    );
+    // Zoom routing lives in Rust: emitted only to the target window.
+    expect(menuRs).toContain("ZoomTarget");
+    expect(menuRs).toContain("emit_to");
     expect(read("src/shared/menuZoom.ts")).not.toContain("document.hasFocus");
-    expect(read("src/shared/menuZoomFocus.ts")).toContain(
-      "nextMenuZoomEligibility",
-    );
-    expect(read("src/shared/menuZoomFocus.ts")).toContain("getAllWindows");
   });
 });
