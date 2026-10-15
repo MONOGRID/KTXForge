@@ -14,3 +14,5 @@
 *.ttf filter=lfs diff=lfs merge=lfs -text
 *.otf filter=lfs diff=lfs merge=lfs -text
 *.eot filter=lfs diff=lfs merge=lfs -text
+# Playwright compares snapshots byte for byte and writes LF; keep CRLF checkouts (Windows autocrlf) from failing them.
+tests/__snapshots__/**/*.json text eol=lf
