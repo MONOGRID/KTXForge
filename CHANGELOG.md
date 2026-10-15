@@ -1,3 +1,17 @@
+## [1.1.1](https://github.com/MONOGRID/KTXForge/compare/v1.1.0...v1.1.1) (2026-10-14)
+
+### Bug Fixes
+
+* "Fit" mode horizontal centering in low res images now works correctly ([2534569](https://github.com/MONOGRID/KTXForge/commit/2534569ddb44b9aa18482f6d380117073a51d088))
+* BasisLZ animations, 16-bit previews, 1:1 view and linear presets ([6c5c0c1](https://github.com/MONOGRID/KTXForge/commit/6c5c0c1cf711828dc359c3469c597547d9e78deb))
+* correctly export all cubemap faces when "all frames at current levels" is selected in inspector ([4ee6106](https://github.com/MONOGRID/KTXForge/commit/4ee61066e10d89935bf18608cafd0073757a4c1a))
+* cubemap faces selector now is mutually exclusive with cross ([609511c](https://github.com/MONOGRID/KTXForge/commit/609511c9a66939d9bdfee0300a9b48fcb97273e7))
+* encoder-inspector interoperability fixed, for example encoder can be opened by inspector "Open.." ([8489569](https://github.com/MONOGRID/KTXForge/commit/8489569f3a1b95cd9753eff47a65f8cf802338b8))
+* export logs with dedicated UI, no longer clutters main UI ([96a910a](https://github.com/MONOGRID/KTXForge/commit/96a910ae6e163ba5a75a5f4a7009a7f3820b67ee))
+* native menu appears on inspector window on os file association open ([faaf6b9](https://github.com/MONOGRID/KTXForge/commit/faaf6b91c41520fac6c700f593ecd0cf03c61e93))
+* options rules never build a ktx create command line the tool rejects ([c021c7e](https://github.com/MONOGRID/KTXForge/commit/c021c7ea4803f124aac1a11fd8b86a07ccdb18d4))
+* when opening small files in big viewports and using "Fit" , the images are now centered correctly ([af6a788](https://github.com/MONOGRID/KTXForge/commit/af6a7889c42641e84ef1ad4c6b01e6e267ead120))
+
 ## [1.1.0](https://github.com/MONOGRID/KTXForge/compare/v1.0.0...v1.1.0) (2026-10-13)
 
 ### Features
