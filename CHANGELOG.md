@@ -1,3 +1,10 @@
+## [1.1.2](https://github.com/MONOGRID/KTXForge/compare/v1.1.1...v1.1.2) (2026-10-17)
+
+### Bug Fixes
+
+* OS open no longer quits on Windows, menu survives closing a window, update banner only offers real updates ([2f58999](https://github.com/MONOGRID/KTXForge/commit/2f58999416e0186552f264196aacb014cbae8d96))
+* View zoom menu and shortcuts work in a newly opened inspector ([09f5817](https://github.com/MONOGRID/KTXForge/commit/09f5817f31245b7d9394432f5ed7923bb38bb770))
+
 ## [1.1.1](https://github.com/MONOGRID/KTXForge/compare/v1.1.0...v1.1.1) (2026-10-14)
 
 ### Bug Fixes
