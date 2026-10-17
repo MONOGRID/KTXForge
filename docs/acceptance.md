@@ -18,7 +18,7 @@ Verified: 2026-10-12. Quality gate: `npm run check` (includes `npm test`). `fall
 | 6 | KTX inspector window (+ OS open) | `inspector_window.rs`, `os_open.rs`, `fileAssociations`, `InspectorApp.vue` | T7.2; `os_open` argv/URL unit tests; associations need installed bundle smoke | pass |
 | 7 | Multi-frame + anim metadata | `AnimationSection.vue`, `ktx/anim.rs`, encode pipeline | `writes_anim_data_*`, `encode_animation_frames_writes_anim_key` | pass |
 | 8 | Mipmap preview | `MipStrip.vue`, `PreviewIndexSliders.vue`, `inspector_image` | T7.2; extract/inspect staged-binary tests | pass |
-| 9 | Responsive UI | async commands, scrub gate, extract concurrency | Vitest `scrubGate`; decision-context extract slots | pass |
+| 9 | Responsive UI | async commands, scrub gate, extract concurrency | Playwright `scrubGate.spec.ts`; decision-context extract slots | pass |
 | 10 | Heavy work in Rust | `src-tauri/src/{ktx,image,commands}` | Architecture + fallow/TS not calling shell | pass |
 | 11 | Vue visualization only | `src/api/commands.ts`, `events.ts` | Code review / API wrappers | pass |
 
@@ -50,19 +50,19 @@ Verified: 2026-10-12. Quality gate: `npm run check` (includes `npm test`). `fall
 | Area | Where | Verified | Status |
 | --- | --- | --- | --- |
 | Status / header / level index / index / DFD / known KV / other KV / Basis global / KTX1 text | `info.rs`, `info_types.rs`; `StatusPanel`, `HeaderPanel`, `LevelIndexTable`, `IndexPanel`, `DfdPanel`, `KnownMetadataPanel`, `KeyValueTable`, `BasisGlobalDataPanel`, `Ktx1TextPanel` | sample JSON deserialize; `anim_info_has_ktx_anim_data` | pass |
-| Image viewer, mips, faces, layers, depth, frame player | `ImageViewer`, `MipStrip`, `SubresourceSelectors`, `FramePlayer`; `imageCache.ts` | Vitest LRU/slots; T7.2 | pass |
+| Image viewer, mips, faces, layers, depth, frame player | `ImageViewer`, `MipStrip`, `SubresourceSelectors`, `FramePlayer`; `imageCache.ts` | Playwright LRU/slots (`imageMemoryLru.spec.ts`); T7.2 | pass |
 | Export PNG/JPEG/EXR | `commands/export.rs`, `ExportPanel.vue` | `export_anim_frames_as_jpeg_via_staged_binary` | pass |
-| Windows menu shortcut fallback | `menu.rs`, `menuShortcuts.ts` | Vitest `menuShortcuts.test.ts` | pass |
+| Windows menu shortcut fallback | `menu.rs`, `menuShortcuts.ts` | Playwright `menuShortcuts.spec.ts` | pass |
 
 ---
 
-## Frontend unit tests (Vitest)
+## Frontend unit tests (Playwright, `tests/unit`)
 
 | Suite | Covers |
 | --- | --- |
-| `src/shared/scrubGate.test.ts` | Latest-only scrub coalesce under stampede |
-| `src/shared/menuShortcuts.test.ts` | Matcher chords + sync with `menu.rs` / apps |
-| `src/inspector/imageMemoryLru.test.ts` | Soft-cap LRU, pins, `extractSlotsForCores` |
+| `tests/unit/scrubGate.spec.ts` | Latest-only scrub coalesce under stampede |
+| `tests/unit/menuShortcuts.spec.ts` | Matcher chords + sync with `menu.rs` / apps |
+| `tests/unit/imageMemoryLru.spec.ts` | Soft-cap LRU, pins, `extractSlotsForCores` |
 
 ---
 
