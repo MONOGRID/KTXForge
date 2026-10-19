@@ -274,6 +274,20 @@ function fixLoaderPath(bin, triple) {
   return triple.includes("linux") ? patchelfRpath(bin, rpaths) : machoRpath(bin, rpaths);
 }
 
+/**
+ * The upstream dylib keeps Khronos's Team ID signature, while the sidecars are
+ * ad hoc signed (no Team ID). Library validation then refuses to map it
+ * ("different Team IDs"). Re-sign it ad hoc so both sides match. Idempotent.
+ */
+function adhocSignLibs(cfg, triple) {
+  if (!triple.includes("apple-darwin")) {
+    return;
+  }
+  for (const libRel of cfg.libs || []) {
+    run("codesign", ["--force", "--sign", "-", join(binariesDir, libName(libRel))]);
+  }
+}
+
 function verifyStaged(bin) {
   const { ok, text } = reportedVersion(bin);
   if (!ok) {
@@ -290,6 +304,7 @@ async function extractAndStage(triple, cfg, version, isWindows) {
   extractArchive(cfg.extract, assetPath, extractDir);
 
   stageLibs(extractDir, cfg.libs || [], isWindows);
+  adhocSignLibs(cfg, triple);
   for (const tool of SIDECARS) {
     const out = stagedToolPath(tool, triple, isWindows);
     copyExecutable(findInTree(extractDir, archiveToolPath(cfg.ktxPath, tool)), out, isWindows);
@@ -321,6 +336,7 @@ async function stageTarget(triple) {
   mkdirSync(cacheDir, { recursive: true });
 
   if (alreadyStaged(outPaths, cfg.libs || [], manifest.version)) {
+    adhocSignLibs(cfg, triple);
     refreshStaged(outPaths, triple);
     return;
   }

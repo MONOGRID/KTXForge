@@ -74,7 +74,7 @@ The rpath step is idempotent and runs on already-staged binaries. Darwin `.pkg` 
 
 **Why:** `externalBin` copies executables only. A Linux .deb/.rpm without the library made both sidecars exit 127; the AppImage only worked by picking up a host copy. Resources are Tauri's supported path for non-executables on Windows and Linux, and `/usr/lib/<productName>/` is the per-app directory Tauri owns. On macOS the bundler signs only frameworks and binaries, so a dylib in `Contents/MacOS` breaks signing and arm64 loading. `7z x` stops at the xar and leaves the binary inside a gzip+cpio Payload. The soname a binary `NEEDED`s is a symlink, so a walk over regular files never finds it.
 
-**Revised:** 2026-10-12 — added `ktx2ktx2` (KTX1 preview/export only worked from a dev checkout) and shipped `libktx` in every installer.
+**Revised:** 2026-10-19 — macOS: `fetch-ktx` also re-signs `libktx.4.dylib` ad hoc; the upstream Khronos Team ID signature made dyld refuse it for the ad hoc sidecars ("different Team IDs"). 2026-10-12 — added `ktx2ktx2` (KTX1 preview/export only worked from a dev checkout) and shipped `libktx` in every installer.
 
 ## 2026-10-10 — Sidecar process lifecycle and temp workspace
 
